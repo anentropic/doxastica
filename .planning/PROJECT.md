@@ -31,9 +31,11 @@ deferred, the formal core and its property-test suite must be right.
 
 <!-- Current scope. Building toward these. All hypotheses until shipped. -->
 
-- [ ] `BeliefStore` Protocol implemented against an **injected** LadybugDB connection +
-      namespace prefix (library never opens its own file in production; tests use private
-      throwaway databases)
+- [ ] `BeliefStore` Protocol implemented against LadybugDB with a **flexible connection
+      model**: accept an **injected** connection + namespace prefix (NVM's primary need —
+      it owns the handle and leases it under label tenancy), *and* be able to open/manage
+      its own connection for standalone and other usages. Tests use private throwaway
+      databases.
 - [ ] **Scopes** as named belief-holders, including a privileged **world scope** where
       `contract()` is an error (append-only / no-retcon enforcement point)
 - [ ] **`Belief` / `BeliefState` split** — stable identity + immutable, append-only
@@ -114,9 +116,11 @@ deferred, the formal core and its property-test suite must be right.
   serialization for free.
 - **Tooling**: `cookiecutter-python-uv-library` template — basedpyright strict typing,
   ruff lint/format, pytest + coverage, pre-commit, git-cliff changelog, GitHub Actions.
-- **Storage**: pinned to LadybugDB / Cypher. Connection is **injected**
-  (`MemoryCore(db_connection, namespace_prefix)`); the library never opens its own file in
-  production.
+- **Storage**: pinned to LadybugDB / Cypher (`ladybugdb`, https://github.com/LadybugDB/ladybug,
+  a uv dependency). **Flexible connection**: `MemoryCore` accepts an injected connection +
+  namespace prefix (NVM leases it under label tenancy) *and* can open/manage its own
+  connection for standalone use. The DI seam stays NVM↔core, not core↔database (no storage
+  abstraction over the DB).
 - **Discipline**: append-only — no operation removes or rewrites `BeliefState` nodes or
   `HAS_REVISION` edges; revision is forward-only. World-scope `contract()` is an error.
 - **Boundary**: no game/narrative/LLM concepts in core code; each such appearance is the
@@ -147,8 +151,9 @@ deferred, the formal core and its property-test suite must be right.
   (§10.3)
 - **Seed authored invariants into the world scope at build?** — lean yes, for uniform
   querying (§6 residual / §10.4)
-- **`ladybugdb` availability & API** — confirm the dependency exists, is installable, and
-  its Cypher/connection surface matches the injection model (build-time risk — research target)
+- **`ladybugdb` connection surface** — `ladybugdb` is real (https://github.com/LadybugDB/ladybug,
+  installed via uv). Confirm its connection/Cypher API and design the flexible model
+  (accept-injected vs. open-own) cleanly around it (research target)
 
 ## Evolution
 
