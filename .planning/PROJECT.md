@@ -31,11 +31,18 @@ deferred, the formal core and its property-test suite must be right.
 
 <!-- Current scope. Building toward these. All hypotheses until shipped. -->
 
-- [ ] `BeliefStore` Protocol implemented against LadybugDB with a **flexible connection
-      model**: accept an **injected** connection + namespace prefix (NVM's primary need —
-      it owns the handle and leases it under label tenancy), *and* be able to open/manage
-      its own connection for standalone and other usages. Tests use private throwaway
-      databases.
+- [ ] **`BeliefStore` Protocol** as the public seam consumers (NVM and others) code against
+- [ ] **Ports & Adapters / pluggable backends** — the belief-revision discipline lives in a
+      backend-agnostic core (`MemoryCore`) above a defined **backend port**; alternative
+      backends can be written for any labelled property graph meeting the documented
+      constraint. `ladybug` is the **reference backend**; an **in-memory backend** ships as
+      the second backend (proves the seam *and* doubles as the property-test oracle). The
+      AGM/Hansson property suite runs as a **backend conformance suite** — every backend
+      passes the same postulate tests.
+- [ ] **Flexible connection (ladybug backend)** — accept an **injected** connection +
+      namespace prefix (NVM's primary need — it owns the handle and leases it under label
+      tenancy), *and* open/manage its own connection for standalone use. Tests use private
+      throwaway databases.
 - [ ] **Scopes** as named belief-holders, including a privileged **world scope** where
       `contract()` is an error (append-only / no-retcon enforcement point)
 - [ ] **`Belief` / `BeliefState` split** — stable identity + immutable, append-only
@@ -76,8 +83,13 @@ deferred, the formal core and its property-test suite must be right.
   semantics is the deliberate, better behaviour (per the Kumiho analysis)
 - **LLM / inference of any kind** — M0 is the zero-LLM milestone; NL→triple mapping and
   entrenchment policy are NVM-layer prompt-engineering concerns
-- **Storage abstraction over the database** — a non-goal; the DI seam is NVM↔core, not
-  core↔database. The core is pinned to LadybugDB/Cypher on purpose
+- **Non-LPG / config-style storage abstraction** — the backend port's data model is a
+  labelled property graph (nodes, typed edges, properties); backends that don't model an
+  LPG (relational/document stores, unless they emulate an LPG), and ORM/config-style
+  indirection, stay out. *(Note: a graph **backend port** itself is now IN scope — see
+  Active + Key Decisions. This reverses the earlier NVM "no storage abstraction" stance for
+  the standalone-library context; the backend port sits **below** the NVM↔core seam, which
+  is unchanged.)*
 - **Entity nodes, topology, sheet/mechanical state, the Chronicle, prospective indexing,
   the planner cache** — all NVM-owned; the core subgraph is closed (no outbound graph refs)
 - **Epistemic edge labels** (`WITNESSED_BY`, `TOLD_BY`, `INFERRED_FROM`) and **stance
@@ -117,13 +129,16 @@ deferred, the formal core and its property-test suite must be right.
   LadybugDB's single-writer/multi-reader embedded model enforces write serialization for free.
 - **Tooling**: `cookiecutter-python-uv-library` template — basedpyright strict typing,
   ruff lint/format, pytest + coverage, pre-commit, git-cliff changelog, GitHub Actions.
-- **Storage**: pinned to LadybugDB / Cypher (PyPI package **`ladybug`**, a Kùzu fork —
-  https://github.com/LadybugDB/ladybug). API: `lb.Database(path | ":memory:")` →
-  `lb.Connection(db)` → `conn.execute(cypher, parameters=...)`; schema-first (CREATE
-  NODE/REL TABLE), uniqueness only via PRIMARY KEY. **Flexible connection**: `MemoryCore`
-  accepts an injected `Connection` + namespace prefix (NVM leases it under label tenancy;
-  the core never closes it) *and* can open/manage its own (`:memory:` or file) for
-  standalone use. The DI seam stays NVM↔core, not core↔database (no storage abstraction).
+- **Storage**: behind a **backend port** (Ports & Adapters). The belief-revision discipline
+  is backend-agnostic; backends implement the port for a given labelled property graph. The
+  **reference backend** is LadybugDB (PyPI package **`ladybug`**, a Kùzu fork —
+  https://github.com/LadybugDB/ladybug; API: `lb.Database(path | ":memory:")` →
+  `lb.Connection(db)` → `conn.execute(cypher, parameters=...)`; schema-first, uniqueness
+  only via PRIMARY KEY). The ladybug backend supports a **flexible connection** (injected
+  `Connection` + namespace prefix, never closed by the core, for NVM's R19 tenancy / shared
+  DB; *and* self-managed `:memory:`/file). A second **in-memory backend** ships to prove the
+  port and serve as the test oracle. Backend port granularity (Cypher-level vs. LPG-primitive)
+  is an open Phase-1 decision — see Open questions.
 - **Discipline**: append-only — no operation removes or rewrites `BeliefState` nodes or
   `HAS_REVISION` edges; revision is forward-only. World-scope `contract()` is an error.
 - **Boundary**: no game/narrative/LLM concepts in core code; each such appearance is the
@@ -143,6 +158,8 @@ deferred, the formal core and its property-test suite must be right.
 | Opaque `value: Any` + opaque event ids | Triple structure and provenance meaning belong to NVM; keeps the core domain-agnostic | ⚠️ Revisit — `query_scope(query: str)` semantics underspecified (soft spot §10.1) |
 | Injected connection, label-family tenancy (R19) | Core is a tenant in a shared embedded DB, not its owner; DI seam is NVM↔core | — Pending |
 | `get_impact` default `depth=5` | Sketch number from the recovered Protocol; truncation policy undesigned | ⚠️ Revisit (soft spot §10.3) |
+| **Pluggable backends via a port (Ports & Adapters)** — reverses NVM's "no storage abstraction" stance | Justified by the new context: doxastica is a *publishable standalone* library, so backend pluggability is a real product goal, not speculative generality. The port sits **below** the unchanged NVM↔core seam, so NVM and R19 tenancy are unaffected; the property suite becomes a backend conformance suite proving every backend correct | ⚠️ Revisit — port *granularity* (Cypher-level vs. LPG-primitive) undecided (Phase 1) |
+| Ship a second (in-memory) backend in M0 | Proves the port is real *and* is the shadow oracle Phase 7 needs anyway — nearly free, load-bearing, not speculative | — Pending |
 
 ### Open questions to resolve during planning
 
@@ -160,6 +177,12 @@ deferred, the formal core and its property-test suite must be right.
 - **BeliefState primary key** — research proposes PK = caller-supplied `source_event_id`
   (free uniqueness; turns `get_scope_at` into a `state_id <= $as_of` scan); multi-scope
   needs a synthesized PK + logical `belief_id`. Ratify in the data-model / schema phase.
+- **Backend port granularity** — where the port's contract sits: **Cypher-level** (run
+  Cypher + params + manage tx; portable to any Cypher-speaking LPG; couples core to Cypher)
+  vs. **LPG-primitive** (upsert node / add edge / match / bounded var-length traversal /
+  unit-of-work tx; portable to any LPG incl. in-memory; but `get_impact`/`get_scope_at` may
+  cost more round-trips than one Cypher query). Lean LPG-primitive; resolve the traversal
+  performance tension in the Phase 2 ladybug spike.
 
 ## Evolution
 

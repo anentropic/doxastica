@@ -75,14 +75,27 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [ ] **HIST-03**: `get_scope_at(scope, as_of_event_id)` reconstructs the active base as of an
       event, purely structurally from immutable event-id-ordered states (time-travel)
 
-### Connection & Tenancy
+### Backends & Ports (Ports & Adapters)
 
-- [ ] **CONN-01**: **Flexible connection** — `MemoryCore(conn, namespace=...)` accepts an
-      injected `ladybug.Connection` (never closed by the core; tenancy R19) *and*
-      `MemoryCore.open(path | ":memory:", namespace=...)` self-manages its own
-- [ ] **CONN-02**: **Label-family tenancy** — the core owns and is the only writer of its
-      namespaced `:Scope` / `:Belief` / `:BeliefState` tables and edge types; closed subgraph
-      (no outbound graph references — entity mentions are opaque values)
+- [ ] **BACK-01**: The belief-revision discipline lives in a **backend-agnostic core**
+      (`MemoryCore`) above a defined **backend port**; no backend/Cypher-specific code in the
+      core logic layer. Port *granularity* (Cypher-level vs. LPG-primitive) decided in Phase 1
+- [ ] **BACK-02**: **`ladybug` reference backend adapter** implements the port over LadybugDB
+- [ ] **BACK-03**: **In-memory backend adapter** ships as the second backend — proves the port
+      is real and doubles as the Phase 7 shadow-model test oracle (zero extra dependency)
+- [ ] **BACK-04**: The backend port contract is **documented** so a third party can write an
+      alternative backend for any labelled property graph meeting the documented constraint
+- [ ] **BACK-05**: The AGM/Hansson property suite runs as a **backend conformance suite** —
+      parameterised so every registered backend must pass the same postulate + invariant tests
+
+### Connection & Tenancy (ladybug backend)
+
+- [ ] **CONN-01**: **Flexible connection** — the ladybug backend accepts an injected
+      `ladybug.Connection` + namespace (never closed by the core; tenancy R19) *and* can
+      self-manage its own (`open(path | ":memory:", namespace=...)`)
+- [ ] **CONN-02**: **Label-family tenancy** — the ladybug backend owns and is the only writer
+      of its namespaced `:Scope` / `:Belief` / `:BeliefState` tables and edge types; closed
+      subgraph (no outbound graph references — entity mentions are opaque values)
 - [ ] **CONN-03**: Idempotent schema bootstrap (`CREATE NODE/REL TABLE IF NOT EXISTS`) on init;
       uniqueness enforced structurally (LadybugDB/Kùzu has no UNIQUE constraint)
 
@@ -110,8 +123,9 @@ Foundational, decision-grade choices that must be settled before storage code ex
       `hypothesis` added to the dev group; CI matrix Python 3.11 (floor) and 3.14
 - [ ] **PKG-03**: **MIT** license; README leads with "standalone reference implementation of
       Kumiho (arXiv 2603.17244), multi-scope extension, no recovery"
-- [ ] **PKG-04**: mkdocs-material docs site, GitHub Actions CI + release pipeline, PyPI-ready
-      packaging, CHANGELOG via git-cliff
+- [ ] **PKG-04**: mkdocs-material docs site (including the published backend port "how to write
+      a backend" contract — the consumer-facing form of BACK-04), GitHub Actions CI + release
+      pipeline, PyPI-ready packaging, CHANGELOG via git-cliff
 
 ## v2 Requirements
 
@@ -126,7 +140,7 @@ Explicitly excluded. Documented to prevent scope creep.
 |---------|--------|
 | AGM Recovery postulate | False for belief bases (theorem); incompatible with immutable observable history; superseded-chain semantics is the better replacement |
 | Any narrative / game / LLM concept (actors, turns, scenes, plausibility, diegetic time, GM assembly) | Each appearance is the leak the Protocol seam exists to prevent; meaning lives in the NVM layer above |
-| Storage abstraction over the database | Non-goal; the DI seam is NVM↔core, not core↔DB. Pinned to LadybugDB/Cypher; only the *connection* is flexible |
+| Non-LPG / config-style storage abstraction | A graph **backend port** IS now in scope (BACK-01..05); but backends that don't model a labelled property graph (relational/document, unless emulating an LPG) and ORM/config-style indirection stay out. The port sits below the unchanged NVM↔core seam |
 | Epistemic edge labels (`WITNESSED_BY`, `TOLD_BY`, `INFERRED_FROM`) | NVM *specialisations* of generic edges; epistemic meaning is narrative semantics |
 | Stance / entrenchment policy (confidence arithmetic, ordering, contradiction resolution) | NVM-layer policy (R21); the core stores opaque values and traverses edges only |
 | Deductive closure / OWL / DL inference in the graph | Flouris impossibility: no AGM-compliant operator exists for DLs; voids the correctness story |
@@ -148,6 +162,10 @@ Which phases cover which requirements. Populated during roadmap creation.
 | DATA-05 | Phase 1 | Pending |
 | DATA-06 | Phase 1 | Pending |
 | PKG-01 | Phase 1 | Pending |
+| BACK-01 | Phase 1 | Pending |
+| BACK-04 | Phase 1 | Pending |
+| BACK-02 | Phase 2 | Pending |
+| BACK-03 | Phase 2 | Pending |
 | CONN-01 | Phase 2 | Pending |
 | CONN-02 | Phase 2 | Pending |
 | CONN-03 | Phase 2 | Pending |
@@ -172,15 +190,17 @@ Which phases cover which requirements. Populated during roadmap creation.
 | FORMAL-03 | Phase 7 | Pending |
 | FORMAL-04 | Phase 7 | Pending |
 | FORMAL-05 | Phase 7 | Pending |
+| BACK-05 | Phase 7 | Pending |
 | PKG-02 | Phase 8 | Pending |
 | PKG-03 | Phase 8 | Pending |
 | PKG-04 | Phase 8 | Pending |
 
 **Coverage:**
-- v1 requirements: 34 total (the source "30" undercounted; 34 distinct REQ-IDs are defined above)
-- Mapped to phases: 34 ✓
+- v1 requirements: 39 total (34 prior + 5 new BACK-01..05; CONN-01..03 reframed to the ladybug backend, not added)
+- Mapped to phases: 39 ✓
 - Unmapped: 0 ✓
+- Double-mapped: 0 ✓ (BACK-04's documented contract is drafted in Phase 1 and published via PKG-04 in Phase 8 — primary home is Phase 1; Phase 8 references it through PKG-04, not a second mapping)
 
 ---
 *Requirements defined: 2026-06-13*
-*Last updated: 2026-06-13 after roadmap creation (traceability populated)*
+*Last updated: 2026-06-13 after backend-port revision (BACK-01..05 added, CONN-01..03 reframed, traceability re-validated at 39/39)*
