@@ -141,13 +141,46 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (pending roadmap) | — | Pending |
+| DATA-01 | Phase 1 | Pending |
+| DATA-02 | Phase 1 | Pending |
+| DATA-03 | Phase 1 | Pending |
+| DATA-04 | Phase 1 | Pending |
+| DATA-05 | Phase 1 | Pending |
+| DATA-06 | Phase 1 | Pending |
+| PKG-01 | Phase 1 | Pending |
+| CONN-01 | Phase 2 | Pending |
+| CONN-02 | Phase 2 | Pending |
+| CONN-03 | Phase 2 | Pending |
+| FORMAL-06 | Phase 2 | Pending |
+| SCOPE-01 | Phase 3 | Pending |
+| SCOPE-02 | Phase 3 | Pending |
+| SCOPE-03 | Phase 3 | Pending |
+| CHAIN-01 | Phase 3 | Pending |
+| CHAIN-02 | Phase 3 | Pending |
+| CHAIN-03 | Phase 3 | Pending |
+| OPS-01 | Phase 3 | Pending |
+| OPS-02 | Phase 3 | Pending |
+| OPS-03 | Phase 3 | Pending |
+| HIST-02 | Phase 3 | Pending |
+| CHAIN-04 | Phase 4 | Pending |
+| HIST-01 | Phase 4 | Pending |
+| EDGE-01 | Phase 5 | Pending |
+| EDGE-02 | Phase 5 | Pending |
+| HIST-03 | Phase 6 | Pending |
+| FORMAL-01 | Phase 7 | Pending |
+| FORMAL-02 | Phase 7 | Pending |
+| FORMAL-03 | Phase 7 | Pending |
+| FORMAL-04 | Phase 7 | Pending |
+| FORMAL-05 | Phase 7 | Pending |
+| PKG-02 | Phase 8 | Pending |
+| PKG-03 | Phase 8 | Pending |
+| PKG-04 | Phase 8 | Pending |
 
 **Coverage:**
-- v1 requirements: 30 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 30 ⚠️
+- v1 requirements: 34 total (the source "30" undercounted; 34 distinct REQ-IDs are defined above)
+- Mapped to phases: 34 ✓
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-06-13*
-*Last updated: 2026-06-13 after initial definition*
+*Last updated: 2026-06-13 after roadmap creation (traceability populated)*
