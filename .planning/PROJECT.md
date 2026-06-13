@@ -59,7 +59,8 @@ deferred, the formal core and its property-test suite must be right.
 - [ ] **Irony-join demonstration** on synthetic data: actor-scope vs. world-scope
       divergence computed as a single query
 - [ ] Packaged from the `cookiecutter-python-uv-library` template (uv, basedpyright strict,
-      ruff, pytest) depending on **`ladybugdb` + `pydantic` only**, zero NVM imports
+      ruff, pytest) depending on **`ladybug` (the LadybugDB PyPI package) + `pydantic` only**,
+      zero NVM imports
 - [ ] **Publication-ready**: MIT license, docs site, GitHub Actions CI + release config,
       PyPI-ready packaging; README leads with "standalone reference implementation of
       Kumiho (arXiv 2603.17244), multi-scope extension, no recovery"
@@ -110,17 +111,19 @@ deferred, the formal core and its property-test suite must be right.
 
 ## Constraints
 
-- **Tech stack**: Python (uv) — runtime deps **`ladybugdb` + `pydantic` only**, zero NVM
-  imports. Why: the repo boundary keeps the implementation faithful to the paper's
-  domain-agnostic model and the single-writer embedded constraint enforces write
-  serialization for free.
+- **Tech stack**: Python (uv) — runtime deps **`ladybug` (the LadybugDB PyPI package, a
+  Kùzu fork, import `ladybug as lb`) + `pydantic` v2 only**, zero NVM imports. Why: the
+  repo boundary keeps the implementation faithful to the paper's domain-agnostic model and
+  LadybugDB's single-writer/multi-reader embedded model enforces write serialization for free.
 - **Tooling**: `cookiecutter-python-uv-library` template — basedpyright strict typing,
   ruff lint/format, pytest + coverage, pre-commit, git-cliff changelog, GitHub Actions.
-- **Storage**: pinned to LadybugDB / Cypher (`ladybugdb`, https://github.com/LadybugDB/ladybug,
-  a uv dependency). **Flexible connection**: `MemoryCore` accepts an injected connection +
-  namespace prefix (NVM leases it under label tenancy) *and* can open/manage its own
-  connection for standalone use. The DI seam stays NVM↔core, not core↔database (no storage
-  abstraction over the DB).
+- **Storage**: pinned to LadybugDB / Cypher (PyPI package **`ladybug`**, a Kùzu fork —
+  https://github.com/LadybugDB/ladybug). API: `lb.Database(path | ":memory:")` →
+  `lb.Connection(db)` → `conn.execute(cypher, parameters=...)`; schema-first (CREATE
+  NODE/REL TABLE), uniqueness only via PRIMARY KEY. **Flexible connection**: `MemoryCore`
+  accepts an injected `Connection` + namespace prefix (NVM leases it under label tenancy;
+  the core never closes it) *and* can open/manage its own (`:memory:` or file) for
+  standalone use. The DI seam stays NVM↔core, not core↔database (no storage abstraction).
 - **Discipline**: append-only — no operation removes or rewrites `BeliefState` nodes or
   `HAS_REVISION` edges; revision is forward-only. World-scope `contract()` is an error.
 - **Boundary**: no game/narrative/LLM concepts in core code; each such appearance is the
@@ -151,9 +154,12 @@ deferred, the formal core and its property-test suite must be right.
   (§10.3)
 - **Seed authored invariants into the world scope at build?** — lean yes, for uniform
   querying (§6 residual / §10.4)
-- **`ladybugdb` connection surface** — `ladybugdb` is real (https://github.com/LadybugDB/ladybug,
-  installed via uv). Confirm its connection/Cypher API and design the flexible model
-  (accept-injected vs. open-own) cleanly around it (research target)
+- **UUID7 ordering contract for `get_scope_at`** — intra-ms monotonicity is *optional* per
+  RFC 9562; the core takes event ids as opaque caller inputs, so time-travel needs an
+  explicit ordering contract (or a core-owned tie-breaker). Resolve in the data-model phase.
+- **BeliefState primary key** — research proposes PK = caller-supplied `source_event_id`
+  (free uniqueness; turns `get_scope_at` into a `state_id <= $as_of` scan); multi-scope
+  needs a synthesized PK + logical `belief_id`. Ratify in the data-model / schema phase.
 
 ## Evolution
 
