@@ -53,7 +53,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. `query_scope`'s parameter is a closed typed filter over core-owned fields (e.g. `belief_id`, `status`, event-id range) — never a free `str` — so triple structure cannot leak and no value is interpolated into Cypher
   5. The `get_impact` return shape carries a truncation/frontier signal and a ratified `depth` default; a written UUID7 ordering contract for `source_event_id` exists; and frozen `pydantic` v2 models (`Scope`, `BeliefState`, `EdgeType` enum) treat `value: Any` and the UUID7 `source_event_id` as opaque, with beliefs modelled as finite explicit belief bases (no deductive closure / DL inference)
   6. The **backend port contract is drafted** as a written spec (the constraints a third-party LPG backend must meet) — authored here; publication of the consumer-facing docs is finished in Phase 8 (BACK-04, port contract)
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+- [ ] 01-01-PLAN.md — Scaffold the doxastica package (PKG-01): cookiecutter render, deps pinned to ladybug+pydantic, 3.14 floor, hypothesis in dev
+- [ ] 01-02-PLAN.md — Frozen pydantic taxonomy + errors (DATA-02/04/05/06): Scope, Belief, BeliefState, BeliefFilter, ImpactResult, Status/EdgeType enums
+- [ ] 01-03-PLAN.md — Public BeliefStore Protocol + import-purity guard + UUID7 ordering contract (DATA-01/02/03/04/05)
+- [ ] 01-04-PLAN.md — Internal LPG-primitive BackendPort + drafted backend-contract spec (BACK-01/04)
 
 ### Phase 2: Backend Adapters & Schema Bootstrap (De-risking Spike)
 **Goal**: First real LadybugDB contact, verified before any belief logic stands on it: BOTH backends standing behind the Phase 1 port — the `ladybug` reference backend (flexible connection, idempotent namespaced schema bootstrap) and the in-memory backend (which doubles as the Phase 7 oracle) — plus the `:memory:` test harness scaffold every later phase depends on. Confirms the port survives contact with the real ladybug API.
@@ -138,7 +143,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Protocol, Backend Port & Data-Model Decisions | 0/TBD | Not started | - |
+| 1. Protocol, Backend Port & Data-Model Decisions | 0/4 | Planned | - |
 | 2. Backend Adapters & Schema Bootstrap | 0/TBD | Not started | - |
 | 3. Append-Only Revision Spine | 0/TBD | Not started | - |
 | 4. Retrieval & Observation Surface | 0/TBD | Not started | - |
