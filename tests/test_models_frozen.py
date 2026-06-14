@@ -85,8 +85,35 @@ def test_belief_filter_constructs_with_all_none_defaults():
 
 
 def test_impact_result_constructs_and_exposes_three_fields():
-    result = ImpactResult(reached=[], frontier=frozenset(), truncated=False)
-    assert result.reached == []
+    result = ImpactResult(reached=(), frontier=frozenset(), truncated=False)
+    assert result.reached == ()
     assert result.frontier == frozenset()
     assert result.truncated is False
     assert set(ImpactResult.model_fields) == {"reached", "frontier", "truncated"}
+
+
+def test_impact_result_reached_is_an_immutable_tuple():
+    # WR-03: reached must be a tuple so the frozen guarantee is complete —
+    # a mutable list would allow result.reached.append(...) past frozen=True.
+    result = ImpactResult(reached=(), frontier=frozenset(), truncated=False)
+    assert isinstance(result.reached, tuple)
+
+
+def test_belief_filter_rejects_unknown_field():
+    # WR-01: extra="forbid" makes the "triple-structure leak unrepresentable"
+    # claim mechanical — an unknown kwarg must raise, not be silently discarded.
+    with pytest.raises(ValidationError):
+        BeliefFilter(bogus=1)  # type: ignore[call-arg]
+
+
+def test_belief_state_rejects_unknown_field():
+    with pytest.raises(ValidationError):
+        BeliefState(
+            state_id=uuid7(),
+            belief_id="b1",
+            scope_id="s1",
+            source_event_id=uuid7(),
+            value={"opaque": "blob"},
+            status=Status.active,
+            provenance="leaked",  # type: ignore[call-arg]
+        )

@@ -55,7 +55,7 @@ class EdgeType(StrEnum):
     DERIVED_FROM = "DERIVED_FROM"
 
 
-class Scope(BaseModel, frozen=True):
+class Scope(BaseModel, frozen=True, extra="forbid"):
     """
     A named belief-holder.
 
@@ -68,13 +68,13 @@ class Scope(BaseModel, frozen=True):
     is_world: bool = False
 
 
-class Belief(BaseModel, frozen=True):
+class Belief(BaseModel, frozen=True, extra="forbid"):
     """Stable logical identity — one per ``Belief`` node."""
 
     belief_id: str
 
 
-class BeliefState(BaseModel, frozen=True):
+class BeliefState(BaseModel, frozen=True, extra="forbid"):
     """
     An immutable, append-only revision of a belief.
 
@@ -93,7 +93,7 @@ class BeliefState(BaseModel, frozen=True):
     status: Status
 
 
-class BeliefFilter(BaseModel, frozen=True):
+class BeliefFilter(BaseModel, frozen=True, extra="forbid"):
     """
     A closed, AND-combined typed filter over core-owned fields (DATA-02).
 
@@ -108,7 +108,7 @@ class BeliefFilter(BaseModel, frozen=True):
     event_id_max: UUID | None = None
 
 
-class ImpactResult(BaseModel, frozen=True):
+class ImpactResult(BaseModel, frozen=True, extra="forbid"):
     """
     A bounded-cascade result that never silently under-reports (DATA-04).
 
@@ -117,6 +117,6 @@ class ImpactResult(BaseModel, frozen=True):
     bound stopped the walk early.
     """
 
-    reached: list[BeliefState]
+    reached: tuple[BeliefState, ...]
     frontier: frozenset[UUID]
     truncated: bool
