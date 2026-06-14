@@ -111,18 +111,19 @@ class BeliefStore(Protocol):
     def query_scope(
         self,
         scope_id: str,
-        filter: BeliefFilter,
+        belief_filter: BeliefFilter,
         include_deprecated: bool = False,
     ) -> list[BeliefState]:
         """
-        Return the belief states in ``scope_id`` matching the closed ``filter`` (DATA-02).
+        Return the belief states in ``scope_id`` matching ``belief_filter`` (DATA-02).
 
-        ``filter`` is a closed, AND-combined ``BeliefFilter`` — never a free query string.
+        ``belief_filter`` is a closed, AND-combined ``BeliefFilter`` — never a free query
+        string.
 
         ``include_deprecated`` is ergonomic sugar over the filter's ``status`` field:
         ``False`` means ``{active}`` and ``True`` means ``{active, retracted}``. An explicit
-        ``filter.status`` governs — when the caller sets ``status`` it takes precedence over
-        the ``include_deprecated`` shorthand.
+        ``belief_filter.status`` governs — when the caller sets ``status`` it takes
+        precedence over the ``include_deprecated`` shorthand.
         """
         ...
 
