@@ -53,9 +53,9 @@ deferred, the formal core and its property-test suite must be right.
 |------------|-------------|---------|-----|
 | **ladybug** | `>=0.17,<0.18` | Embedded graph DB + Cypher; the pinned storage substrate | The project deliberately pins storage to LadybugDB/Cypher (no abstraction layer). Embedded single-writer model *enforces* write serialization for free (a stated design payoff). Verified PyPI name `ladybug` 0.17.1, `requires-python <3.15,>=3.10` — covers the whole 3.11–3.14 band. |
 | **pydantic** | `>=2.11,<3` | Typed value/model layer at the API boundary (`Scope`, `BeliefState`, `EdgeType`) | v2 is the current line (2.13.4). Rust core, fast validation, frozen models for immutable `BeliefState`. `requires-python >=3.9` — no floor problem. |
-### The UUID7 decision (the one genuine runtime gap)
-- **Python 3.14** ships `uuid.uuid7()` natively (new in 3.14, RFC 9562 §5.7, monotonic — verified). On the 3.14 dev interpreter, **no dependency needed**.
-- **Python 3.11–3.13** (the supported floor, `requires-python>=3.11`) has **no** `uuid.uuid7()`.
+### The UUID7 decision (RESOLVED — floor raised to 3.14)
+- **Python 3.14** ships `uuid.uuid7()` natively (new in 3.14, RFC 9562 §5.7, monotonic — verified). The core mints `state_id` UUID7 keys from the stdlib — **no runtime dependency, no dev shim**.
+- **Locked (CONTEXT decision #2, Phase 1):** `requires-python>=3.14`. The earlier 3.11–3.13 gap (no stdlib `uuid.uuid7()`) is moot — the floor was deliberately raised to 3.14 so UUID7 minting is native and runtime deps stay at exactly `ladybug` + `pydantic`. NVM is assumed to target 3.14.
 ### Development Tools (from cookiecutter — verified current, no re-litigation)
 | Tool | Template pin | Current (2026-06) | Notes |
 |------|--------------|-------------------|-------|
@@ -72,7 +72,7 @@ deferred, the formal core and its property-test suite must be right.
 # Runtime (the ONLY two runtime deps)
 # Dev / test tooling (hypothesis is the addition over the template defaults)
 # pytest, pytest-cov, basedpyright, ruff, ipython, pdbpp come from the template
-# (Optional, dev-only) UUID7 generation for the 3.11–3.13 test matrix:
+# (No UUID7 shim — the floor is 3.14, so `uuid.uuid7()` is in the stdlib. See "Python version posture".)
 ## Ladybug — the high-value detail (verified against docs.ladybugdb.com)
 ### Connection API (verified)
 # On-disk
@@ -108,9 +108,9 @@ deferred, the formal core and its property-test suite must be right.
 - **Ladybug ships types?** Unverified — likely partial. If `lb.Connection` / `lb.execute` return `Any`/untyped, strict mode will flag `reportUnknownMemberType` etc. Plan to wrap Ladybug behind the core's typed methods (you're doing that anyway) and, if needed, add a narrowly-scoped `[[tool.basedpyright.executionEnvironments]]` or `# pyright: ignore[...]` at the single DB-adapter boundary — not scattered. Keep `pydantic` models fully typed; that's where strictness pays off.
 - pydantic v2 + basedpyright strict play well together (pydantic ships `py.typed`).
 ## Python version posture
-- **Dev/CI primary: 3.14** (template's `python_version`) — gets native `uuid.uuid7()`, latest typing.
-- **Floor: 3.11** (`requires-python>=3.11`). Ladybug supports `>=3.10,<3.15`; pydantic `>=3.9`; hypothesis `>=3.10` — **all green across 3.11–3.14**. No dependency forces raising the floor.
-- CI matrix recommendation: test 3.11 and 3.14 at minimum (floor + dev). The only floor-sensitive code is UUID7 *generation in tests* — handled by the dev-group `uuid-utils` shim.
+- **Dev/CI primary: 3.14** (template's `python_version`) — native `uuid.uuid7()`, latest typing.
+- **Floor: 3.14** (`requires-python>=3.14`) — LOCKED (CONTEXT decision #2, Phase 1). Deliberately raised from the originally-scoped 3.11 so the core mints `state_id` UUID7 keys from the stdlib with zero extra deps. Ladybug supports `>=3.10,<3.15` and pydantic/hypothesis are green on 3.14, so the substrate is unaffected.
+- CI matrix: 3.14 only (floor == dev). No `uuid-utils`/shim — the one previously floor-sensitive concern (UUID7 generation) is now native stdlib.
 ## Alternatives Considered
 | Recommended | Alternative | When/why the alternative — and why NOT here |
 |-------------|-------------|----------------------------------------------|
@@ -118,7 +118,7 @@ deferred, the formal core and its property-test suite must be right.
 | pydantic v2 | dataclasses / attrs / msgspec | Constraint says pydantic. v2 gives frozen models + validation at the seam. dataclasses lack validation; msgspec would be a third runtime dep (forbidden). |
 | Hypothesis `RuleBasedStateMachine` | hand-written sequence tests / `pytest-randomly` | AGM postulates over *operation sequences* are the textbook stateful-property case; shrinking minimal failing sequences is exactly what makes the formal claim credible. Hand-rolled sequences don't shrink. |
 | in-memory `:memory:` DB per test | shared fixture DB / Dockerized server | Embedded + in-memory means zero infra, perfect isolation, fast Hypothesis replay. A server DB would be slower and break reproducibility under shrinking. |
-| caller supplies `source_event_id` | core mints UUID7 | Keeps runtime deps at exactly two and dodges the 3.11 stdlib `uuid7` gap; matches the design (NVM owns event-id meaning). |
+| caller supplies `source_event_id` (opaque) | core mints `source_event_id` | NVM owns event-id meaning, so the caller supplies it and the core treats it as an opaque, non-unique handle. (Distinct from `state_id`, which the core *does* mint as a native stdlib UUID7 PK on the locked 3.14 floor.) |
 | mkdocs-material | sphinx-shibuya | Both offered by the template; mkdocs-material + mkdocstrings is already wired and lower-friction for an API-reference docs site. Either satisfies the publishable-docs requirement. |
 ## What NOT to Use
 - **`ladybugdb` as a package/import name** — does not exist on PyPI (404). The dependency string and all imports must be `ladybug`. This is the single most likely scaffolding bug; flag it loudly in the roadmap. (PROJECT.md's "`ladybugdb`" is the project/brand, not the installable.)
@@ -134,7 +134,7 @@ deferred, the formal core and its property-test suite must be right.
 - Ladybug docs — Transactions: https://docs.ladybugdb.com/cypher/transaction/ — HIGH (single-writer, BEGIN/COMMIT/ROLLBACK, CHECKPOINT)
 - Ladybug docs — Prepared statements: https://docs.ladybugdb.com/get-started/prepared-statements/ — HIGH ($param + parameters dict)
 - PyPI `ladybug` 0.17.1 (`requires-python <3.15,>=3.10`); `ladybugdb` confirmed absent — HIGH
-- PyPI: pydantic 2.13.4, hypothesis 6.155.2, pytest 9.0.3, basedpyright 1.39.7, ruff 0.15.17, uuid-utils 0.16.0 — HIGH
+- PyPI: pydantic 2.13.4, hypothesis 6.155.2, pytest 9.0.3, basedpyright 1.39.7, ruff 0.15.17 — HIGH
 - Hypothesis stateful docs: https://hypothesis.readthedocs.io/en/latest/stateful.html — HIGH
 - Python 3.14 `uuid.uuid7()` (RFC 9562 §5.7, native): https://docs.python.org/3/library/uuid.html — HIGH
 - cookiecutter-python-uv-library template (local) — tool pins grounded — HIGH
