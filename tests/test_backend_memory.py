@@ -149,3 +149,34 @@ def test_backend_dependency_error_dual_catch() -> None:
     err = BackendDependencyError("missing driver")
     assert isinstance(err, DoxasticaError)
     assert isinstance(err, ImportError)
+
+
+def test_memory_core_in_memory_works_driver_free() -> None:
+    """``MemoryCore.in_memory()`` returns a working core with zero extra dependency (D-01/D-05)."""
+    from doxastica.core import MemoryCore
+
+    core = MemoryCore.in_memory()
+    assert isinstance(core, MemoryCore)
+
+
+def test_memory_core_unit_of_work_composes_backend() -> None:
+    """``MemoryCore.unit_of_work()`` composes the in-memory backend's atomic scope (D-01)."""
+    from doxastica.core import MemoryCore
+
+    core = MemoryCore.in_memory()
+    backend = core._backend  # pyright: ignore[reportPrivateUsage]  # noqa: SLF001
+    assert isinstance(backend, InMemoryBackend)
+    with core.unit_of_work():
+        backend.upsert_node("Belief", "a", {"id": "a"})
+    assert [r["id"] for r in backend.match_nodes("Belief", {})] == ["a"]
+
+
+def test_top_level_exports() -> None:
+    """``MemoryCore`` / ``InMemoryBackend`` / ``BackendDependencyError`` import from doxastica."""
+    import doxastica
+
+    assert doxastica.MemoryCore is not None
+    assert doxastica.InMemoryBackend is not None
+    assert doxastica.BackendDependencyError is not None
+    for name in ("MemoryCore", "InMemoryBackend", "BackendDependencyError"):
+        assert name in doxastica.__all__, f"{name} missing from doxastica.__all__"
