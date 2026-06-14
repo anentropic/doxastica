@@ -1,8 +1,8 @@
 ---
 phase: 2
 slug: backend-adapters-schema-bootstrap-de-risking-spike
-status: draft
-nyquist_compliant: false
+status: ready
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-06-15
 ---
@@ -42,15 +42,21 @@ created: 2026-06-15
 
 ## Per-Task Verification Map
 
-> Populated by the planner/executor as tasks are created. Every task must map to an automated
-> command or a Wave 0 dependency.
+> Reconciled with the actual plan files: tests live as FLAT modules
+> (`tests/test_backend_memory.py`, `tests/test_backend_ladybug.py`,
+> `tests/test_backend_parity.py`) and a FILLED `tests/conftest.py` — NOT `tests/backends/`
+> or a `tests/conftest_smoke` module.
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 02-01-01 | 01 | 1 | BACK-03 | — | in-memory backend satisfies BackendPort | unit | `uv run pytest tests/backends -q` | ❌ W0 | ⬜ pending |
-| 02-01-02 | 01 | 1 | FORMAL-06 | — | parametrized `:memory:` fixture, no state bleed | unit | `uv run pytest tests/conftest_smoke -q` | ❌ W0 | ⬜ pending |
-| 02-02-01 | 02 | 2 | BACK-02, CONN-01 | — | ladybug adapter; injected conn never closed | unit | `uv run pytest tests/backends -q` | ❌ W0 | ⬜ pending |
-| 02-02-02 | 02 | 2 | CONN-02, CONN-03 | T-02-01 | namespaced sole-writer subgraph; idempotent DDL | unit | `uv run pytest tests/backends -q` | ❌ W0 | ⬜ pending |
+| 02-01-01 | 01 | 1 | BACK-03 | T-02-IM-01/02 | in-memory backend satisfies BackendPort (5 primitives, cycle-safe traverse) | unit | `uv run pytest tests/test_backend_memory.py -x -q` | ❌ W0 | ⬜ pending |
+| 02-01-02 | 01 | 1 | BACK-03 | — | `MemoryCore.in_memory()` works driver-free; top-level exports importable | unit | `uv run pytest tests/test_backend_memory.py -x -q` | ❌ W0 | ⬜ pending |
+| 02-02-01 | 02 | 2 | BACK-02, CONN-01, CONN-02, CONN-03 | T-02-01 | ladybug adapter: ownership (injected conn never closed), namespace isolation, idempotent DDL | unit | `uv run pytest tests/test_backend_ladybug.py -x -q` | ❌ W0 | ⬜ pending |
+| 02-02-02 | 02 | 2 | BACK-02 | T-02-02/03/04/05 | five Cypher primitives + SC4 traverse confirmation (ACYCLIC, raised hop cap) + unit_of_work rollback | unit | `uv run pytest tests/test_backend_ladybug.py -x -q` | ❌ W0 | ⬜ pending |
+| 02-03-01 | 03 | 3 | BACK-03, FORMAL-06 | T-02-PAR-01 | parametrized throwaway `:memory:` `backend` fixture + oracle parity (diamond/cycle/over-bound + match_nodes) | parametrized | `uv run pytest -p no:randomly tests/test_backend_parity.py -q` | ❌ W0 | ⬜ pending |
+| 02-03-02 | 03 | 3 | (D-02) | T-02-PAR-02 | extended import-purity: AST scan over core + backends/memory; subprocess proves driver-free spine | unit | `uv run pytest tests/test_import_purity.py -x -q` | ⚠️ EXTEND | ⬜ pending |
+| 02-04-01 | 04 | 4 | BACK-03 | T-02-PKG-01/02 | Option B pyproject (pydantic-only required, ladybug extra); uv.lock consistent | packaging | `uv lock --check && uv sync --dev --extra ladybug && uv run pytest -q` | (config) | ⬜ pending |
+| 02-04-02 | 04 | 4 | FORMAL-06 | — | two-env CI (base-isolation job ladybug-absent + full [ladybug] job over both backends); [BLOCKING] CLAUDE.md reversal | ci+docs | `uv run python -c "import yaml; [yaml.safe_load(open(p)) for p in ('.github/workflows/quality.yml','.github/workflows/pr.yml')]" && grep -c "reference-backend extra" CLAUDE.md` | (config) | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -58,10 +64,14 @@ created: 2026-06-15
 
 ## Wave 0 Requirements
 
-- [ ] `tests/backends/` — test package for backend conformance (both adapters)
-- [ ] `tests/conftest.py` — parametrized `backend` fixture over `[InMemoryBackend, LadybugBackend]`, throwaway `:memory:` per example
-- [ ] Extend `tests/test_import_purity.py` — assert `doxastica`, `doxastica.core`, `doxastica.backends.memory` import with `ladybug` absent; `MemoryCore.in_memory()` works driver-free
-- [ ] A backend-conformance/parity suite (oracle parity, D-05) including frontier semantics on diamond/cycle/over-bound graphs (research Open Question 1)
+> Test scaffolds that must exist (failing/empty) before implementation. Reconciled to the
+> actual FLAT plan paths.
+
+- [ ] `tests/test_backend_memory.py` — standalone in-memory primitives + `MemoryCore.in_memory()` (Plan 01)
+- [ ] `tests/test_backend_ladybug.py` — `importorskip("ladybug")`-gated: ownership, namespace isolation, idempotent bootstrap, five primitives, SC4 traverse, unit_of_work rollback (Plan 02)
+- [ ] `tests/conftest.py` — FILLED with a parametrized `backend` fixture over `["memory", "ladybug"]` (plain params list, D-01a), throwaway `lb.Database()` per example, ladybug param `importorskip`-skipped when absent (Plan 03)
+- [ ] `tests/test_backend_parity.py` — oracle-parity suite (diamond / cycle / over-bound chain + match_nodes), the BACK-03/D-05 / FORMAL-06 guarantee (Plan 03)
+- [ ] Extend `tests/test_import_purity.py` — add `core` + `backends/memory` to the AST scan AND a subprocess-absence test proving the driver-free spine imports + `MemoryCore.in_memory()` runs with ladybug blocked (Plan 03)
 
 ---
 
@@ -69,18 +79,18 @@ created: 2026-06-15
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| SC4 spike confirmations are documented (30-hop cap, `$param`-in-bound rejection, ACYCLIC unbounded traversal) | BACK-02 | The spike is a *confirmation that the port is unchanged* — its evidence lives in RESEARCH.md and a spike note, not a runtime assertion | Verify RESEARCH.md SC4 findings are reflected in `LadybugBackend.traverse` (validated-int bound, raised `var_length_extend_max_depth`) and that a decision "port unchanged, SC4 confirmed" is recorded |
-| Two-env CI runs a job WITHOUT the ladybug extra | BACK-03 | CI YAML executes in GitHub Actions, not pytest | Confirm CI matrix has a base-install job that runs import-purity with ladybug absent |
+| SC4 spike confirmations are documented (30-hop cap, `$param`-in-bound rejection, ACYCLIC unbounded traversal) | BACK-02 | The spike is a *confirmation that the port is unchanged* — its evidence lives in RESEARCH.md and the plan-02 SUMMARY, not a runtime assertion | Verify RESEARCH.md SC4 findings are reflected in `LadybugBackend.traverse` (validated-int bound, raised `var_length_extend_max_depth`) and that the decision string "port unchanged, SC4 confirmed" is recorded in `02-02-SUMMARY.md` |
+| Two-env CI runs a job WITHOUT the ladybug extra | FORMAL-06 | CI YAML executes in GitHub Actions, not pytest | Confirm `quality.yml` has a base-isolation job (no `--extra ladybug`) running `tests/test_import_purity.py tests/test_backend_memory.py` with ladybug absent, and a full job with `--extra ladybug` running the whole suite over both backends (the `grep -c "extra ladybug"` asymmetry check covers Job 1 vs Job 2 wiring) |
 
 ---
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (reconciled to flat plan paths)
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** ready

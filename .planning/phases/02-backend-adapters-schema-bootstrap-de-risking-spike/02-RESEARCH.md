@@ -462,17 +462,17 @@ conn.execute("CALL current_setting('var_length_extend_max_depth') RETURN *")  # 
 | A3 | NVM (the primary consumer) targets Python 3.14 | (carried from Phase 1) | The locked 3.14 floor assumes this. Out of this phase's reach to verify; flagged for user confirmation. Floor already locked regardless. |
 | A4 | `state_id`/`source_event_id` stored as `STRING` (UUID7 text) is acceptable vs a native type | Pattern 4 | Low — ladybug schema here uses STRING PKs; byte-order ordering (DATA-03) is computed by the core, not the DB. If a native UUID type is later wanted it's a schema migration, but Phase 2 only needs round-trip + uniqueness, both met. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Exact frontier semantics parity between backends under partial bounds.**
    - What we know: both can compute "node at exactly `max_depth` with an unexpanded successor"; ladybug via `EXISTS{}` subquery, in-memory via BFS layering.
    - What's unclear: edge cases (diamond graphs where a node is reachable at two depths) may differ in which depth "wins" for the frontier test.
-   - Recommendation: the parametrized conftest must include a diamond + a cycle + a chain-longer-than-bound, asserting identical `(reached, frontier)` from both backends. This is the BACK-03/D-05 parity guarantee — make it a first-class Phase 2 test, not deferred to Phase 7.
+   - RESOLVED: covered by plan 02-03's parametrized parity suite (diamond/cycle/over-bound graphs) in THIS phase — `tests/test_backend_parity.py` asserts identical `(reached, frontier)` from both backends. This is the BACK-03/D-05 parity guarantee, made a first-class Phase 2 test, not deferred to Phase 7.
 
 2. **Does the port need *any* adjustment after the spike?**
    - What we know: the signature survives unchanged — the 30-cap and `$param` issues are adapter-internal.
    - What's unclear: nothing material. CONTEXT explicitly authorizes adjusting the port now if needed; the spike says it isn't.
-   - Recommendation: record "port unchanged; SC4 confirmed" as a decision; the `_DEPTH_CEILING` and traversal-mode choices are documented adapter details.
+   - RESOLVED: port unchanged; SC4 confirmed live against ladybug 0.17.1. The `_DEPTH_CEILING` and traversal-mode (ACYCLIC var-length + raised `var_length_extend_max_depth`) choices are documented adapter details, not port changes; plan 02-02 records "port unchanged, SC4 confirmed" in its SUMMARY.
 
 ## Environment Availability
 
