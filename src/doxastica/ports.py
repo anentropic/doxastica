@@ -98,7 +98,7 @@ class BackendPort(Protocol):
         start: UUID | str,
         edge_types: frozenset[EdgeType | str],
         max_depth: int | None,
-    ) -> tuple[list[dict[str, Any]], frozenset[UUID]]:
+    ) -> tuple[list[dict[str, Any]], frozenset[UUID | str]]:
         """
         The single generic graph-walk primitive — returns ``(reached, frontier)``.
 
