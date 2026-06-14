@@ -76,8 +76,10 @@ class MemoryCore:
         return cls(LadybugBackend(conn, namespace=namespace, owns_conn=False))  # R19
 ```
 **Load-bearing constraint:** the `from ...ladybug import` statements MUST be inside method
-bodies, not at module top. The extended `test_import_purity.py` proves this; a top-level
-import is a build failure.
+bodies, not at module top. The extended `test_import_purity.py` proves this by scanning
+MODULE-LEVEL imports only — a top-level (or `TYPE_CHECKING`-block) ladybug import is a build
+failure, while these sanctioned function-local imports are explicitly permitted and MUST NOT
+be flagged.
 
 **Do NOT** implement `__init__` to accept a raw connection (D-01 — `from_connection` is the
 factory for that). **Do NOT** write `revise`/`expand`/`contract`/`query_scope`/`get_impact`
@@ -260,30 +262,65 @@ do not share one across examples (Pitfall 5: state bleed / lock errors).
 
 ### `tests/test_import_purity.py` (test, AST/import) — EXTEND
 
-**Analog:** the file itself (`test_import_purity.py:14-34`) — `ast.walk` over the parsed module,
-collect `ast.Import`/`ast.ImportFrom`, assert no offender whose first dotted component is `ladybug`.
+**Analog:** the file itself (`test_import_purity.py:14-34`) — parse each module, collect
+`ast.Import`/`ast.ImportFrom`, assert no offender whose first dotted component is `ladybug`.
 
-**Existing AST-scan pattern to reuse** (`test_import_purity.py:26-34`):
+**CRITICAL — the scan must become MODULE-LEVEL only (do NOT reuse `ast.walk` as-is):**
+The existing scan uses `ast.walk`, which recurses into function bodies. For `protocol`/`ports`
+that is harmless (they have no function-local imports). But `core.py`'s `open`/`from_connection`
+factories DELIBERATELY place `from doxastica.backends.ladybug import LadybugBackend` INSIDE the
+method bodies (D-02 — function-local imports keep the module driver-blind). An `ast.walk` scan
+would flag those legitimate function-local imports as offenders and fail the test. So when adding
+`core` and `backends/memory` to the scan, the collection logic MUST inspect MODULE-LEVEL imports
+only.
+
+**Module-level collection pattern to use** (replaces the `ast.walk` loop):
 ```python
-imported: list[str] = []
-for node in ast.walk(tree):
-    if isinstance(node, ast.Import):
-        imported += [alias.name for alias in node.names]
-    elif isinstance(node, ast.ImportFrom) and node.module:
-        imported.append(node.module)
+def _module_level_imports(tree: ast.Module) -> list[str]:
+    """Collect imports at module scope only: top-level + TYPE_CHECKING-block imports.
+
+    Deliberately ignores imports nested inside function/method bodies — core.py's
+    factories use sanctioned function-local ladybug imports (D-02) that the contract
+    PERMITS, so the driver-blind scan must not see them.
+    """
+    nodes: list[ast.stmt] = list(tree.body)
+    # Descend into module-level `if TYPE_CHECKING:` blocks (and their else), but NOT
+    # into FunctionDef / AsyncFunctionDef / ClassDef-method bodies.
+    for stmt in tree.body:
+        if isinstance(stmt, ast.If) and _is_type_checking_test(stmt.test):
+            nodes += [*stmt.body, *stmt.orelse]
+
+    imported: list[str] = []
+    for node in nodes:
+        if isinstance(node, ast.Import):
+            imported += [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imported.append(node.module)
+    return imported
+```
+(`_is_type_checking_test` matches a bare `TYPE_CHECKING` name or a `typing.TYPE_CHECKING`
+attribute. An equivalent acceptable approach is to keep `ast.walk` but skip any import node
+nested under a `FunctionDef`/`AsyncFunctionDef`.) The offender assertion is unchanged:
+```python
 offenders = [name for name in imported if name.split(".")[0] == "ladybug"]
 assert not offenders, f"{module}.py must not import ladybug; found: {offenders}"
 ```
 
 **Extend (D-02)** two ways:
-1. **Static AST scan** — add `core` and `backends/memory` to the `@pytest.mark.parametrize`
-   module list (they join `protocol`, `ports`). Same assertion catches a top-level OR
-   `TYPE_CHECKING`-block ladybug import in `core.py`.
+1. **Static module-level scan** — add `core` and `backends/memory` to the
+   `@pytest.mark.parametrize` module list (they join `protocol`, `ports`), and switch the scan to
+   the module-level collection above. The assertion then catches a top-level OR
+   `TYPE_CHECKING`-block ladybug import in `core.py` / `backends.memory` (the real violations),
+   while NOT flagging `MemoryCore`'s deliberate function-local ladybug imports. Update the module
+   docstring accordingly: it inspects MODULE-LEVEL imports only and intentionally ignores
+   function-local imports (REMOVE the prior claim that function-body imports are caught — that is
+   no longer true and would mis-describe the contract).
 2. **Runtime absence** — assert `import doxastica`, `import doxastica.core`,
    `import doxastica.backends.memory` and `MemoryCore.in_memory()` succeed with `ladybug`
    genuinely absent from `sys.modules`. Per RESEARCH §"simulating absence": ladybug IS
    installed in dev, so use a subprocess with a `sys.meta_path` finder that raises for
-   `ladybug` (or `python -c` stub), AND rely on the CI base-install Job 1. Recommend BOTH.
+   `ladybug` (or `python -c` stub), AND rely on the CI base-install Job 1. Recommend BOTH; this
+   subprocess test plus CI Job 1 are the independent proofs of D-02 isolation.
 
 ---
 
@@ -371,8 +408,11 @@ BACK-xx) and what it deliberately does NOT do (e.g. "no AGM operation bodies —
 ### Backend-blind / driver-blind import discipline
 **Source:** `protocol.py:6-11` (the prose contract) + `tests/test_import_purity.py` (the AST gate).
 **Apply to:** `core.py`, `__init__.py`, `backends/__init__.py`, `backends/memory.py`.
-NEVER `import ladybug` outside `backends/ladybug.py`. core.py uses function-local imports in its
-factories. Mechanically enforced by the extended AST scan.
+NEVER place a MODULE-LEVEL `import ladybug` (top-level or under `TYPE_CHECKING`) outside
+`backends/ladybug.py`. core.py uses sanctioned FUNCTION-LOCAL imports in its factories — those
+are PERMITTED and the gate must not flag them. Mechanically enforced by the extended
+MODULE-LEVEL AST scan (which inspects top-level + TYPE_CHECKING-block imports only) plus the
+runtime-absence subprocess test.
 
 ### `from __future__ import annotations` + `TYPE_CHECKING`-gated imports
 **Source:** `ports.py:45-53`, `protocol.py:26-39`.
@@ -388,7 +428,9 @@ adapters'. Keep the port model-blind.
 ### Discipline tests (AST scan + `hasattr` surface assertions)
 **Source:** `test_import_purity.py:20-34`, `test_port_distinct.py:19-37`.
 **Apply to:** `test_import_purity.py` extension and the new backend tests — small functions,
-requirement-ID docstrings, `assert ..., f"actionable message"`.
+requirement-ID docstrings, `assert ..., f"actionable message"`. NOTE: the import-purity scan
+must be MODULE-LEVEL (not `ast.walk` into function bodies) once `core` joins it — see the EXTEND
+section above.
 
 ### Parameterized-Cypher / single-interpolation-point discipline (ladybug only)
 **Source:** RESEARCH Pattern 3 + Security Domain; CLAUDE.md "string-interpolated Cypher
