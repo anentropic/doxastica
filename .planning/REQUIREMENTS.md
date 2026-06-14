@@ -19,16 +19,21 @@ Foundational, decision-grade choices that must be settled before storage code ex
 
 - [ ] **DATA-01**: `BeliefStore` Protocol (`typing.Protocol`) defines the seam — imports only
       `pydantic`/`typing`, never `ladybug`; consumers code against the interface
+
 - [ ] **DATA-02**: `query_scope` takes a **closed typed filter** over core-owned fields
       (e.g. `belief_id`, `status`, event-id range) — never a free `str` interpolated into
       Cypher (prevents triple-structure leak and injection)
+
 - [ ] **DATA-03**: An explicit **UUID7 ordering contract** for `source_event_id` (byte-order
       total order, or a core-owned sequence tie-breaker) so `get_scope_at` is well-defined
       under optional intra-ms monotonicity (RFC 9562)
+
 - [ ] **DATA-04**: `get_impact` return shape carries a **truncation/frontier signal** (so a
       depth-bounded cascade never silently under-reports); `depth` default ratified
+
 - [ ] **DATA-05**: Beliefs modelled as finite explicit **belief bases** (Hansson), not
       deductively-closed sets; no DL/OWL inference in the core (Flouris impossibility)
+
 - [ ] **DATA-06**: Frozen `pydantic` v2 models for `Scope`, `BeliefState`, and an `EdgeType`
       enum; opaque `value: Any` (JSON-encoded), opaque UUID7 `source_event_id`
 
@@ -37,6 +42,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [ ] **SCOPE-01**: `get_or_create_scope(scope_id)` creates/returns a named belief-holder
 - [ ] **SCOPE-02**: A privileged **world scope** exists; `contract()` on it raises
       (`WorldScopeContractionError`) — the no-retcon enforcement point
+
 - [ ] **SCOPE-03**: Multiple scopes are independent peers (multi-scope extension to Kumiho),
       enabling cross-scope divergence queries
 
@@ -44,10 +50,13 @@ Foundational, decision-grade choices that must be settled before storage code ex
 
 - [ ] **CHAIN-01**: `Belief` (stable identity) / `BeliefState` (immutable version) split, one
       belief per `Belief` node
+
 - [ ] **CHAIN-02**: Append-only `HAS_REVISION` chain — no operation deletes or mutates an
       existing `BeliefState` or `HAS_REVISION` edge
+
 - [ ] **CHAIN-03**: Exactly one mutable `CURRENT_STATE` pointer per belief, re-pointed
       atomically (single transaction) on each write
+
 - [ ] **CHAIN-04**: Deprecated vs. superseded is a **structural/query** distinction
       (`include_deprecated` flag + `SUPERSEDES` edge); meaning is left to consumers
 
@@ -55,8 +64,10 @@ Foundational, decision-grade choices that must be settled before storage code ex
 
 - [ ] **OPS-01**: `revise(scope, belief_id, value, source_event_id)` installs `value` as the
       current belief, superseding any prior current state
+
 - [ ] **OPS-02**: `expand(scope, belief_id, value, source_event_id)` adds a belief with no
       conflict check (the AGM expansion reference operation)
+
 - [ ] **OPS-03**: `contract(scope, belief_id, source_event_id)` marks the belief deprecated
       (creates a `status='retracted'` state) — never deletes; world-scope guarded
 
@@ -64,6 +75,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 
 - [ ] **EDGE-01**: `add_edge(from_state, to_state, edge_type)` for generic typed edges
       `SUPERSEDES` / `DEPENDS_ON` / `DERIVED_FROM` (no epistemic semantics in core)
+
 - [ ] **EDGE-02**: `get_impact(belief_state_id, depth)` performs bounded-depth, cycle-safe
       dependency traversal (the contraction cascade *mechanism*; policy is the consumer's)
 
@@ -71,6 +83,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 
 - [ ] **HIST-01**: `query_scope(scope, filter, include_deprecated=False)` returns active (or,
       with the flag, deprecated) belief states — the observation surface
+
 - [ ] **HIST-02**: `get_revision_chain(belief_id)` returns the full immutable version chain
 - [ ] **HIST-03**: `get_scope_at(scope, as_of_event_id)` reconstructs the active base as of an
       event, purely structurally from immutable event-id-ordered states (time-travel)
@@ -80,11 +93,14 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [ ] **BACK-01**: The belief-revision discipline lives in a **backend-agnostic core**
       (`MemoryCore`) above a defined **backend port**; no backend/Cypher-specific code in the
       core logic layer. Port *granularity* (Cypher-level vs. LPG-primitive) decided in Phase 1
+
 - [ ] **BACK-02**: **`ladybug` reference backend adapter** implements the port over LadybugDB
 - [ ] **BACK-03**: **In-memory backend adapter** ships as the second backend — proves the port
       is real and doubles as the Phase 7 shadow-model test oracle (zero extra dependency)
+
 - [ ] **BACK-04**: The backend port contract is **documented** so a third party can write an
       alternative backend for any labelled property graph meeting the documented constraint
+
 - [ ] **BACK-05**: The AGM/Hansson property suite runs as a **backend conformance suite** —
       parameterised so every registered backend must pass the same postulate + invariant tests
 
@@ -93,9 +109,11 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [ ] **CONN-01**: **Flexible connection** — the ladybug backend accepts an injected
       `ladybug.Connection` + namespace (never closed by the core; tenancy R19) *and* can
       self-manage its own (`open(path | ":memory:", namespace=...)`)
+
 - [ ] **CONN-02**: **Label-family tenancy** — the ladybug backend owns and is the only writer
       of its namespaced `:Scope` / `:Belief` / `:BeliefState` tables and edge types; closed
       subgraph (no outbound graph references — entity mentions are opaque values)
+
 - [ ] **CONN-03**: Idempotent schema bootstrap (`CREATE NODE/REL TABLE IF NOT EXISTS`) on init;
       uniqueness enforced structurally (LadybugDB/Kùzu has no UNIQUE constraint)
 
@@ -104,25 +122,33 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [ ] **FORMAL-01**: AGM revision postulate suite green via Hypothesis stateful tests over
       operation sequences: **Success (K*2), Inclusion (K*3), Vacuity (K*4), Consistency (K*5),
       Extensionality (K*6)** — Closure (K*1) dropped by construction (bases)
+
 - [ ] **FORMAL-02**: Hansson belief-base postulate suite green: **Contraction Success,
       Inclusion, Relevance, Core-Retainment, Uniformity**
+
 - [ ] **FORMAL-03**: Structural-invariant suite green: `CURRENT_STATE` uniqueness, chain
       immutability, `get_scope_at ≡ replay`, world-scope no-contraction
+
 - [ ] **FORMAL-04**: AGM **Recovery deliberately excluded** — a loud, named `xfail` with
       rationale, plus positive superseded-chain replacement tests (no Recovery assertion)
+
 - [ ] **FORMAL-05**: The **irony join** demonstrated on synthetic data — actor-scope vs.
       world-scope divergence on `belief_id` computed as one query
+
 - [ ] **FORMAL-06**: Test harness uses throwaway `:memory:` LadybugDB per example,
       `@precondition` (not `assume()`), with a parallel shadow model for the AGM oracle
 
 ### Packaging & Publication
 
-- [ ] **PKG-01**: Scaffolded from `cookiecutter-python-uv-library` (uv, basedpyright strict,
+- [x] **PKG-01**: Scaffolded from `cookiecutter-python-uv-library` (uv, basedpyright strict,
       ruff, pytest + coverage, pre-commit, git-cliff); import name `doxastica`
+
 - [ ] **PKG-02**: Runtime deps **`ladybug` + `pydantic` v2 only**, zero NVM imports;
       `hypothesis` added to the dev group; CI matrix Python 3.11 (floor) and 3.14
+
 - [ ] **PKG-03**: **MIT** license; README leads with "standalone reference implementation of
       Kumiho (arXiv 2603.17244), multi-scope extension, no recovery"
+
 - [ ] **PKG-04**: mkdocs-material docs site (including the published backend port "how to write
       a backend" contract — the consumer-facing form of BACK-04), GitHub Actions CI + release
       pipeline, PyPI-ready packaging, CHANGELOG via git-cliff
@@ -161,7 +187,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | DATA-04 | Phase 1 | Pending |
 | DATA-05 | Phase 1 | Pending |
 | DATA-06 | Phase 1 | Pending |
-| PKG-01 | Phase 1 | Pending |
+| PKG-01 | Phase 1 | Complete |
 | BACK-01 | Phase 1 | Pending |
 | BACK-04 | Phase 1 | Pending |
 | BACK-02 | Phase 2 | Pending |
@@ -196,6 +222,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | PKG-04 | Phase 8 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 39 total (34 prior + 5 new BACK-01..05; CONN-01..03 reframed to the ladybug backend, not added)
 - Mapped to phases: 39 ✓
 - Unmapped: 0 ✓

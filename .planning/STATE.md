@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 1 context gathered
-last_updated: "2026-06-14T19:09:43.152Z"
-last_activity: 2026-06-13 — Roadmap revised for pluggable backends (Ports & Adapters; 39 v1 requirements mapped)
+last_updated: "2026-06-14T19:20:04.251Z"
+last_activity: 2026-06-14 -- Phase 01 execution started
 progress:
   total_phases: 8
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 4
+  completed_plans: 1
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-13)
 
 **Core value:** A correct, append-only belief-revision core behind a clean `BeliefStore` Protocol whose correctness is *provable* — AGM/Hansson postulate compliance and structural invariants verified mechanically, zero narrative semantics leaking in.
-**Current focus:** Phase 1 — Protocol, Backend Port & Data-Model Decisions
+**Current focus:** Phase 01 — protocol-backend-port-data-model-decisions
 
 ## Current Position
 
-Phase: 1 of 8 (Protocol, Backend Port & Data-Model Decisions)
-Plan: 0 of TBD in current phase
+Phase: 01 (protocol-backend-port-data-model-decisions) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-06-13 — Roadmap revised for pluggable backends (Ports & Adapters; 39 v1 requirements mapped)
+Last activity: 2026-06-14 -- Phase 01 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: —
 
 *Updated after each plan completion*
+| Phase 01 P01 | 2 | 3 tasks | 29 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,8 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase 1]: UUID7 ordering contract for `get_scope_at` (byte-order total order or core-owned sequence tie-breaker)
 - [Phase 1]: Draft the backend port contract spec (BACK-04) here; publish the consumer-facing "how to write a backend" docs in Phase 8 via PKG-04
 - [Phase 2]: Confirm `$depth` bind param in variable-length Cypher and `belief_id` synthesized vs. composite PK against the installed `ladybug` package (the spike IS the research); confirm the chosen port granularity survives the real ladybug API and the traversal round-trip budget is acceptable
+- [Phase ?]: Python floor raised 3.11 -> 3.14 at the cookiecutter prompt (CONTEXT #2); requires-python, CI matrices, ruff target, .python-version all render at 3.14
+- [Phase ?]: Runtime deps pinned to exactly ladybug + pydantic; ladybugdb slopsquat token absent; pins resolved on PyPI (ladybug 0.17.1, pydantic 2.13.4)
 
 ### Pending Todos
 
@@ -86,6 +89,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-14T18:24:04.280Z
+Last session: 2026-06-14T19:19:59.570Z
 Stopped at: Phase 1 context gathered
 Resume file: .planning/phases/01-protocol-backend-port-data-model-decisions/01-CONTEXT.md

@@ -60,7 +60,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 4 plansPlans:
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — Scaffold the doxastica package (PKG-01): cookiecutter render, deps pinned to ladybug+pydantic, 3.14 floor, hypothesis in dev
+- [x] 01-01-PLAN.md — Scaffold the doxastica package (PKG-01): cookiecutter render, deps pinned to ladybug+pydantic, 3.14 floor, hypothesis in dev
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -175,7 +175,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Protocol, Backend Port & Data-Model Decisions | 0/4 | Planned | - |
+| 1. Protocol, Backend Port & Data-Model Decisions | 1/4 | In Progress|  |
 | 2. Backend Adapters & Schema Bootstrap | 0/TBD | Not started | - |
 | 3. Append-Only Revision Spine | 0/TBD | Not started | - |
 | 4. Retrieval & Observation Surface | 0/TBD | Not started | - |
