@@ -201,5 +201,8 @@ This document evolves at phase transitions and milestone boundaries.
 3. Audit Out of Scope — reasons still valid?
 4. Update Context with current state
 
+**Phase history:**
+- **Phase 1 — Protocol, Backend Port & Data-Model Decisions** (complete 2026-06-14): typed `basedpyright`-strict foundation landed. Public `BeliefStore` Protocol (pydantic/typing-only, import-purity-guarded), a distinct internal LPG-primitive `BackendPort`, frozen pydantic v2 taxonomy (`extra="forbid"`, opaque `value`/UUID7), closed `BeliefFilter`, `ImpactResult` truncation contract, the UUID7 ordering contract, and the drafted `docs/backend-contract.md`. Decision-grade only — zero storage code; runtime behavior begins Phase 2 (backend adapters & schema-bootstrap spike).
+
 ---
-*Last updated: 2026-06-13 after initialization*
+*Last updated: 2026-06-14 after Phase 1 completion*
