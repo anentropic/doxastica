@@ -468,19 +468,21 @@ def test_protocol_does_not_import_ladybug():
 
 **This table is non-empty:** A1 (NVM 3.14) is the one assumption with real downstream cost and is explicitly carried into planning for user confirmation.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **EdgeType enum membership: do structural `HAS_REVISION`/`CURRENT_STATE` belong in `EdgeType`?**
+> All three questions are dispositioned for Phase 1: Q1 **RESOLVED** in planning (structural edges kept OUT of `EdgeType`); Q2 is a **sanctioned Phase 2 carry-forward** per CONTEXT (not a Phase 1 question); Q3 **RESOLVED** as a prose Markdown spec (`docs/backend-contract.md`).
+
+1. **[RESOLVED — separate]** **EdgeType enum membership: do structural `HAS_REVISION`/`CURRENT_STATE` belong in `EdgeType`?**
    - What we know: generic `SUPERSEDES`/`DEPENDS_ON`/`DERIVED_FROM` are definitely in scope; `HAS_REVISION`/`CURRENT_STATE` are *structural* (the revision-chain plumbing), not consumer-facing edge types passed to `add_edge`.
    - What's unclear: whether they share one enum (simpler, one vocabulary) or live as separate structural constants (cleaner — `add_edge`'s `edge_type` param then can't accept a structural edge).
    - Recommendation: **separate** — `add_edge` should only accept the three generic types; structural edges are written by `MemoryCore` internals, never by a consumer. Planner decides; flagged as discretion in CONTEXT.
 
-2. **Can ladybug express an unbounded cycle-safe reachable-set in one query? (Phase 2 spike — NOT Phase 1)**
+2. **[CARRY-FORWARD — Phase 2 spike]** **Can ladybug express an unbounded cycle-safe reachable-set in one query? (Phase 2 spike — NOT Phase 1)**
    - What we know: LadybugDB/Kùzu variable-length `-[:REL*min..max]-` **requires an upper bound (defaults to 30)** and offers `WALK`/`TRAIL`/`ACYCLIC` semantics + shortest-path variants, all max-bounded `[CITED: docs.ladybugdb.com]`.
    - What's unclear: whether a recursive-join / projected-graph construct gives a genuinely unbounded, cycle-safe *reachable-node-set* (not path-enumeration) efficiently.
    - Recommendation: **do not resolve in Phase 1.** Write `get_impact(depth=None)` + `ImpactResult` as the contract; the in-memory backend's visited-set BFS is the trivial reference; Phase 2 SC4 confirms the ladybug expression or the port/default adjusts. This is already a locked carry-forward.
 
-3. **BACK-04 port-contract spec format.**
+3. **[RESOLVED — prose Markdown]** **BACK-04 port-contract spec format.**
    - What we know: it must enumerate the constraints a third-party LPG backend must meet (see Backend Port Contract below); authored as a doc this phase, published Phase 8 (PKG-04).
    - What's unclear: Markdown prose vs. a `Protocol` docstring vs. a conformance-checklist format.
    - Recommendation: a `docs/backend-contract.md` prose spec keyed to the port Protocol's methods + the invariants list below; the Phase 7 conformance suite (BACK-05) becomes its executable form.
