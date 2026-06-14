@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 1 context gathered
-last_updated: "2026-06-14T19:34:16.319Z"
+last_updated: "2026-06-14T19:51:03.213Z"
 last_activity: 2026-06-14 -- Phase 01 execution started
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 ## Current Position
 
 Phase: 01 (protocol-backend-port-data-model-decisions) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-06-14 -- Phase 01 execution started
 
@@ -54,6 +54,7 @@ Progress: [░░░░░░░░░░] 0%
 *Updated after each plan completion*
 | Phase 01 P01 | 2 | 3 tasks | 29 files |
 | Phase 01 P02 | 12 | 2 tasks | 3 files |
+| Phase 01 P03 | 3min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,8 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase ?]: Python floor raised 3.11 -> 3.14 at the cookiecutter prompt (CONTEXT #2); requires-python, CI matrices, ruff target, .python-version all render at 3.14
 - [Phase ?]: Runtime deps pinned to exactly ladybug + pydantic; ladybugdb slopsquat token absent; pins resolved on PyPI (ladybug 0.17.1, pydantic 2.13.4)
 - [Phase ?]: EdgeType excludes structural HAS_REVISION/CURRENT_STATE (Open Q1 resolved); Status closed to {active,retracted}; BeliefState closed six-field set; used enum.StrEnum as the UP042-clean (str,Enum) equivalent
+- [Phase ?]: 01-03: Public Protocol annotation imports guarded under TYPE_CHECKING (with future annotations) instead of noqa — keeps the seam ruff-clean while the DATA-01 AST scan still inspects them
+- [Phase ?]: 01-03: DATA-03 UUID7 ordering contract written into protocol.py source as docstrings so the doc-assertion finds the (source_event_id byte-order, state_id tiebreak) text
 
 ### Pending Todos
 
@@ -91,6 +94,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-14T19:34:04.681Z
+Last session: 2026-06-14T19:49:09.539Z
 Stopped at: Phase 1 context gathered
 Resume file: .planning/phases/01-protocol-backend-port-data-model-decisions/01-CONTEXT.md

@@ -17,14 +17,14 @@ invariants verified mechanically, with zero narrative semantics leaking in.
 Foundational, decision-grade choices that must be settled before storage code exists
 (reversing any of these is a rewrite).
 
-- [ ] **DATA-01**: `BeliefStore` Protocol (`typing.Protocol`) defines the seam — imports only
+- [x] **DATA-01**: `BeliefStore` Protocol (`typing.Protocol`) defines the seam — imports only
       `pydantic`/`typing`, never `ladybug`; consumers code against the interface
 
 - [x] **DATA-02**: `query_scope` takes a **closed typed filter** over core-owned fields
       (e.g. `belief_id`, `status`, event-id range) — never a free `str` interpolated into
       Cypher (prevents triple-structure leak and injection)
 
-- [ ] **DATA-03**: An explicit **UUID7 ordering contract** for `source_event_id` (byte-order
+- [x] **DATA-03**: An explicit **UUID7 ordering contract** for `source_event_id` (byte-order
       total order, or a core-owned sequence tie-breaker) so `get_scope_at` is well-defined
       under optional intra-ms monotonicity (RFC 9562)
 
@@ -181,9 +181,9 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATA-01 | Phase 1 | Pending |
+| DATA-01 | Phase 1 | Complete |
 | DATA-02 | Phase 1 | Complete |
-| DATA-03 | Phase 1 | Pending |
+| DATA-03 | Phase 1 | Complete |
 | DATA-04 | Phase 1 | Complete |
 | DATA-05 | Phase 1 | Complete |
 | DATA-06 | Phase 1 | Complete |
