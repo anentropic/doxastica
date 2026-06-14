@@ -88,7 +88,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — Driver-free spine: InMemoryBackend oracle + MemoryCore engine/factories + BackendDependencyError (BACK-03)
+- [x] 02-01-PLAN.md — Driver-free spine: InMemoryBackend oracle + MemoryCore engine/factories + BackendDependencyError (BACK-03)
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -192,7 +192,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Protocol, Backend Port & Data-Model Decisions | 4/4 | Complete    | 2026-06-14 |
-| 2. Backend Adapters & Schema Bootstrap | 0/4 | Not started | - |
+| 2. Backend Adapters & Schema Bootstrap | 1/4 | In Progress|  |
 | 3. Append-Only Revision Spine | 0/TBD | Not started | - |
 | 4. Retrieval & Observation Surface | 0/TBD | Not started | - |
 | 5. Edge Model & Contraction Cascade | 0/TBD | Not started | - |

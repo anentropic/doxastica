@@ -95,7 +95,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
       core logic layer. Port *granularity* (Cypher-level vs. LPG-primitive) decided in Phase 1
 
 - [ ] **BACK-02**: **`ladybug` reference backend adapter** implements the port over LadybugDB
-- [ ] **BACK-03**: **In-memory backend adapter** ships as the second backend — proves the port
+- [x] **BACK-03**: **In-memory backend adapter** ships as the second backend — proves the port
       is real and doubles as the Phase 7 shadow-model test oracle (zero extra dependency)
 
 - [x] **BACK-04**: The backend port contract is **documented** so a third party can write an
@@ -191,7 +191,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | BACK-01 | Phase 1 | Complete |
 | BACK-04 | Phase 1 | Complete |
 | BACK-02 | Phase 2 | Pending |
-| BACK-03 | Phase 2 | Pending |
+| BACK-03 | Phase 2 | Complete |
 | CONN-01 | Phase 2 | Pending |
 | CONN-02 | Phase 2 | Pending |
 | CONN-03 | Phase 2 | Pending |
