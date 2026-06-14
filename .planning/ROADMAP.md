@@ -84,7 +84,23 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. The spike confirms against the installed `ladybug` package that the chosen port granularity survives the real API: `IF NOT EXISTS` DDL syntax, multi-statement `BEGIN TRANSACTION`/`COMMIT`, `$param` binds, and `$depth` in variable-length patterns (validated-int workaround documented if unsupported) — AND that `get_impact`/`get_scope_at` do not force an unacceptable number of round-trips under an LPG-primitive port (the named performance tension); the port abstraction is adjusted now if the spike demands it
   5. A `conftest.py` fixture provides a throwaway `:memory:` backend per example (parameterisable across both registered backends) with no shared-path lock errors or state bleed across tests
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+**Wave 1**
+
+- [ ] 02-01-PLAN.md — Driver-free spine: InMemoryBackend oracle + MemoryCore engine/factories + BackendDependencyError (BACK-03)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 02-02-PLAN.md — LadybugBackend: guarded import, ownership (R19), idempotent namespaced bootstrap, 5 primitives + SC4 traverse (BACK-02/CONN-01/02/03)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 02-03-PLAN.md — Parametrized conftest + oracle-parity suite (diamond/cycle/over-bound) + import-purity extension (BACK-03/FORMAL-06)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 02-04-PLAN.md — Option B packaging: pydantic-required/ladybug-extra, uv.lock, two-env CI, [BLOCKING] CLAUDE.md reversal (D-03)
 
 ### Phase 3: Append-Only Revision Spine (Keystone)
 
@@ -176,7 +192,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Protocol, Backend Port & Data-Model Decisions | 4/4 | Complete    | 2026-06-14 |
-| 2. Backend Adapters & Schema Bootstrap | 0/TBD | Not started | - |
+| 2. Backend Adapters & Schema Bootstrap | 0/4 | Not started | - |
 | 3. Append-Only Revision Spine | 0/TBD | Not started | - |
 | 4. Retrieval & Observation Surface | 0/TBD | Not started | - |
 | 5. Edge Model & Contraction Cascade | 0/TBD | Not started | - |
