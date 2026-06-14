@@ -90,7 +90,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 
 ### Backends & Ports (Ports & Adapters)
 
-- [ ] **BACK-01**: The belief-revision discipline lives in a **backend-agnostic core**
+- [x] **BACK-01**: The belief-revision discipline lives in a **backend-agnostic core**
       (`MemoryCore`) above a defined **backend port**; no backend/Cypher-specific code in the
       core logic layer. Port *granularity* (Cypher-level vs. LPG-primitive) decided in Phase 1
 
@@ -98,7 +98,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [ ] **BACK-03**: **In-memory backend adapter** ships as the second backend — proves the port
       is real and doubles as the Phase 7 shadow-model test oracle (zero extra dependency)
 
-- [ ] **BACK-04**: The backend port contract is **documented** so a third party can write an
+- [x] **BACK-04**: The backend port contract is **documented** so a third party can write an
       alternative backend for any labelled property graph meeting the documented constraint
 
 - [ ] **BACK-05**: The AGM/Hansson property suite runs as a **backend conformance suite** —
@@ -188,8 +188,8 @@ Which phases cover which requirements. Populated during roadmap creation.
 | DATA-05 | Phase 1 | Complete |
 | DATA-06 | Phase 1 | Complete |
 | PKG-01 | Phase 1 | Complete |
-| BACK-01 | Phase 1 | Pending |
-| BACK-04 | Phase 1 | Pending |
+| BACK-01 | Phase 1 | Complete |
+| BACK-04 | Phase 1 | Complete |
 | BACK-02 | Phase 2 | Pending |
 | BACK-03 | Phase 2 | Pending |
 | CONN-01 | Phase 2 | Pending |

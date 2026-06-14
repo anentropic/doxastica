@@ -32,7 +32,7 @@ dependency ordering.
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Protocol, Backend Port & Data-Model Decisions** - Two seams (public `BeliefStore` Protocol + internal backend port), backend port granularity decided, frozen models, and the decision-grade choices (no DB contact) that a rewrite would otherwise cost
+- [x] **Phase 1: Protocol, Backend Port & Data-Model Decisions** - Two seams (public `BeliefStore` Protocol + internal backend port), backend port granularity decided, frozen models, and the decision-grade choices (no DB contact) that a rewrite would otherwise cost (completed 2026-06-14)
 - [ ] **Phase 2: Backend Adapters & Schema Bootstrap (De-risking Spike)** - First real LadybugDB contact: the `ladybug` reference backend (flexible connection, idempotent DDL) AND the in-memory backend, both behind the port, plus the `:memory:` test harness
 - [ ] **Phase 3: Append-Only Revision Spine (Keystone)** - Scopes, `Belief`/`BeliefState` split, immutable chains, `CURRENT_STATE` pointer, and `revise`/`expand`/`contract` — written against the port, running on both backends
 - [ ] **Phase 4: Retrieval & Observation Surface** - `query_scope` with closed typed filter + deprecated/superseded matrix; full `get_revision_chain`
@@ -69,7 +69,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [x] 01-03-PLAN.md — Public BeliefStore Protocol + import-purity guard + UUID7 ordering contract (DATA-01/02/03/04/05)
-- [ ] 01-04-PLAN.md — Internal LPG-primitive BackendPort + drafted backend-contract spec (BACK-01/04)
+- [x] 01-04-PLAN.md — Internal LPG-primitive BackendPort + drafted backend-contract spec (BACK-01/04)
 
 ### Phase 2: Backend Adapters & Schema Bootstrap (De-risking Spike)
 
@@ -175,7 +175,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Protocol, Backend Port & Data-Model Decisions | 3/4 | In Progress|  |
+| 1. Protocol, Backend Port & Data-Model Decisions | 4/4 | Complete   | 2026-06-14 |
 | 2. Backend Adapters & Schema Bootstrap | 0/TBD | Not started | - |
 | 3. Append-Only Revision Spine | 0/TBD | Not started | - |
 | 4. Retrieval & Observation Surface | 0/TBD | Not started | - |

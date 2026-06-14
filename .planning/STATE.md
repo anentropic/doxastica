@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
+status: verifying
 stopped_at: Phase 1 context gathered
-last_updated: "2026-06-14T19:51:03.213Z"
+last_updated: "2026-06-14T20:24:27.986Z"
 last_activity: 2026-06-14 -- Phase 01 execution started
 progress:
   total_phases: 8
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 3
-  percent: 0
+  completed_plans: 4
+  percent: 13
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 
 Phase: 01 (protocol-backend-port-data-model-decisions) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-14 -- Phase 01 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -55,6 +55,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P01 | 2 | 3 tasks | 29 files |
 | Phase 01 P02 | 12 | 2 tasks | 3 files |
 | Phase 01 P03 | 3min | 2 tasks | 3 files |
+| Phase 01 P04 | 4min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,9 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase ?]: EdgeType excludes structural HAS_REVISION/CURRENT_STATE (Open Q1 resolved); Status closed to {active,retracted}; BeliefState closed six-field set; used enum.StrEnum as the UP042-clean (str,Enum) equivalent
 - [Phase ?]: 01-03: Public Protocol annotation imports guarded under TYPE_CHECKING (with future annotations) instead of noqa — keeps the seam ruff-clean while the DATA-01 AST scan still inspects them
 - [Phase ?]: 01-03: DATA-03 UUID7 ordering contract written into protocol.py source as docstrings so the doc-assertion finds the (source_event_id byte-order, state_id tiebreak) text
+- [Phase ?]: 01-04: BACK-01 backend port granularity DECIDED as LPG-primitive (five graph primitives, no run/query/execute); recorded in ports.py
+- [Phase ?]: 01-04: traverse is the single graph-walk primitive; get_impact/get_scope_at compose from it (Phases 3+); round-trip tension flagged for Phase 2 spike SC4
+- [Phase ?]: 01-04: BACK-04 contract drafted as prose Markdown (docs/backend-contract.md, 7 constraints); executable form is the Phase 7 conformance suite BACK-05
 
 ### Pending Todos
 
@@ -94,6 +98,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-14T19:49:09.539Z
+Last session: 2026-06-14T20:24:11.198Z
 Stopped at: Phase 1 context gathered
 Resume file: .planning/phases/01-protocol-backend-port-data-model-decisions/01-CONTEXT.md
