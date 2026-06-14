@@ -20,7 +20,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [ ] **DATA-01**: `BeliefStore` Protocol (`typing.Protocol`) defines the seam — imports only
       `pydantic`/`typing`, never `ladybug`; consumers code against the interface
 
-- [ ] **DATA-02**: `query_scope` takes a **closed typed filter** over core-owned fields
+- [x] **DATA-02**: `query_scope` takes a **closed typed filter** over core-owned fields
       (e.g. `belief_id`, `status`, event-id range) — never a free `str` interpolated into
       Cypher (prevents triple-structure leak and injection)
 
@@ -28,13 +28,13 @@ Foundational, decision-grade choices that must be settled before storage code ex
       total order, or a core-owned sequence tie-breaker) so `get_scope_at` is well-defined
       under optional intra-ms monotonicity (RFC 9562)
 
-- [ ] **DATA-04**: `get_impact` return shape carries a **truncation/frontier signal** (so a
+- [x] **DATA-04**: `get_impact` return shape carries a **truncation/frontier signal** (so a
       depth-bounded cascade never silently under-reports); `depth` default ratified
 
-- [ ] **DATA-05**: Beliefs modelled as finite explicit **belief bases** (Hansson), not
+- [x] **DATA-05**: Beliefs modelled as finite explicit **belief bases** (Hansson), not
       deductively-closed sets; no DL/OWL inference in the core (Flouris impossibility)
 
-- [ ] **DATA-06**: Frozen `pydantic` v2 models for `Scope`, `BeliefState`, and an `EdgeType`
+- [x] **DATA-06**: Frozen `pydantic` v2 models for `Scope`, `BeliefState`, and an `EdgeType`
       enum; opaque `value: Any` (JSON-encoded), opaque UUID7 `source_event_id`
 
 ### Scopes
@@ -182,11 +182,11 @@ Which phases cover which requirements. Populated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | DATA-01 | Phase 1 | Pending |
-| DATA-02 | Phase 1 | Pending |
+| DATA-02 | Phase 1 | Complete |
 | DATA-03 | Phase 1 | Pending |
-| DATA-04 | Phase 1 | Pending |
-| DATA-05 | Phase 1 | Pending |
-| DATA-06 | Phase 1 | Pending |
+| DATA-04 | Phase 1 | Complete |
+| DATA-05 | Phase 1 | Complete |
+| DATA-06 | Phase 1 | Complete |
 | PKG-01 | Phase 1 | Complete |
 | BACK-01 | Phase 1 | Pending |
 | BACK-04 | Phase 1 | Pending |

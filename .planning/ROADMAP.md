@@ -64,7 +64,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02-PLAN.md — Frozen pydantic taxonomy + errors (DATA-02/04/05/06): Scope, Belief, BeliefState, BeliefFilter, ImpactResult, Status/EdgeType enums
+- [x] 01-02-PLAN.md — Frozen pydantic taxonomy + errors (DATA-02/04/05/06): Scope, Belief, BeliefState, BeliefFilter, ImpactResult, Status/EdgeType enums
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -175,7 +175,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Protocol, Backend Port & Data-Model Decisions | 1/4 | In Progress|  |
+| 1. Protocol, Backend Port & Data-Model Decisions | 2/4 | In Progress|  |
 | 2. Backend Adapters & Schema Bootstrap | 0/TBD | Not started | - |
 | 3. Append-Only Revision Spine | 0/TBD | Not started | - |
 | 4. Retrieval & Observation Surface | 0/TBD | Not started | - |
