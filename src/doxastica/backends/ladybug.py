@@ -35,8 +35,8 @@ real ladybug API unchanged. The two adapter-internal details that make this work
 1. Variable-length patterns cap the upper hop bound at 30 by default; ``traverse`` issues
    ``CALL var_length_extend_max_depth=<bound>`` to raise that ceiling. ``max_depth=None``
    ("full closure") compiles to the literal :data:`_DEPTH_CEILING`, not a truly-infinite walk.
-2. ``$param`` is rejected inside the var-length bound (``*1..$d`` is a parser error), so the
-   bound is interpolated as a validated ``int``. ``ACYCLIC`` (node-distinct) is the honest,
+2. ``$param`` is rejected inside the var-length hop range (a parser error), so the bound is
+   interpolated as a validated ``int``. ``ACYCLIC`` (node-distinct) is the honest,
    cycle-safe expression of the port's "de-duplicated reachable set". The ``(reached,
    frontier)`` shape is computed in ONE query via ``min(length(p))`` + an ``EXISTS{}`` subquery.
 
@@ -49,8 +49,9 @@ Phases 3-6). The ``HAS_REVISION`` / ``CURRENT_STATE`` edge tables arrive in Phas
 
 from __future__ import annotations
 
+import contextlib
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from doxastica import errors
 
@@ -61,6 +62,12 @@ except ImportError as exc:  # pragma: no cover - exercised in the base-install C
         "The ladybug backend requires the 'ladybug' package. "
         "Install it with:  pip install doxastica[ladybug]"
     ) from exc
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from uuid import UUID
+
+    from doxastica.models import EdgeType
 
 
 # The single sanctioned identifier guard (D-04): DDL table names cannot be $param-bound, so the
@@ -155,6 +162,147 @@ class LadybugBackend:
                 f"CREATE REL TABLE IF NOT EXISTS {ns}_{edge_type}"
                 f"(FROM {ns}_BeliefState TO {ns}_BeliefState)"
             )
+
+    def upsert_node(
+        self,
+        label: str,
+        node_id: UUID | str,
+        props: dict[str, Any],
+    ) -> None:
+        """
+        Insert-or-update a node keyed by ``node_id``; idempotent (BACK-02).
+
+        Compiles to ``MERGE (n:{ns}_{label} {pk:$id}) SET ...`` — ``MERGE`` (NOT ``CREATE``)
+        is idempotent by construction (verified: double-MERGE = 1 node). The node id and every
+        prop value flow through ``$param`` binds (T-02-02); only the validated namespace and the
+        label are interpolated (a Cypher label cannot be ``$param``-bound).
+        """
+        labelled = f"{self._ns}_{label}"
+        params: dict[str, Any] = {"id": str(node_id)}
+        set_clauses: list[str] = []
+        for i, (key, value) in enumerate(props.items()):
+            pname = f"p{i}"
+            params[pname] = value
+            set_clauses.append(f"n.{key} = ${pname}")
+        cypher = f"MERGE (n:{labelled} {{state_id: $id}})"
+        if set_clauses:
+            cypher += " SET " + ", ".join(set_clauses)
+        self._exec(cypher, params)
+
+    def add_edge(
+        self,
+        edge_type: EdgeType | str,
+        from_id: UUID | str,
+        to_id: UUID | str,
+        props: dict[str, Any] | None = None,  # noqa: ARG002  (edge props unused; kept for port parity)
+    ) -> None:
+        """
+        Add a typed directed edge; idempotent — a repeated edge yields exactly one (BACK-02).
+
+        Matches both endpoints then ``MERGE (a)-[:{ns}_{edge_type}]->(b)`` (verified:
+        double-MERGE = 1 edge; double-CREATE = 2). Endpoint ids are ``$param`` binds; only the
+        namespace + edge-type label are interpolated.
+        """
+        rel = f"{self._ns}_{edge_type}"
+        node = f"{self._ns}_BeliefState"
+        self._exec(
+            f"MATCH (a:{node} {{state_id: $from}}), (b:{node} {{state_id: $to}}) "
+            f"MERGE (a)-[:{rel}]->(b)",
+            {"from": str(from_id), "to": str(to_id)},
+        )
+
+    def match_nodes(
+        self,
+        label: str,
+        where: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        """
+        Return nodes of ``label`` whose props exact-match the AND-combined ``where`` (BACK-02).
+
+        Empty ``where`` returns all nodes of that label. Each predicate value is a ``$param``
+        bind (T-02-02); only the namespace + label are interpolated. Returns raw ``list[dict]``
+        below the model layer (D-04).
+        """
+        labelled = f"{self._ns}_{label}"
+        params: dict[str, Any] = {}
+        predicates: list[str] = []
+        for i, (key, value) in enumerate(where.items()):
+            pname = f"p{i}"
+            params[pname] = value
+            predicates.append(f"n.{key} = ${pname}")
+        cypher = f"MATCH (n:{labelled})"
+        if predicates:
+            cypher += " WHERE " + " AND ".join(predicates)
+        cypher += " RETURN n"
+        # `RETURN n` yields a node-object dict per row; unwrap it and strip ladybug's internal
+        # `_ID` / `_LABEL` keys so the row is the plain prop map the oracle returns (D-04 parity).
+        return [
+            {k: v for k, v in row["n"].items() if not k.startswith("_")}
+            for row in self._rows(self._exec(cypher, params))
+        ]
+
+    def traverse(
+        self,
+        start: UUID | str,
+        edge_types: frozenset[EdgeType | str],
+        max_depth: int | None,
+    ) -> tuple[list[dict[str, Any]], frozenset[UUID | str]]:
+        """
+        The single graph-walk primitive — the SC4 resolution, in ONE query (BACK-02 / SC4).
+
+        ``ACYCLIC`` var-length traversal returns the de-duplicated, cycle-safe reachable set
+        (excluding ``start`` itself, matching the in-memory oracle). ``max_depth=None`` compiles
+        to the literal :data:`_DEPTH_CEILING` with ``var_length_extend_max_depth`` raised to lift
+        the default 30-hop cap (Pitfall 1) — so the unbounded frontier is empty in practice. The
+        depth bound is a validated ``int`` interpolated into ``*1..N`` (``$param`` is rejected
+        there — Pitfall 2); ``$start`` is a ``$param`` bind. The ``(reached, frontier)`` shape is
+        computed in one query via ``min(length(p))`` + an ``EXISTS{}`` subquery: a node is on the
+        frontier iff its min depth equals the bound AND it has an unexpanded successor (parity
+        with the oracle, asserted in plan 02-03).
+        """
+        ns = self._ns
+        bound = max_depth if max_depth is not None else _DEPTH_CEILING
+        # belt-and-braces on the typed int (T-02-03): the bound is interpolated, never $param.
+        assert bound >= 0, f"max_depth must be non-negative; got {bound}"
+        self._exec(f"CALL var_length_extend_max_depth={bound}")  # lift the 30-hop cap
+        rels = "|".join(f"{ns}_{edge_type}" for edge_type in edge_types)
+        node = f"{ns}_BeliefState"
+        cypher = (
+            f"MATCH p=(a:{node} {{state_id: $start}})-[:{rels}* ACYCLIC 1..{bound}]->(b:{node}) "
+            f"WHERE b.state_id <> $start "
+            f"WITH b, min(length(p)) AS d "
+            f"RETURN b.state_id AS state_id, d, "
+            f"(d = {bound} AND EXISTS {{ MATCH (b)-[:{rels}]->() }}) AS at_frontier"
+        )
+        rows = self._rows(self._exec(cypher, {"start": str(start)}))
+        reached = [{"state_id": r["state_id"]} for r in rows]
+        frontier: frozenset[UUID | str] = frozenset(
+            r["state_id"] for r in rows if r["at_frontier"]
+        )
+        return reached, frontier
+
+    @contextlib.contextmanager
+    def unit_of_work(self) -> Generator[None]:
+        """
+        Atomic (all-or-nothing) write scope via ``BEGIN``/``COMMIT``/``ROLLBACK`` (BACK-02 / A2).
+
+        Issues ``BEGIN TRANSACTION`` on entry; on any exception inside the block it issues
+        ``ROLLBACK`` (re-raising), otherwise ``COMMIT`` (serializable WAL — verified: ROLLBACK
+        discards the write). Matches the in-memory adapter's logical snapshot/restore semantics.
+        """
+        self._exec("BEGIN TRANSACTION")
+        try:
+            yield
+        except BaseException:
+            self._exec("ROLLBACK")
+            raise
+        else:
+            self._exec("COMMIT")
+
+    def _rows(self, result: lb.QueryResult) -> list[dict[str, Any]]:
+        """Extract a ``QueryResult`` as raw ``list[dict]`` (the canonical port return, D-04)."""
+        # rows_as_dict() guarantees dict rows; get_all() is typed as the wider list|dict union.
+        return [dict(row) for row in result.rows_as_dict().get_all()]
 
     def _exec(
         self,
