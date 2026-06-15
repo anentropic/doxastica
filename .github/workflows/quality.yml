@@ -39,8 +39,13 @@ jobs:
             spec = importlib.util.find_spec('ladybug'); \
             sys.exit('ladybug must be ABSENT in the isolation job' if spec else 0)"
 
-      - name: Import-purity + in-memory subset (ladybug uninstalled)
-        run: uv run pytest tests/test_import_purity.py tests/test_backend_memory.py
+      - name: Full suite, driver-free path (ladybug uninstalled)
+        # Run the WHOLE suite with ladybug absent and rely on `pytest.importorskip` to skip the
+        # ladybug-dependent tests/params (WR-04). An explicit two-file allowlist would silently
+        # exclude any new driver-free test from the D-02 isolation guarantee; running everything
+        # keeps new driver-free tests inside the guarantee automatically. The asymmetry is
+        # deliberate: this job MUST NOT install `--extra ladybug` (the `full` job does that).
+        run: uv run pytest
 
       - name: Cache pruning
         if: always()
