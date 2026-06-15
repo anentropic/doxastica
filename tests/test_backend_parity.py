@@ -46,18 +46,24 @@ def _node(backend: BackendPort, state_id: str, **props: Any) -> None:
     """
     Upsert a BeliefState node keyed by ``state_id`` (the PK), mirroring the id into props.
 
-    ``state_id`` is the ladybug ``BeliefState`` PRIMARY KEY: it is set from the MERGE key
-    (``node_id``) and cannot be re-SET as an ordinary property (ladybug raises). So the PK is
-    NOT passed in the props dict for the ladybug backend. The in-memory oracle stores props
-    verbatim and does not derive ``state_id`` from ``node_id``, so it gets ``state_id`` mirrored
-    into props — giving both backends a ``state_id`` field in ``match_nodes`` rows for parity.
+    Both backends receive an IDENTICAL call (CR-01 fix): the ladybug adapter now derives the
+    MERGE key from the label's PK and EXCLUDES that PK column from the SET loop, so passing
+    ``state_id`` in props is safe (it is the merge key, not a re-SET property). The in-memory
+    oracle stores props verbatim, so mirroring ``state_id`` into props gives both backends a
+    ``state_id`` field in ``match_nodes`` rows — true symmetric parity, no backend-specific
+    workaround (the old ``state_id``-stripping branch masked CR-01).
     """
-    from doxastica.backends.memory import InMemoryBackend
+    backend.upsert_node("BeliefState", state_id, {"state_id": state_id, **props})
 
-    if isinstance(backend, InMemoryBackend):
-        backend.upsert_node("BeliefState", state_id, {"state_id": state_id, **props})
-    else:
-        backend.upsert_node("BeliefState", state_id, dict(props))
+
+def _scope(backend: BackendPort, scope_id: str, **props: Any) -> None:
+    """Upsert a ``Scope`` node keyed on its real PK ``scope_id`` (CR-01 coverage)."""
+    backend.upsert_node("Scope", scope_id, {"scope_id": scope_id, **props})
+
+
+def _belief(backend: BackendPort, belief_id: str, **props: Any) -> None:
+    """Upsert a ``Belief`` node keyed on its real PK ``belief_id`` (CR-01 coverage)."""
+    backend.upsert_node("Belief", belief_id, {"belief_id": belief_id, **props})
 
 
 def _reached_ids(reached: list[dict[str, Any]]) -> list[str]:
@@ -166,6 +172,46 @@ def test_chain_full_closure_empty_frontier_parity(backend: BackendPort) -> None:
     reached, frontier = backend.traverse("A", frozenset({_DEPENDS_ON}), None)
     assert _reached_ids(reached) == ["B", "C", "D"]
     assert _frontier_ids(frontier) == [], "full closure has an empty frontier on both backends"
+
+
+def test_max_depth_zero_frontier_parity(backend: BackendPort) -> None:
+    """Chain, max_depth=0: reach nothing; start is the frontier on both backends (WR-02 / D-05)."""
+    _build_chain(backend)
+    reached, frontier = backend.traverse("A", frozenset({_DEPENDS_ON}), 0)
+    assert _reached_ids(reached) == [], (
+        f"max_depth=0 reaches no nodes (layer 0 is start); got {_reached_ids(reached)}"
+    )
+    assert _frontier_ids(frontier) == ["A"], (
+        f"start sits at the bound with unexpanded successor B; got {_frontier_ids(frontier)}"
+    )
+
+
+def test_max_depth_zero_no_out_edge_empty_frontier_parity(backend: BackendPort) -> None:
+    """A lone node, max_depth=0: empty reached AND empty frontier (no out-edge) on both (WR-02)."""
+    _node(backend, "solo")
+    reached, frontier = backend.traverse("solo", frozenset({_DEPENDS_ON}), 0)
+    assert _reached_ids(reached) == [], f"a lone node reaches nothing; got {_reached_ids(reached)}"
+    assert _frontier_ids(frontier) == [], (
+        f"a node with no out-edge is NOT on the max_depth=0 frontier; got {_frontier_ids(frontier)}"
+    )
+
+
+def test_scope_upsert_parity(backend: BackendPort) -> None:
+    """``Scope`` nodes upsert+match on their real PK ``scope_id`` on both backends (CR-01)."""
+    _scope(backend, "world", is_world=True)
+    _scope(backend, "local", is_world=False)
+    all_ids = sorted(str(r["scope_id"]) for r in backend.match_nodes("Scope", {}))
+    assert all_ids == ["local", "world"], f"both Scope nodes must round-trip; got {all_ids}"
+    worlds = sorted(str(r["scope_id"]) for r in backend.match_nodes("Scope", {"is_world": True}))
+    assert worlds == ["world"], f"AND-exact Scope match on is_world; got {worlds}"
+
+
+def test_belief_upsert_parity(backend: BackendPort) -> None:
+    """``Belief`` nodes upsert+match on their real PK ``belief_id`` on both backends (CR-01)."""
+    _belief(backend, "b1")
+    _belief(backend, "b2")
+    all_ids = sorted(str(r["belief_id"]) for r in backend.match_nodes("Belief", {}))
+    assert all_ids == ["b1", "b2"], f"both Belief nodes must round-trip; got {all_ids}"
 
 
 def test_match_nodes_and_exact_parity(backend: BackendPort) -> None:

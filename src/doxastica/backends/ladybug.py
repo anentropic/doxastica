@@ -282,11 +282,31 @@ class LadybugBackend:
         """
         ns = self._ns
         bound = max_depth if max_depth is not None else _DEPTH_CEILING
-        # belt-and-braces on the typed int (T-02-03): the bound is interpolated, never $param.
-        assert bound >= 0, f"max_depth must be non-negative; got {bound}"
-        self._exec(f"CALL var_length_extend_max_depth={bound}")  # lift the 30-hop cap
+        # Runtime guard on the typed int (WR-03): the bound is INTERPOLATED into `*1..N`, never
+        # $param-bound, so it is part of the injection-safety story (T-02-03). A real `raise`
+        # (not `assert`) keeps the check alive under `python -O`.
+        if bound < 0:
+            raise ValueError(f"max_depth must be non-negative; got {bound}")
         rels = "|".join(f"{ns}_{edge_type}" for edge_type in edge_types)
         node = f"{ns}_BeliefState"
+        # WR-02: `max_depth=0` would compile to the degenerate var-length range `*1..0`. Match the
+        # in-memory oracle (memory.py:122-124): layer 0 is `start`, every out-edge exceeds the
+        # bound, so nothing is reached and `start` is on the frontier iff it has any out-edge.
+        if bound == 0:
+            has_out_edge = bool(
+                self._rows(
+                    self._exec(
+                        f"MATCH (a:{node} {{{_PK_BY_LABEL['BeliefState']}: $start}})"
+                        f"-[:{rels}]->() RETURN a LIMIT 1",
+                        {"start": str(start)},
+                    )
+                )
+            )
+            frontier_zero: frozenset[UUID | str] = (
+                frozenset({str(start)}) if has_out_edge else frozenset()
+            )
+            return [], frontier_zero
+        self._exec(f"CALL var_length_extend_max_depth={bound}")  # lift the 30-hop cap
         cypher = (
             f"MATCH p=(a:{node} {{state_id: $start}})-[:{rels}* ACYCLIC 1..{bound}]->(b:{node}) "
             f"WHERE b.state_id <> $start "
@@ -296,9 +316,7 @@ class LadybugBackend:
         )
         rows = self._rows(self._exec(cypher, {"start": str(start)}))
         reached = [{"state_id": r["state_id"]} for r in rows]
-        frontier: frozenset[UUID | str] = frozenset(
-            r["state_id"] for r in rows if r["at_frontier"]
-        )
+        frontier: frozenset[UUID | str] = frozenset(r["state_id"] for r in rows if r["at_frontier"])
         return reached, frontier
 
     @contextlib.contextmanager
@@ -333,12 +351,16 @@ class LadybugBackend:
         Execute a single Cypher statement and narrow the result to a single ``QueryResult``.
 
         ``Connection.execute`` is typed ``QueryResult | list[QueryResult]`` (the list form is
-        only for multi-statement scripts, which this adapter never issues). The single
+        only for multi-statement scripts, which this adapter never issues). The explicit
         ``isinstance`` narrows the union — the one genuine typing task at the driver boundary
         (Pitfall 4: ladybug ships ``py.typed``, so no missing-type-stub suppression is needed).
+        A real ``raise`` (not ``assert``, WR-03) keeps the narrowing alive under ``python -O``;
+        otherwise a stripped assert would let a ``list`` leak out and fail with a confusing
+        ``AttributeError`` far from here.
         """
         result = self._conn.execute(cypher, parameters=parameters or {})
-        assert isinstance(result, lb.QueryResult), (
-            "single-statement execute must return one QueryResult"
-        )
+        if not isinstance(result, lb.QueryResult):
+            raise TypeError(
+                f"single-statement execute must return one QueryResult; got {type(result)!r}"
+            )
         return result

@@ -173,6 +173,65 @@ def test_traverse_bounded_frontier() -> None:
     be.close()
 
 
+def test_upsert_scope_and_belief_use_their_own_pk() -> None:
+    """Scope/Belief upsert+match on their real PK columns, not a hardcoded state_id (CR-01)."""
+    be = LadybugBackend.open(":memory:", namespace="dx")
+    # Scope's PK is `scope_id`; Belief's is `belief_id`. Before CR-01 these MERGEd on a
+    # non-existent `state_id` column and errored (or silently lost the PK uniqueness guarantee).
+    be.upsert_node("Scope", "world", {"is_world": True})
+    be.upsert_node("Scope", "world", {"is_world": True})  # idempotent on the real PK
+    be.upsert_node("Belief", "b1", {})
+
+    scopes = sorted(str(r["scope_id"]) for r in be.match_nodes("Scope", {}))
+    assert scopes == ["world"], f"double Scope upsert must yield one node on scope_id; got {scopes}"
+    beliefs = sorted(str(r["belief_id"]) for r in be.match_nodes("Belief", {}))
+    assert beliefs == ["b1"], f"Belief upsert keys on belief_id; got {beliefs}"
+    be.close()
+
+
+def test_upsert_tolerates_pk_in_props() -> None:
+    """Passing the PK inside props is safe — it is the merge key, never re-SET (WR-01)."""
+    be = LadybugBackend.open(":memory:", namespace="dx")
+    # Before WR-01 this raised: `SET n.state_id = $p0` re-SETs the merge key. Now the PK is
+    # excluded from the SET loop, so the call (and a re-upsert) succeed.
+    be.upsert_node("BeliefState", "s1", {"state_id": "s1", "status": "active"})
+    be.upsert_node("BeliefState", "s1", {"state_id": "s1", "status": "retracted"})
+    rows = be.match_nodes("BeliefState", {})
+    assert _ids(rows) == ["s1"], f"PK-in-props re-upsert must stay one node; got {rows}"
+    assert rows[0]["status"] == "retracted", "non-PK props still SET-update on re-upsert"
+    be.close()
+
+
+def test_traverse_max_depth_zero() -> None:
+    """max_depth=0 reaches nothing; start is the frontier iff it has an out-edge (WR-02)."""
+    be = LadybugBackend.open(":memory:", namespace="dx")
+    be.upsert_node("BeliefState", "a", {})
+    be.upsert_node("BeliefState", "b", {})
+    be.add_edge("DEPENDS_ON", "a", "b")
+    reached, frontier = be.traverse("a", frozenset({"DEPENDS_ON"}), 0)
+    assert reached == [], f"max_depth=0 reaches nothing; got {reached}"
+    assert frontier == frozenset({"a"}), (
+        f"start sits at the bound with unexpanded successor b; got {frontier}"
+    )
+
+    # A node with no out-edge is NOT on the max_depth=0 frontier.
+    reached2, frontier2 = be.traverse("b", frozenset({"DEPENDS_ON"}), 0)
+    assert reached2 == [] and frontier2 == frozenset(), (
+        f"a node with no out-edge has empty reached+frontier at max_depth=0; "
+        f"got {reached2}, {frontier2}"
+    )
+    be.close()
+
+
+def test_traverse_negative_depth_raises_valueerror() -> None:
+    """A negative max_depth raises ValueError (WR-03: a real raise survives python -O)."""
+    be = LadybugBackend.open(":memory:", namespace="dx")
+    be.upsert_node("BeliefState", "a", {})
+    with pytest.raises(ValueError, match="max_depth must be non-negative"):
+        be.traverse("a", frozenset({"DEPENDS_ON"}), -1)
+    be.close()
+
+
 def test_unit_of_work_rollback() -> None:
     """A write inside a ``unit_of_work`` that raises is discarded (A2 / BACK-02)."""
     be = LadybugBackend.open(":memory:", namespace="dx")
