@@ -85,6 +85,19 @@ _DEPTH_CEILING = 1_000_000
 # the in-memory oracle, which keys on ``node_id`` regardless of label — D-05 parity).
 _PK_BY_LABEL = {"Scope": "scope_id", "Belief": "belief_id", "BeliefState": "state_id"}
 
+# Edge-type string -> (FROM label, TO label). The closed map (PATTERNS flag 1) that lets
+# ``add_edge`` resolve per-edge-type endpoint labels + PK columns instead of hardcoding both
+# endpoints to ``BeliefState``. ``HAS_REVISION`` is the hub-form structural edge (D-07): its FROM
+# endpoint is a ``Belief`` (keyed ``belief_id``), NOT a ``BeliefState``. The three consumer-facing
+# ``EdgeType`` members stay ``BeliefState -> BeliefState``. Keys are RAW STRINGS — ``HAS_REVISION``
+# arrives as a string, never an ``EdgeType`` enum member (D-07), and ``str(EdgeType.X) == "X"``.
+_EDGE_ENDPOINTS = {
+    "HAS_REVISION": ("Belief", "BeliefState"),
+    "SUPERSEDES": ("BeliefState", "BeliefState"),
+    "DEPENDS_ON": ("BeliefState", "BeliefState"),
+    "DERIVED_FROM": ("BeliefState", "BeliefState"),
+}
+
 
 def _validate_namespace(ns: str) -> None:
     """Reject a namespace that is not a safe bare identifier (D-04, mitigates T-02-01)."""
@@ -149,7 +162,8 @@ class LadybugBackend:
         injected DB. ``{self._ns}`` is the ONLY interpolated identifier (validated in
         ``__init__``); everything else is structural DDL. ``state_id`` is a STRING PK holding
         the UUID7 text form (the core mints + stringifies; CONN-03 uniqueness via PRIMARY KEY).
-        ``HAS_REVISION`` / ``CURRENT_STATE`` arrive in Phase 3.
+        Phase 3 adds ONLY the hub-form ``HAS_REVISION`` REL table (``FROM Belief TO BeliefState``,
+        D-07); no ``CURRENT_STATE`` table is created — current is DERIVED, not a stored edge (D-01).
         """
         ns = self._ns
         # PK columns are read from `_PK_BY_LABEL` so the DDL and `upsert_node`'s MERGE key
@@ -174,6 +188,13 @@ class LadybugBackend:
                 f"CREATE REL TABLE IF NOT EXISTS {ns}_{edge_type}"
                 f"(FROM {ns}_BeliefState TO {ns}_BeliefState)"
             )
+        # The hub-form HAS_REVISION structural edge (D-07): FROM is a Belief (keyed belief_id),
+        # NOT a BeliefState — so it is its own statement, not part of the BeliefState->BeliefState
+        # loop above. No CURRENT_STATE table (D-01: current is derived, not a stored edge).
+        self._exec(
+            f"CREATE REL TABLE IF NOT EXISTS {ns}_HAS_REVISION"
+            f"(FROM {ns}_Belief TO {ns}_BeliefState)"
+        )
 
     def upsert_node(
         self,
@@ -220,13 +241,22 @@ class LadybugBackend:
         Add a typed directed edge; idempotent — a repeated edge yields exactly one (BACK-02).
 
         Matches both endpoints then ``MERGE (a)-[:{ns}_{edge_type}]->(b)`` (verified:
-        double-MERGE = 1 edge; double-CREATE = 2). Endpoint ids are ``$param`` binds; only the
-        namespace + edge-type label are interpolated.
+        double-MERGE = 1 edge; double-CREATE = 2). The endpoint LABELS + PK columns are resolved
+        per edge type from ``_EDGE_ENDPOINTS`` (+ ``_PK_BY_LABEL``), NOT hardcoded to
+        ``BeliefState``/``state_id`` — so the hub-form ``HAS_REVISION`` matches its FROM endpoint
+        as a ``Belief`` (keyed ``belief_id``) while the structural family stays
+        ``BeliefState``->``BeliefState`` (keyed ``state_id``). ``HAS_REVISION`` arrives as a raw
+        string, never an ``EdgeType`` member (D-07). Endpoint ids are ``$param`` binds; only the
+        validated namespace + fixed endpoint labels + edge-type label are interpolated.
         """
+        from_label, to_label = _EDGE_ENDPOINTS[str(edge_type)]
         rel = f"{self._ns}_{edge_type}"
-        node = f"{self._ns}_BeliefState"
+        a_node = f"{self._ns}_{from_label}"
+        b_node = f"{self._ns}_{to_label}"
+        a_pk = _PK_BY_LABEL[from_label]
+        b_pk = _PK_BY_LABEL[to_label]
         self._exec(
-            f"MATCH (a:{node} {{state_id: $from}}), (b:{node} {{state_id: $to}}) "
+            f"MATCH (a:{a_node} {{{a_pk}: $from}}), (b:{b_node} {{{b_pk}: $to}}) "
             f"MERGE (a)-[:{rel}]->(b)",
             {"from": str(from_id), "to": str(to_id)},
         )
