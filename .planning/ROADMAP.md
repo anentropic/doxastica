@@ -119,7 +119,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Wave 1**
 
 - [x] 03-01-PLAN.md — Structural foundation: WORLD_SCOPE_ID constant + barrel export; HAS_REVISION REL table (hub) + generalized ladybug add_edge endpoints
-- [ ] 03-03-PLAN.md — Wave-0 behavior test scaffold (tests/test_revision_spine.py) over both backends
+- [x] 03-03-PLAN.md — Wave-0 behavior test scaffold (tests/test_revision_spine.py) over both backends
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -206,7 +206,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 |-------|----------------|--------|-----------|
 | 1. Protocol, Backend Port & Data-Model Decisions | 4/4 | Complete    | 2026-06-14 |
 | 2. Backend Adapters & Schema Bootstrap | 4/4 | Complete    | 2026-06-15 |
-| 3. Append-Only Revision Spine | 1/4 | In Progress|  |
+| 3. Append-Only Revision Spine | 2/4 | In Progress|  |
 | 4. Retrieval & Observation Surface | 0/TBD | Not started | - |
 | 5. Edge Model & Contraction Cascade | 0/TBD | Not started | - |
 | 6. Structural Time-Travel | 0/TBD | Not started | - |

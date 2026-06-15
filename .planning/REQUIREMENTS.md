@@ -39,16 +39,16 @@ Foundational, decision-grade choices that must be settled before storage code ex
 
 ### Scopes
 
-- [ ] **SCOPE-01**: `get_or_create_scope(scope_id)` creates/returns a named belief-holder
+- [x] **SCOPE-01**: `get_or_create_scope(scope_id)` creates/returns a named belief-holder
 - [x] **SCOPE-02**: A privileged **world scope** exists; `contract()` on it raises
       (`WorldScopeContractionError`) — the no-retcon enforcement point
 
-- [ ] **SCOPE-03**: Multiple scopes are independent peers (multi-scope extension to Kumiho),
+- [x] **SCOPE-03**: Multiple scopes are independent peers (multi-scope extension to Kumiho),
       enabling cross-scope divergence queries
 
 ### Revision Chains (the keystone)
 
-- [ ] **CHAIN-01**: `Belief` (stable identity) / `BeliefState` (immutable version) split, one
+- [x] **CHAIN-01**: `Belief` (stable identity) / `BeliefState` (immutable version) split, one
       belief per `Belief` node
 
 - [x] **CHAIN-02**: Append-only `HAS_REVISION` chain — no operation deletes or mutates an
@@ -62,13 +62,13 @@ Foundational, decision-grade choices that must be settled before storage code ex
 
 ### Core Belief Operations
 
-- [ ] **OPS-01**: `revise(scope, belief_id, value, source_event_id)` installs `value` as the
+- [x] **OPS-01**: `revise(scope, belief_id, value, source_event_id)` installs `value` as the
       current belief, superseding any prior current state
 
-- [ ] **OPS-02**: `expand(scope, belief_id, value, source_event_id)` adds a belief with no
+- [x] **OPS-02**: `expand(scope, belief_id, value, source_event_id)` adds a belief with no
       conflict check (the AGM expansion reference operation)
 
-- [ ] **OPS-03**: `contract(scope, belief_id, source_event_id)` marks the belief deprecated
+- [x] **OPS-03**: `contract(scope, belief_id, source_event_id)` marks the belief deprecated
       (creates a `status='retracted'` state) — never deletes; world-scope guarded
 
 ### Edges & Contraction Cascade
@@ -196,15 +196,15 @@ Which phases cover which requirements. Populated during roadmap creation.
 | CONN-02 | Phase 2 | Complete |
 | CONN-03 | Phase 2 | Complete |
 | FORMAL-06 | Phase 2 | Complete |
-| SCOPE-01 | Phase 3 | Pending |
+| SCOPE-01 | Phase 3 | Complete |
 | SCOPE-02 | Phase 3 | Complete |
-| SCOPE-03 | Phase 3 | Pending |
-| CHAIN-01 | Phase 3 | Pending |
+| SCOPE-03 | Phase 3 | Complete |
+| CHAIN-01 | Phase 3 | Complete |
 | CHAIN-02 | Phase 3 | Complete |
 | CHAIN-03 | Phase 3 | Pending |
-| OPS-01 | Phase 3 | Pending |
-| OPS-02 | Phase 3 | Pending |
-| OPS-03 | Phase 3 | Pending |
+| OPS-01 | Phase 3 | Complete |
+| OPS-02 | Phase 3 | Complete |
+| OPS-03 | Phase 3 | Complete |
 | HIST-02 | Phase 3 | Complete |
 | CHAIN-04 | Phase 4 | Pending |
 | HIST-01 | Phase 4 | Pending |
