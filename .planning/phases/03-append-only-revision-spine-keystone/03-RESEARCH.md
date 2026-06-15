@@ -548,34 +548,47 @@ self._exec(
 | A3 | `_DEPTH_CEILING`/traverse is NOT needed for Phase-3 derived-current (current uses `match_nodes`, not `traverse`). | Pattern 2 | LOW — verified: derived-current is a `match_nodes` + Python max, no graph walk. `traverse` first matters in Phase 5. `[VERIFIED: live probe]` |
 | A4 | The SC3 consistency check belongs in this phase as a Hypothesis stateful machine (a scoped subset), with the FULL AGM/Hansson suite assembled in Phase 7. | Validation Architecture | LOW — SC3/FORMAL-03 are the Phase-3 success criterion; CONTEXT D-01 explicitly reframes the invariant test as a consistency check for this phase. `[CITED: 03-CONTEXT.md D-01]` |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All three discretionary questions below carried embedded recommended answers; they are now
+> formally resolved and the Phase-3 plans (03-01..03-04) implement the resolutions verbatim
+> (D-07 hub edge in 03-01; cross-scope `get_revision_chain` in 03-02; pure-function `is_world` in
+> 03-02 `_ensure_scope`). No plan change resulted from the resolution — the recommendations were
+> already the plan-of-record.
 
 1. **`HAS_REVISION` shape: hub (`Belief→state`) vs chain-link (`state→state`)?**
+   - **RESOLVED: hub form (`FROM Belief TO BeliefState`).** Simplest, matches the design sketch,
+     and Phase 6 reconstructs the chain by ordering-sort anyway (no edge-walk needed). 03-01 Task 2
+     creates `CREATE REL TABLE IF NOT EXISTS {ns}_HAS_REVISION(FROM {ns}_Belief TO {ns}_BeliefState)`
+     and generalizes `add_edge` endpoints accordingly. Revisit only if Phase-6 profiling later
+     wants a walkable `state→state` chain.
    - What we know: Claude's Discretion (D-07). Hub matches the design sketch; both satisfy
      `get_revision_chain`. Derived-current does NOT depend on the edge shape (it uses
      `match_nodes` + ordering, not edge-walk).
-   - What's unclear: whether any later phase (Phase 6 `get_scope_at`) wants to *walk*
-     `HAS_REVISION` rather than re-`match_nodes`. If so, chain-link gives a literal chain to
+   - What's unclear (at research time): whether any later phase (Phase 6 `get_scope_at`) wants to
+     *walk* `HAS_REVISION` rather than re-`match_nodes`. If so, chain-link gives a literal chain to
      traverse; hub gives a fan-out from the Belief.
-   - Recommendation: **Hub form** (`FROM Belief TO BeliefState`) — simplest, matches the sketch,
-     and Phase 6 reconstructs by ordering-sort anyway (no edge-walk needed). Revisit only if
-     Phase-6 profiling wants a walkable chain.
 
 2. **Is `get_revision_chain(belief_id)` scoped or cross-scope?**
+   - **RESOLVED: cross-scope** — return all states for `belief_id` across scopes, ordered by
+     `(source_event_id, state_id)`. The protocol signature takes only `belief_id` (no `scope_id`),
+     so it cannot be scoped at the public surface, and HIST-02 says "the full immutable version
+     chain". 03-02 Task 2 implements `match_nodes("BeliefState", {"belief_id": belief_id})` then the
+     ordering-contract sort (Pattern 6); 03-03 adds the multi-scope chain coverage.
    - What we know: the protocol signature takes only `belief_id` (no `scope_id`), so it cannot be
      scoped at the public surface. HIST-02 says "the full immutable version chain".
-   - What's unclear: in multi-scope, the same `belief_id` has states in several scopes; "the
-     chain" is naturally the union across scopes ordered by the contract.
-   - Recommendation: return **all states for `belief_id` across scopes**, ordered by
-     `(source_event_id, state_id)` (Pattern 6). This matches the signature and HIST-02's "full".
-     Flag for the planner to confirm against `05 §6` and to add a multi-scope chain test.
+   - What's unclear (at research time): in multi-scope, the same `belief_id` has states in several
+     scopes; "the chain" is naturally the union across scopes ordered by the contract.
 
 3. **Does `_ensure_scope` inside a write need to re-derive `is_world`, and should an existing
    non-world scope ever flip?**
+   - **RESOLVED: `is_world` is a pure function of `scope_id == WORLD_SCOPE_ID`; an existing scope
+     NEVER flips.** The ensure step only create-if-absent (applying the reserved-id rule on create);
+     it does not re-derive or mutate the `is_world` of a pre-existing scope. 03-02 Task 1 implements
+     `_ensure_scope` this way and derives `is_world` in the core for the return value (Pitfall 4),
+     never trusting the stored column.
    - What we know: D-06 says apply the reserved-id rule on auto-create. A pre-existing
      `"__world__"` scope is already `is_world=True`; a non-`"__world__"` id can never be world.
-   - Recommendation: `is_world` is a pure function of `scope_id == WORLD_SCOPE_ID`; never flip an
-     existing scope. The ensure step only needs to create-if-absent. No ambiguity in practice.
 
 ## Environment Availability
 
