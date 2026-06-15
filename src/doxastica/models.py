@@ -27,6 +27,12 @@ from uuid import UUID  # noqa: TC003  (pydantic resolves field annotations at ru
 
 from pydantic import BaseModel
 
+# The reserved world-scope id (D-02). Deliberately dunder-wrapped — chosen over a bare
+# ``"world"`` so it cannot collide with a caller-chosen scope literally named "world". This is
+# the single id for which ``get_or_create_scope`` yields ``Scope(is_world=True)``; the signature
+# ``get_or_create_scope(scope_id: str) -> Scope`` is unchanged (no ``is_world`` parameter).
+WORLD_SCOPE_ID: str = "__world__"
+
 
 class Status(StrEnum):
     """

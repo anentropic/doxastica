@@ -8,6 +8,7 @@ from doxastica.errors import (
     WorldScopeContractionError,
 )
 from doxastica.models import (
+    WORLD_SCOPE_ID,
     Belief,
     BeliefFilter,
     BeliefState,
@@ -31,5 +32,6 @@ __all__ = [
     "MemoryCore",
     "Scope",
     "Status",
+    "WORLD_SCOPE_ID",
     "WorldScopeContractionError",
 ]
