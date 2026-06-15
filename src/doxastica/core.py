@@ -64,16 +64,14 @@ class MemoryCore:
         Build a core over a self-managing ladybug backend (``owns_conn=True``, D-01).
 
         Opens and owns its own LadybugDB connection for ``path`` (or ``":memory:"``). The
-        ``LadybugBackend.open`` classmethod is built in plan 02-02; this wiring references it
-        by name. The driver import is FUNCTION-LOCAL (D-02).
+        ``LadybugBackend.open`` classmethod is the wave-2 ladybug adapter (plan 02-02); this
+        wiring references it by name. The driver import is FUNCTION-LOCAL (D-02).
         """
-        # function-local (D-02); forward-references the wave-2 ladybug adapter (plan 02-02),
-        # so the module is statically unresolved until then — cast pins the BackendPort type.
-        from doxastica.backends import (
-            ladybug,  # pyright: ignore[reportAttributeAccessIssue, reportUnknownVariableType]
-        )
+        # function-local (D-02) — keeps this module driver-blind; the cast pins the BackendPort
+        # type so the composed core is statically typed without importing the driver here.
+        from doxastica.backends import ladybug
 
-        backend = cast("BackendPort", ladybug.LadybugBackend.open(path, namespace=namespace))  # pyright: ignore[reportUnknownMemberType]
+        backend = cast("BackendPort", ladybug.LadybugBackend.open(path, namespace=namespace))
         return cls(backend)
 
     @classmethod
@@ -83,17 +81,16 @@ class MemoryCore:
 
         Wraps a tenant-supplied ``lb.Connection`` with ``owns_conn=False`` — the core is a
         tenant and must not close someone else's handle. The driver import is FUNCTION-LOCAL
-        (D-02); ``LadybugBackend`` arrives in plan 02-02.
+        (D-02); ``LadybugBackend`` is the wave-2 ladybug adapter (plan 02-02).
         """
-        # function-local (D-02); forward-references the wave-2 ladybug adapter (plan 02-02),
-        # so the module is statically unresolved until then — cast pins the BackendPort type.
-        from doxastica.backends import (
-            ladybug,  # pyright: ignore[reportAttributeAccessIssue, reportUnknownVariableType]
-        )
+        # function-local (D-02) — keeps this module driver-blind. The cast pins the BackendPort
+        # type; ``conn`` is typed ``object`` (not ``lb.Connection``) so core.py never imports the
+        # driver, hence the reportArgumentType suppression on the LadybugBackend construction.
+        from doxastica.backends import ladybug
 
         backend = cast(
             "BackendPort",
-            ladybug.LadybugBackend(conn, namespace=namespace, owns_conn=False),  # pyright: ignore[reportUnknownMemberType]
+            ladybug.LadybugBackend(conn, namespace=namespace, owns_conn=False),  # pyright: ignore[reportArgumentType]
         )
         return cls(backend)
 
