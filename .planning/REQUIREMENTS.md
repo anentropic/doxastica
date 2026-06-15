@@ -40,7 +40,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 ### Scopes
 
 - [ ] **SCOPE-01**: `get_or_create_scope(scope_id)` creates/returns a named belief-holder
-- [ ] **SCOPE-02**: A privileged **world scope** exists; `contract()` on it raises
+- [x] **SCOPE-02**: A privileged **world scope** exists; `contract()` on it raises
       (`WorldScopeContractionError`) — the no-retcon enforcement point
 
 - [ ] **SCOPE-03**: Multiple scopes are independent peers (multi-scope extension to Kumiho),
@@ -51,7 +51,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [ ] **CHAIN-01**: `Belief` (stable identity) / `BeliefState` (immutable version) split, one
       belief per `Belief` node
 
-- [ ] **CHAIN-02**: Append-only `HAS_REVISION` chain — no operation deletes or mutates an
+- [x] **CHAIN-02**: Append-only `HAS_REVISION` chain — no operation deletes or mutates an
       existing `BeliefState` or `HAS_REVISION` edge
 
 - [ ] **CHAIN-03**: Exactly one mutable `CURRENT_STATE` pointer per belief, re-pointed
@@ -84,7 +84,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [ ] **HIST-01**: `query_scope(scope, filter, include_deprecated=False)` returns active (or,
       with the flag, deprecated) belief states — the observation surface
 
-- [ ] **HIST-02**: `get_revision_chain(belief_id)` returns the full immutable version chain
+- [x] **HIST-02**: `get_revision_chain(belief_id)` returns the full immutable version chain
 - [ ] **HIST-03**: `get_scope_at(scope, as_of_event_id)` reconstructs the active base as of an
       event, purely structurally from immutable event-id-ordered states (time-travel)
 
@@ -197,15 +197,15 @@ Which phases cover which requirements. Populated during roadmap creation.
 | CONN-03 | Phase 2 | Complete |
 | FORMAL-06 | Phase 2 | Complete |
 | SCOPE-01 | Phase 3 | Pending |
-| SCOPE-02 | Phase 3 | Pending |
+| SCOPE-02 | Phase 3 | Complete |
 | SCOPE-03 | Phase 3 | Pending |
 | CHAIN-01 | Phase 3 | Pending |
-| CHAIN-02 | Phase 3 | Pending |
+| CHAIN-02 | Phase 3 | Complete |
 | CHAIN-03 | Phase 3 | Pending |
 | OPS-01 | Phase 3 | Pending |
 | OPS-02 | Phase 3 | Pending |
 | OPS-03 | Phase 3 | Pending |
-| HIST-02 | Phase 3 | Pending |
+| HIST-02 | Phase 3 | Complete |
 | CHAIN-04 | Phase 4 | Pending |
 | HIST-01 | Phase 4 | Pending |
 | EDGE-01 | Phase 5 | Pending |

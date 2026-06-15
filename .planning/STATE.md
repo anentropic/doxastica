@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 3 context gathered
-last_updated: "2026-06-15T23:30:59.204Z"
-last_activity: 2026-06-15 -- Phase 03 planning complete
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-06-15T23:37:13.994Z"
+last_activity: 2026-06-15 -- Phase 03 execution started
 progress:
   total_phases: 8
   completed_phases: 2
-  total_plans: 8
-  completed_plans: 8
+  total_plans: 12
+  completed_plans: 9
   percent: 25
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-13)
 
 **Core value:** A correct, append-only belief-revision core behind a clean `BeliefStore` Protocol whose correctness is *provable* — AGM/Hansson postulate compliance and structural invariants verified mechanically, zero narrative semantics leaking in.
-**Current focus:** Phase 02 — backend-adapters-schema-bootstrap-de-risking-spike
+**Current focus:** Phase 03 — append-only-revision-spine-keystone
 
 ## Current Position
 
-Phase: 3
-Plan: Not started
+Phase: 03 (append-only-revision-spine-keystone) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-06-15 -- Phase 03 planning complete
+Last activity: 2026-06-15 -- Phase 03 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02 P02 | 12min | 2 tasks | 4 files |
 | Phase 02 P03 | 12min | 2 tasks | 4 files |
 | Phase 02 P04 | 15 | 2 tasks | 5 files |
+| Phase 03 P01 | 3min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,8 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase ?]: DEF-02-01: ladybug coerces brace/bracket-shaped STRING params to STRUCT/LIST (value-opacity hazard) — deferred to the Phase 3 value-encoding contract
 - [Phase ?]: Phase 2 D-03 (Option B packaging): pydantic is the sole required runtime dep; ladybug demoted to the doxastica[ladybug] opt-in extra; future backends are extras.
 - [Phase ?]: [BLOCKING] CLAUDE.md constraint reversal recorded as decision-grade (sibling to the 3.14-floor decision): exactly-ladybug+pydantic and pinned-to-LadybugDB / no-storage-abstraction superseded by the Phase-1 BackendPort; ladybug is the reference backend, not the only substrate.
+- [Phase 03]: 03-01: WORLD_SCOPE_ID is the dunder-wrapped '__world__' constant in models.py (not constants.py), barrel-re-exported; get_or_create_scope signature unchanged (D-02)
+- [Phase 03]: 03-01: HAS_REVISION is hub form FROM Belief TO BeliefState, passed to add_edge as a raw string; ladybug add_edge generalized via _EDGE_ENDPOINTS for per-edge-type endpoint labels+PKs; no CURRENT_STATE table (D-01/D-07)
 
 ### Pending Todos
 
@@ -109,6 +112,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-15T23:01:05.130Z
-Stopped at: Phase 3 context gathered
-Resume file: .planning/phases/03-append-only-revision-spine-keystone/03-CONTEXT.md
+Last session: 2026-06-15T23:37:13.989Z
+Stopped at: Completed 03-01-PLAN.md
+Resume file: None
