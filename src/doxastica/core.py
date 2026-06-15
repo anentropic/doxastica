@@ -27,20 +27,33 @@ shared ``revise`` ≡ ``expand`` append (D-04), ``contract`` (D-05 vacuity + ret
 D-03 structural world-scope guard), and ``get_revision_chain`` (HIST-02). The remaining AGM
 read surface (``query_scope`` / ``get_impact`` / ``get_scope_at``) lands in Phases 4-6. All
 bodies compose ONLY the five ``BackendPort`` primitives and stay driver-blind — the opaque
-``value`` is ``json.dumps``-encoded on write and ``json.loads``-decoded on hydrate so it
-round-trips byte-identically on BOTH backends (DEF-02-01). ``json`` / ``uuid`` are stdlib
-(allowed at module top); the only forbidden module-level import remains ``ladybug``.
+``value`` is encoded ONCE on write (``_encode_value``) and decoded on hydrate
+(``_decode_value``) so it round-trips byte-identically on BOTH backends (DEF-02-01). The
+encoding is base64-over-JSON rather than bare ``json.dumps``: a brace/bracket-shaped JSON
+string (``{"x": 2}`` / ``[1, 2, 3]``) is silently coerced by the ladybug ``STRING`` column
+(it parses the literal as a STRUCT/LIST and re-stringifies, dropping the inner quotes — the
+inherited brace-coercion corruption, T-03-03). base64 yields an alnum/``+/=`` token that
+NEVER starts with a brace, so ladybug stores it verbatim; the in-memory backend stores it
+verbatim too, keeping the two backends byte-identical. The encode/decode boundary lives here
+in ``core.py`` (NOT in either adapter), applied identically on both, so the oracle stays
+value-verbatim and parity holds. ``contract`` copies the already-encoded stored token
+VERBATIM (no re-encode — Pitfall 2). ``json`` / ``base64`` / ``uuid`` are stdlib (allowed at
+module top); the only forbidden module-level import remains ``ladybug``.
 """
 
 from __future__ import annotations
 
+import base64
 import json
+import uuid
 from typing import TYPE_CHECKING, Any, cast
 
+from doxastica.errors import WorldScopeContractionError
 from doxastica.models import WORLD_SCOPE_ID, BeliefState, Scope, Status
 
 if TYPE_CHECKING:
     from contextlib import AbstractContextManager
+    from uuid import UUID
 
     from doxastica.ports import BackendPort
     # NOTE (D-02): do NOT import ladybug here, even under TYPE_CHECKING — the open() /
@@ -159,20 +172,156 @@ class MemoryCore:
             return None
         return max(states, key=lambda s: (str(s["source_event_id"]), str(s["state_id"])))
 
-    # --- Value-decode boundary ----------------------------------------------
+    # --- Value encode/decode boundary (DEF-02-01, identical on both backends) -
+    @staticmethod
+    def _encode_value(value: Any) -> str:
+        """
+        Encode the opaque ``value`` to a coercion-proof stored token (the write boundary).
+
+        JSON-serialize, then base64 the UTF-8 bytes. The base64 token is alnum/``+/=`` only and
+        never starts with ``{`` / ``[``, so the ladybug ``STRING`` column cannot mis-parse it as a
+        STRUCT/LIST literal (the inherited brace-coercion corruption, T-03-03 / DEF-02-01). Applied
+        identically on both backends, so the stored form is byte-identical everywhere.
+        """
+        return base64.b64encode(json.dumps(value).encode("utf-8")).decode("ascii")
+
+    @staticmethod
+    def _decode_value(stored: str) -> Any:
+        """Inverse of :meth:`_encode_value` — base64-decode then ``json.loads`` (read boundary)."""
+        return json.loads(base64.b64decode(stored.encode("ascii")).decode("utf-8"))
+
     def _hydrate(self, props: dict[str, Any]) -> BeliefState:
         """
-        Build a frozen ``BeliefState`` from raw port props — the ``json.loads`` decode boundary.
+        Build a frozen ``BeliefState`` from raw port props — the value-decode boundary.
 
-        Inverse of the ``json.dumps`` encode in ``_append``: ``value`` is decoded back to the
-        opaque object; pydantic coerces the ``state_id`` / ``source_event_id`` strings to ``UUID``
-        at the seam, and ``status`` is rebuilt as a ``Status`` member.
+        Inverse of the ``_encode_value`` write encode: ``value`` is decoded back to the opaque
+        object; pydantic coerces the ``state_id`` / ``source_event_id`` strings to ``UUID`` at the
+        seam, and ``status`` is rebuilt as a ``Status`` member.
         """
         return BeliefState(
             state_id=props["state_id"],
             belief_id=props["belief_id"],
             scope_id=props["scope_id"],
             source_event_id=props["source_event_id"],
-            value=json.loads(props["value"]),
+            value=self._decode_value(props["value"]),
             status=Status(props["status"]),
         )
+
+    # --- Shared revise/expand append (D-04) ---------------------------------
+    def _append(
+        self,
+        scope_id: str,
+        belief_id: str,
+        value: Any,
+        source_event_id: UUID,
+        status: Status,
+    ) -> BeliefState:
+        """
+        The shared ``revise`` ≡ ``expand`` body (D-04) — one append, inside ONE unit_of_work.
+
+        Steps (CHAIN-02/03, D-06, D-07, DEF-02-01), all composing the port primitives:
+        auto-create the scope and ``Belief`` node (D-06); compute ``prior`` BEFORE the new
+        append (Pitfall 3); mint a fresh ``state_id`` (stdlib ``uuid.uuid7()``); ``json.dumps``
+        the opaque value once (DEF-02-01); append the active ``BeliefState``; lay the
+        ``HAS_REVISION`` hub edge (raw string — NOT an ``EdgeType`` member, D-07); and, when a
+        prior current existed, lay ``SUPERSEDES new → prior`` (raw string). Returns the hydrated
+        new state.
+        """
+        with self._backend.unit_of_work():  # exactly one (CHAIN-03)
+            self._ensure_scope(scope_id)  # D-06
+            self._backend.upsert_node("Belief", belief_id, {"belief_id": belief_id})  # D-06
+            prior = self._current(scope_id, belief_id)  # derived, BEFORE append (Pitfall 3)
+            state_id = uuid.uuid7()
+            props: dict[str, Any] = {
+                "state_id": str(state_id),
+                "belief_id": belief_id,
+                "scope_id": scope_id,
+                "source_event_id": str(source_event_id),
+                "value": self._encode_value(value),  # encode once on write (DEF-02-01)
+                "status": status.value,
+            }
+            self._backend.upsert_node("BeliefState", state_id, props)
+            self._backend.add_edge("HAS_REVISION", belief_id, str(state_id))  # hub form (D-07)
+            if prior is not None:
+                self._backend.add_edge("SUPERSEDES", str(state_id), prior["state_id"])
+            return self._hydrate(props)
+
+    # --- Core belief operations ---------------------------------------------
+    def revise(
+        self,
+        scope_id: str,
+        belief_id: str,
+        value: Any,
+        source_event_id: UUID,
+    ) -> BeliefState:
+        """AGM revision: append a new active ``BeliefState`` for ``belief_id`` (OPS-01)."""
+        return self._append(scope_id, belief_id, value, source_event_id, Status.active)
+
+    def expand(
+        self,
+        scope_id: str,
+        belief_id: str,
+        value: Any,
+        source_event_id: UUID,
+    ) -> BeliefState:
+        """
+        AGM expansion — MECHANICALLY IDENTICAL to ``revise`` (D-04, OPS-02).
+
+        A one-line delegate to the shared ``_append`` (not a bare ``expand = revise`` class-body
+        alias) so basedpyright-strict keeps the bound-method type; both names stay on the public
+        surface (``protocol.py`` requires both; Phase 7 exercises both AGM families).
+        """
+        return self._append(scope_id, belief_id, value, source_event_id, Status.active)
+
+    def contract(
+        self,
+        scope_id: str,
+        belief_id: str,
+        source_event_id: UUID,
+    ) -> None:
+        """
+        AGM contraction (OPS-03, D-03/D-05): structural world-scope guard, vacuity, retracted-copy.
+
+        The world-scope guard (D-03) is the FIRST statement — it fires BEFORE ``unit_of_work`` and
+        before any backend access, so ``contract(WORLD_SCOPE_ID, …)`` leaks no write even if the
+        world node was never created. Otherwise, inside ONE unit_of_work: compute the prior
+        current; if absent, return ``None`` (D-05 vacuity — silent no-op, no state appended); else
+        append exactly one ``retracted`` state copying the prior STORED value VERBATIM (already
+        json-encoded — do NOT re-encode, Pitfall 2) and lay ``HAS_REVISION`` + ``SUPERSEDES
+        new(retracted) → prior``. Always returns ``None``.
+        """
+        if scope_id == WORLD_SCOPE_ID:  # D-03 STRUCTURAL guard, before any backend access
+            raise WorldScopeContractionError(
+                "contract() is forbidden on the privileged world scope"
+            )
+        with self._backend.unit_of_work():  # exactly one (CHAIN-03)
+            self._ensure_scope(scope_id)
+            prior = self._current(scope_id, belief_id)
+            if prior is None:
+                return None  # D-05 vacuity: silent no-op
+            state_id = uuid.uuid7()
+            props: dict[str, Any] = {
+                "state_id": str(state_id),
+                "belief_id": belief_id,
+                "scope_id": scope_id,
+                "source_event_id": str(source_event_id),
+                "value": prior["value"],  # D-05: copy STORED form verbatim (no re-dumps, Pitfall 2)
+                "status": Status.retracted.value,
+            }
+            self._backend.upsert_node("BeliefState", state_id, props)
+            self._backend.add_edge("HAS_REVISION", belief_id, str(state_id))
+            self._backend.add_edge("SUPERSEDES", str(state_id), prior["state_id"])
+            return None
+
+    # --- History ------------------------------------------------------------
+    def get_revision_chain(self, belief_id: str) -> list[BeliefState]:
+        """
+        Return every ``BeliefState`` for ``belief_id`` (cross-scope) in ordering order (HIST-02).
+
+        Cross-scope by signature (Open Q2 A2 — only ``belief_id``); ordered by the same UUID7
+        contract as ``_current`` (``(source_event_id, state_id)``) but a full ``sort`` rather than
+        a ``max``. The chain is the immutable append-only history (D-07).
+        """
+        states = self._backend.match_nodes("BeliefState", {"belief_id": belief_id})
+        states.sort(key=lambda s: (str(s["source_event_id"]), str(s["state_id"])))
+        return [self._hydrate(s) for s in states]
