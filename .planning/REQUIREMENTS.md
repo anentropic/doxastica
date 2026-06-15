@@ -135,7 +135,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [ ] **FORMAL-05**: The **irony join** demonstrated on synthetic data — actor-scope vs.
       world-scope divergence on `belief_id` computed as one query
 
-- [ ] **FORMAL-06**: Test harness uses throwaway `:memory:` LadybugDB per example,
+- [x] **FORMAL-06**: Test harness uses throwaway `:memory:` LadybugDB per example,
       `@precondition` (not `assume()`), with a parallel shadow model for the AGM oracle
 
 ### Packaging & Publication
@@ -195,7 +195,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | CONN-01 | Phase 2 | Complete |
 | CONN-02 | Phase 2 | Complete |
 | CONN-03 | Phase 2 | Complete |
-| FORMAL-06 | Phase 2 | Pending |
+| FORMAL-06 | Phase 2 | Complete |
 | SCOPE-01 | Phase 3 | Pending |
 | SCOPE-02 | Phase 3 | Pending |
 | SCOPE-03 | Phase 3 | Pending |
