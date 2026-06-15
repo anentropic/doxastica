@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Phase 1 context gathered
-last_updated: "2026-06-15T00:23:15.763Z"
+status: verifying
+stopped_at: Completed 02-04-PLAN.md (last plan of Phase 02; phase ready for verification)
+last_updated: "2026-06-15T10:14:50.039Z"
 last_activity: 2026-06-14 -- Phase 02 execution started
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 8
-  completed_plans: 7
-  percent: 13
+  completed_plans: 8
+  percent: 25
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 
 Phase: 02 (backend-adapters-schema-bootstrap-de-risking-spike) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-14 -- Phase 02 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02 P01 | 20min | 2 tasks | 6 files |
 | Phase 02 P02 | 12min | 2 tasks | 4 files |
 | Phase 02 P03 | 12min | 2 tasks | 4 files |
+| Phase 02 P04 | 15 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,8 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase ?]: Port unchanged, SC4 confirmed — LPG-primitive BackendPort survives ladybug 0.17.1 unchanged; 30-hop cap and $param-in-bound rejection are adapter-internal details
 - [Phase ?]: LadybugBackend.traverse: ACYCLIC var-length, raised var_length_extend_max_depth ceiling, one-query (reached, frontier); excludes start (WHERE b.state_id <> $start) to match the in-memory oracle
 - [Phase ?]: DEF-02-01: ladybug coerces brace/bracket-shaped STRING params to STRUCT/LIST (value-opacity hazard) — deferred to the Phase 3 value-encoding contract
+- [Phase ?]: Phase 2 D-03 (Option B packaging): pydantic is the sole required runtime dep; ladybug demoted to the doxastica[ladybug] opt-in extra; future backends are extras.
+- [Phase ?]: [BLOCKING] CLAUDE.md constraint reversal recorded as decision-grade (sibling to the 3.14-floor decision): exactly-ladybug+pydantic and pinned-to-LadybugDB / no-storage-abstraction superseded by the Phase-1 BackendPort; ladybug is the reference backend, not the only substrate.
 
 ### Pending Todos
 
@@ -105,6 +108,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-15T00:23:11.558Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-protocol-backend-port-data-model-decisions/01-CONTEXT.md
+Last session: 2026-06-15T10:14:50.035Z
+Stopped at: Completed 02-04-PLAN.md (last plan of Phase 02; phase ready for verification)
+Resume file: None

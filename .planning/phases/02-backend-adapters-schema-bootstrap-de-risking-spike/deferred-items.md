@@ -62,3 +62,21 @@ OUT of this plan's scope (SCOPE BOUNDARY: only auto-fix issues directly caused b
 task). Fix by typing `_value` to return a comparable (e.g. `str`) or annotating the
 comprehension. Owning plan: a 02-01 follow-up or the 02-03 parity work that also touches the
 memory backend tests.
+
+## DEF-02-03 — pre-existing prek formatting nits in `.gitignore` + `backends/ladybug.py`
+
+**Found during:** Plan 02-04, Task 2 (`prek run --all-files` while preparing the CI/CLAUDE.md commit).
+**Severity:** Low (cosmetic; no runtime/typing impact).
+
+`prek run --all-files` auto-fixes two files NOT in this plan's authored file set:
+  - `.gitignore` — `trailing-whitespace` on two template comment lines (lines ~198, ~200 of the
+    GitHub Python `.gitignore` boilerplate).
+  - `src/doxastica/backends/ladybug.py` — `ruff-format` rejoins a `frozenset(...)` generator that
+    was hand-wrapped in Plan 02-03; the joined form is under the 100-col line length.
+
+Both pre-date Plan 02-04 (they exist at the plan's base commit, unrelated to the dependency
+reclassification / CI / CLAUDE.md edits). Per the SCOPE BOUNDARY they were NOT bundled into the
+02-04 commits and were reverted to HEAD. **Note for CI:** Job 2's `prek run --all-files` will
+flag these until fixed. Owning plan: any future plan touching `backends/ladybug.py` (or a quick
+`prek run --all-files && git commit` housekeeping pass). Fix is a no-op apply of the prek
+auto-fixes — zero behavior change.

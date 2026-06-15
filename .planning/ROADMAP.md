@@ -33,7 +33,7 @@ dependency ordering.
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Protocol, Backend Port & Data-Model Decisions** - Two seams (public `BeliefStore` Protocol + internal backend port), backend port granularity decided, frozen models, and the decision-grade choices (no DB contact) that a rewrite would otherwise cost (completed 2026-06-14)
-- [ ] **Phase 2: Backend Adapters & Schema Bootstrap (De-risking Spike)** - First real LadybugDB contact: the `ladybug` reference backend (flexible connection, idempotent DDL) AND the in-memory backend, both behind the port, plus the `:memory:` test harness
+- [x] **Phase 2: Backend Adapters & Schema Bootstrap (De-risking Spike)** - First real LadybugDB contact: the `ladybug` reference backend (flexible connection, idempotent DDL) AND the in-memory backend, both behind the port, plus the `:memory:` test harness (completed 2026-06-15)
 - [ ] **Phase 3: Append-Only Revision Spine (Keystone)** - Scopes, `Belief`/`BeliefState` split, immutable chains, `CURRENT_STATE` pointer, and `revise`/`expand`/`contract` — written against the port, running on both backends
 - [ ] **Phase 4: Retrieval & Observation Surface** - `query_scope` with closed typed filter + deprecated/superseded matrix; full `get_revision_chain`
 - [ ] **Phase 5: Edge Model & Contraction Cascade** - `add_edge` and bounded, cycle-safe `get_impact` with a truncation signal
@@ -100,7 +100,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 02-04-PLAN.md — Option B packaging: pydantic-required/ladybug-extra, uv.lock, two-env CI, [BLOCKING] CLAUDE.md reversal (D-03)
+- [x] 02-04-PLAN.md — Option B packaging: pydantic-required/ladybug-extra, uv.lock, two-env CI, [BLOCKING] CLAUDE.md reversal (D-03)
 
 ### Phase 3: Append-Only Revision Spine (Keystone)
 
@@ -192,7 +192,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Protocol, Backend Port & Data-Model Decisions | 4/4 | Complete    | 2026-06-14 |
-| 2. Backend Adapters & Schema Bootstrap | 3/4 | In Progress|  |
+| 2. Backend Adapters & Schema Bootstrap | 4/4 | Complete   | 2026-06-15 |
 | 3. Append-Only Revision Spine | 0/TBD | Not started | - |
 | 4. Retrieval & Observation Surface | 0/TBD | Not started | - |
 | 5. Edge Model & Contraction Cascade | 0/TBD | Not started | - |
