@@ -9,8 +9,16 @@ authors = [
 requires-python = ">=3.14"
 dependencies = [
     "pydantic>=2.11,<3",
-    "ladybug>=0.17,<0.18",
 ]
+
+[project.optional-dependencies]
+# D-03 (Option B): pydantic is the sole REQUIRED runtime dep; ladybug is the
+# reference-backend extra behind the Phase-1 BackendPort seam. `pip install doxastica`
+# yields a working in-memory AGM core with zero ladybug install; `[ladybug]` adds the
+# reference backend.
+ladybug = ["ladybug>=0.17,<0.18"]
+all = ["doxastica[ladybug]"]
+# future backends slot in here as extras, e.g. neo4j = [...], surrealdb = [...]
 
 [build-system]
 requires = ["uv_build>=0.9.18,<1.0.0"]

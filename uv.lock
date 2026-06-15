@@ -178,8 +178,15 @@ name = "doxastica"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "ladybug" },
     { name = "pydantic" },
+]
+
+[package.optional-dependencies]
+all = [
+    { name = "ladybug" },
+]
+ladybug = [
+    { name = "ladybug" },
 ]
 
 [package.dev-dependencies]
@@ -203,9 +210,11 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ladybug", specifier = ">=0.17,<0.18" },
+    { name = "doxastica", extras = ["ladybug"], marker = "extra == 'all'" },
+    { name = "ladybug", marker = "extra == 'ladybug'", specifier = ">=0.17,<0.18" },
     { name = "pydantic", specifier = ">=2.11,<3" },
 ]
+provides-extras = ["ladybug", "all"]
 
 [package.metadata.requires-dev]
 dev = [
