@@ -54,7 +54,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [x] **CHAIN-02**: Append-only `HAS_REVISION` chain — no operation deletes or mutates an
       existing `BeliefState` or `HAS_REVISION` edge
 
-- [ ] **CHAIN-03**: Exactly one mutable `CURRENT_STATE` pointer per belief, re-pointed
+- [x] **CHAIN-03**: Exactly one mutable `CURRENT_STATE` pointer per belief, re-pointed
       atomically (single transaction) on each write
 
 - [ ] **CHAIN-04**: Deprecated vs. superseded is a **structural/query** distinction
@@ -201,7 +201,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | SCOPE-03 | Phase 3 | Complete |
 | CHAIN-01 | Phase 3 | Complete |
 | CHAIN-02 | Phase 3 | Complete |
-| CHAIN-03 | Phase 3 | Pending |
+| CHAIN-03 | Phase 3 | Complete |
 | OPS-01 | Phase 3 | Complete |
 | OPS-02 | Phase 3 | Complete |
 | OPS-03 | Phase 3 | Complete |

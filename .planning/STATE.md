@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-06-15T23:42:20.894Z"
+last_updated: "2026-06-15T23:51:20.700Z"
 last_activity: 2026-06-15 -- Phase 03 execution started
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 12
-  completed_plans: 10
+  completed_plans: 11
   percent: 25
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 ## Current Position
 
 Phase: 03 (append-only-revision-spine-keystone) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-06-15 -- Phase 03 execution started
 
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02 P04 | 15 | 2 tasks | 5 files |
 | Phase 03 P01 | 3min | 2 tasks | 3 files |
 | Phase 03 P03 | 2min | 1 tasks | 1 files |
+| Phase 03 P02 | 6min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,8 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase 03]: 03-01: WORLD_SCOPE_ID is the dunder-wrapped '__world__' constant in models.py (not constants.py), barrel-re-exported; get_or_create_scope signature unchanged (D-02)
 - [Phase 03]: 03-01: HAS_REVISION is hub form FROM Belief TO BeliefState, passed to add_edge as a raw string; ladybug add_edge generalized via _EDGE_ENDPOINTS for per-edge-type endpoint labels+PKs; no CURRENT_STATE table (D-01/D-07)
 - [Phase ?]: 03-03: test_revision_spine.py constructs MemoryCore(backend) over the parametrized fixture port so spine behaviors run on both backends; verified collect-only (RED until 03-02)
+- [Phase ?]: 03-02: DEF-02-01 closed via base64-over-JSON value codec in core.py (bare json.dumps corrupted by ladybug STRING brace-coercion); identical on both backends
+- [Phase ?]: 03-02: current is DERIVED ordering-max over active states, no CURRENT_STATE pointer (D-01); expand is an explicit one-line delegate to _append (D-04)
 
 ### Pending Todos
 
@@ -114,6 +117,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-15T23:41:53.786Z
+Last session: 2026-06-15T23:50:59.519Z
 Stopped at: Completed 03-01-PLAN.md
 Resume file: None
