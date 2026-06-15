@@ -114,7 +114,20 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Each write re-points exactly one `CURRENT_STATE` pointer per belief atomically in a single transaction (a port unit-of-work), and a structural-invariant test confirms `CURRENT_STATE` uniqueness holds after every operation on both backends
   4. No operation deletes or mutates an existing `BeliefState` node or `HAS_REVISION` edge — chain immutability is verified, and `get_revision_chain(belief_id)` returns the full immutable version chain
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+**Wave 1**
+
+- [ ] 03-01-PLAN.md — Structural foundation: WORLD_SCOPE_ID constant + barrel export; HAS_REVISION REL table (hub) + generalized ladybug add_edge endpoints
+- [ ] 03-03-PLAN.md — Wave-0 behavior test scaffold (tests/test_revision_spine.py) over both backends
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 03-02-PLAN.md — MemoryCore op bodies: get_or_create_scope/_current/_append, revise≡expand, contract (D-05), get_revision_chain, value-encoding contract (DEF-02-01)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 03-04-PLAN.md — Hypothesis stateful SC3 consistency check + chain-immutability invariants (both backends) + flip the DEF-02-01 xfail
 
 ### Phase 4: Retrieval & Observation Surface
 
@@ -193,7 +206,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 |-------|----------------|--------|-----------|
 | 1. Protocol, Backend Port & Data-Model Decisions | 4/4 | Complete    | 2026-06-14 |
 | 2. Backend Adapters & Schema Bootstrap | 4/4 | Complete    | 2026-06-15 |
-| 3. Append-Only Revision Spine | 0/TBD | Not started | - |
+| 3. Append-Only Revision Spine | 0/4 | Not started | - |
 | 4. Retrieval & Observation Surface | 0/TBD | Not started | - |
 | 5. Edge Model & Contraction Cascade | 0/TBD | Not started | - |
 | 6. Structural Time-Travel | 0/TBD | Not started | - |
