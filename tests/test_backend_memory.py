@@ -16,9 +16,17 @@ from doxastica.backends.memory import InMemoryBackend
 from doxastica.errors import BackendDependencyError, DoxasticaError
 
 
-def _value(props: dict[str, object]) -> object:
-    """Pull the stable ``id`` field used to identify a returned node row in assertions."""
-    return props["id"]
+def _value(props: dict[str, object]) -> str:
+    """
+    Pull the stable ``id`` field used to identify a returned node row in assertions.
+
+    Returns the id as ``str`` (every node in these tests is keyed by a string ``id``) so
+    ``sorted(...)`` receives a ``SupportsRichComparison`` iterable under basedpyright strict
+    (DEF-02-02: Plan 01 typechecked src/ only; tests/ is in strict scope too).
+    """
+    value = props["id"]
+    assert isinstance(value, str), f"node id must be str in these fixtures; got {value!r}"
+    return value
 
 
 def test_upsert_node_is_idempotent() -> None:
