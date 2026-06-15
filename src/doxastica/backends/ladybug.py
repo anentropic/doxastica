@@ -78,6 +78,13 @@ _NS_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 # approaches a million deep, so the unbounded frontier is empty in practice (A1, RESEARCH).
 _DEPTH_CEILING = 1_000_000
 
+# Label -> PRIMARY KEY column. The SINGLE source of truth for each node table's PK: the
+# bootstrap DDL (``_bootstrap_schema``) and the ``upsert_node`` MERGE key both read from here,
+# so a schema change cannot silently diverge from the upsert key (CR-01). The port keys upsert
+# on ``node_id`` for ANY label, so the MERGE key is always this PK bound to ``$id`` (matching
+# the in-memory oracle, which keys on ``node_id`` regardless of label — D-05 parity).
+_PK_BY_LABEL = {"Scope": "scope_id", "Belief": "belief_id", "BeliefState": "state_id"}
+
 
 def _validate_namespace(ns: str) -> None:
     """Reject a namespace that is not a safe bare identifier (D-04, mitigates T-02-01)."""
@@ -145,17 +152,22 @@ class LadybugBackend:
         ``HAS_REVISION`` / ``CURRENT_STATE`` arrive in Phase 3.
         """
         ns = self._ns
+        # PK columns are read from `_PK_BY_LABEL` so the DDL and `upsert_node`'s MERGE key
+        # cannot diverge (CR-01: one source of truth for each table's primary key).
         self._exec(
             f"CREATE NODE TABLE IF NOT EXISTS {ns}_Scope"
-            f"(scope_id STRING, is_world BOOLEAN, PRIMARY KEY(scope_id))"
+            f"({_PK_BY_LABEL['Scope']} STRING, is_world BOOLEAN, "
+            f"PRIMARY KEY({_PK_BY_LABEL['Scope']}))"
         )
         self._exec(
-            f"CREATE NODE TABLE IF NOT EXISTS {ns}_Belief(belief_id STRING, PRIMARY KEY(belief_id))"
+            f"CREATE NODE TABLE IF NOT EXISTS {ns}_Belief"
+            f"({_PK_BY_LABEL['Belief']} STRING, PRIMARY KEY({_PK_BY_LABEL['Belief']}))"
         )
         self._exec(
             f"CREATE NODE TABLE IF NOT EXISTS {ns}_BeliefState"
-            f"(state_id STRING, belief_id STRING, scope_id STRING, "
-            f"source_event_id STRING, value STRING, status STRING, PRIMARY KEY(state_id))"
+            f"({_PK_BY_LABEL['BeliefState']} STRING, belief_id STRING, scope_id STRING, "
+            f"source_event_id STRING, value STRING, status STRING, "
+            f"PRIMARY KEY({_PK_BY_LABEL['BeliefState']}))"
         )
         for edge_type in ("SUPERSEDES", "DEPENDS_ON", "DERIVED_FROM"):
             self._exec(
@@ -173,18 +185,26 @@ class LadybugBackend:
         Insert-or-update a node keyed by ``node_id``; idempotent (BACK-02).
 
         Compiles to ``MERGE (n:{ns}_{label} {pk:$id}) SET ...`` — ``MERGE`` (NOT ``CREATE``)
-        is idempotent by construction (verified: double-MERGE = 1 node). The node id and every
-        prop value flow through ``$param`` binds (T-02-02); only the validated namespace and the
-        label are interpolated (a Cypher label cannot be ``$param``-bound).
+        is idempotent by construction (verified: double-MERGE = 1 node). The MERGE key column is
+        the label's PRIMARY KEY, derived from ``_PK_BY_LABEL`` (CR-01) so ``Scope``/``Belief``
+        nodes key on their real PK (``scope_id``/``belief_id``), not a hardcoded ``state_id``.
+        The PK column is EXCLUDED from the SET loop (WR-01): ladybug rejects re-SETting the merge
+        key as an ordinary property, so a caller passing the PK in ``props`` would otherwise raise
+        on re-upsert. The node id and every prop value flow through ``$param`` binds (T-02-02);
+        only the validated namespace and the label are interpolated (a Cypher label cannot be
+        ``$param``-bound).
         """
+        pk = _PK_BY_LABEL[label]
         labelled = f"{self._ns}_{label}"
         params: dict[str, Any] = {"id": str(node_id)}
         set_clauses: list[str] = []
         for i, (key, value) in enumerate(props.items()):
+            if key == pk:
+                continue  # never SET the PK — it is the MERGE key (ladybug rejects re-SET).
             pname = f"p{i}"
             params[pname] = value
             set_clauses.append(f"n.{key} = ${pname}")
-        cypher = f"MERGE (n:{labelled} {{state_id: $id}})"
+        cypher = f"MERGE (n:{labelled} {{{pk}: $id}})"
         if set_clauses:
             cypher += " SET " + ", ".join(set_clauses)
         self._exec(cypher, params)
