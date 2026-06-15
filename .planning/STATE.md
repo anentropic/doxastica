@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 1 context gathered
-last_updated: "2026-06-14T23:56:13.012Z"
+last_updated: "2026-06-15T00:13:11.547Z"
 last_activity: 2026-06-14 -- Phase 02 execution started
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 8
-  completed_plans: 5
+  completed_plans: 6
   percent: 13
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 ## Current Position
 
 Phase: 02 (backend-adapters-schema-bootstrap-de-risking-spike) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-06-14 -- Phase 02 execution started
 
@@ -57,6 +57,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P03 | 3min | 2 tasks | 3 files |
 | Phase 01 P04 | 4min | 2 tasks | 3 files |
 | Phase 02 P01 | 20min | 2 tasks | 6 files |
+| Phase 02 P02 | 12min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,9 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase ?]: 01-04: traverse is the single graph-walk primitive; get_impact/get_scope_at compose from it (Phases 3+); round-trip tension flagged for Phase 2 spike SC4
 - [Phase ?]: 01-04: BACK-04 contract drafted as prose Markdown (docs/backend-contract.md, 7 constraints); executable form is the Phase 7 conformance suite BACK-05
 - [Phase ?]: Phase 2: MemoryCore factories forward-reference the wave-2 ladybug adapter via function-local import + scoped pyright ignores + cast, keeping core.py driver-blind and strict-clean before backends/ladybug.py exists
+- [Phase ?]: Port unchanged, SC4 confirmed — LPG-primitive BackendPort survives ladybug 0.17.1 unchanged; 30-hop cap and $param-in-bound rejection are adapter-internal details
+- [Phase ?]: LadybugBackend.traverse: ACYCLIC var-length, raised var_length_extend_max_depth ceiling, one-query (reached, frontier); excludes start (WHERE b.state_id <> $start) to match the in-memory oracle
+- [Phase ?]: DEF-02-01: ladybug coerces brace/bracket-shaped STRING params to STRUCT/LIST (value-opacity hazard) — deferred to the Phase 3 value-encoding contract
 
 ### Pending Todos
 
@@ -100,6 +104,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-14T23:56:07.899Z
+Last session: 2026-06-15T00:12:46.796Z
 Stopped at: Phase 1 context gathered
 Resume file: .planning/phases/01-protocol-backend-port-data-model-decisions/01-CONTEXT.md

@@ -94,7 +94,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
       (`MemoryCore`) above a defined **backend port**; no backend/Cypher-specific code in the
       core logic layer. Port *granularity* (Cypher-level vs. LPG-primitive) decided in Phase 1
 
-- [ ] **BACK-02**: **`ladybug` reference backend adapter** implements the port over LadybugDB
+- [x] **BACK-02**: **`ladybug` reference backend adapter** implements the port over LadybugDB
 - [x] **BACK-03**: **In-memory backend adapter** ships as the second backend — proves the port
       is real and doubles as the Phase 7 shadow-model test oracle (zero extra dependency)
 
@@ -106,15 +106,15 @@ Foundational, decision-grade choices that must be settled before storage code ex
 
 ### Connection & Tenancy (ladybug backend)
 
-- [ ] **CONN-01**: **Flexible connection** — the ladybug backend accepts an injected
+- [x] **CONN-01**: **Flexible connection** — the ladybug backend accepts an injected
       `ladybug.Connection` + namespace (never closed by the core; tenancy R19) *and* can
       self-manage its own (`open(path | ":memory:", namespace=...)`)
 
-- [ ] **CONN-02**: **Label-family tenancy** — the ladybug backend owns and is the only writer
+- [x] **CONN-02**: **Label-family tenancy** — the ladybug backend owns and is the only writer
       of its namespaced `:Scope` / `:Belief` / `:BeliefState` tables and edge types; closed
       subgraph (no outbound graph references — entity mentions are opaque values)
 
-- [ ] **CONN-03**: Idempotent schema bootstrap (`CREATE NODE/REL TABLE IF NOT EXISTS`) on init;
+- [x] **CONN-03**: Idempotent schema bootstrap (`CREATE NODE/REL TABLE IF NOT EXISTS`) on init;
       uniqueness enforced structurally (LadybugDB/Kùzu has no UNIQUE constraint)
 
 ### Formal Correctness (the differentiator — the M0 exit gate)
@@ -190,11 +190,11 @@ Which phases cover which requirements. Populated during roadmap creation.
 | PKG-01 | Phase 1 | Complete |
 | BACK-01 | Phase 1 | Complete |
 | BACK-04 | Phase 1 | Complete |
-| BACK-02 | Phase 2 | Pending |
+| BACK-02 | Phase 2 | Complete |
 | BACK-03 | Phase 2 | Complete |
-| CONN-01 | Phase 2 | Pending |
-| CONN-02 | Phase 2 | Pending |
-| CONN-03 | Phase 2 | Pending |
+| CONN-01 | Phase 2 | Complete |
+| CONN-02 | Phase 2 | Complete |
+| CONN-03 | Phase 2 | Complete |
 | FORMAL-06 | Phase 2 | Pending |
 | SCOPE-01 | Phase 3 | Pending |
 | SCOPE-02 | Phase 3 | Pending |
