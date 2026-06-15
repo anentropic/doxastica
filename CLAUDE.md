@@ -22,19 +22,32 @@ deferred, the formal core and its property-test suite must be right.
 
 ### Constraints
 
-- **Tech stack**: Python (uv) — runtime deps **`ladybug` (the LadybugDB PyPI package, a
-  Kùzu fork, import `ladybug as lb`) + `pydantic` v2 only**, zero NVM imports. Why: the
-  repo boundary keeps the implementation faithful to the paper's domain-agnostic model and
-  LadybugDB's single-writer/multi-reader embedded model enforces write serialization for free.
+- **Tech stack**: Python (uv) — **`pydantic` v2 is the only REQUIRED runtime dep**; **`ladybug`
+  (the LadybugDB PyPI package, a Kùzu fork, import `ladybug as lb`) is the reference-backend
+  extra (`doxastica[ladybug]`)** behind the Phase-1 `BackendPort` seam; future backends are
+  extras too. Zero NVM imports. Why: the repo boundary keeps the implementation faithful to the
+  paper's domain-agnostic model, and LadybugDB's single-writer/multi-reader embedded model
+  enforces write serialization for free when the reference backend is in use.
+  > **Phase 2 D-03 decision-grade reversal (recorded, not silent — sibling to the Phase 1 §2
+  > 3.14-floor decision):** the original "runtime deps **exactly `ladybug` + `pydantic`**"
+  > constraint is REVERSED. `pydantic` is the sole required dep; `ladybug` moved to
+  > `[project.optional-dependencies]`. `pip install doxastica` ships a working in-memory AGM
+  > core with zero ladybug install; `pip install doxastica[ladybug]` adds the reference backend.
 - **Tooling**: `cookiecutter-python-uv-library` template — basedpyright strict typing,
   ruff lint/format, pytest + coverage, pre-commit, git-cliff changelog, GitHub Actions.
-- **Storage**: pinned to LadybugDB / Cypher (PyPI package **`ladybug`**, a Kùzu fork —
-  https://github.com/LadybugDB/ladybug). API: `lb.Database(path | ":memory:")` →
+- **Storage**: LadybugDB / Cypher is the **reference** backend (PyPI package **`ladybug`**, a
+  Kùzu fork — https://github.com/LadybugDB/ladybug), reached through the Phase-1 `BackendPort`.
+  > **SUPERSEDED (Phase 1 BACK-01 + Phase 2 D-03):** the original "**pinned to LadybugDB** /
+  > no storage abstraction" framing is superseded. The `BackendPort` *is* the seam; ladybug is
+  > the *reference* backend behind it (with the zero-dep `InMemoryBackend` as the second
+  > shipping backend and Phase-7 oracle), not the only substrate. `BackendPort` is a narrow
+  > port, NOT a repository/storage-abstraction layer — that non-goal still holds.
+  Ladybug API (still accurate for the reference backend): `lb.Database(path | ":memory:")` →
   `lb.Connection(db)` → `conn.execute(cypher, parameters=...)`; schema-first (CREATE
-  NODE/REL TABLE), uniqueness only via PRIMARY KEY. **Flexible connection**: `MemoryCore`
+  NODE/REL TABLE), uniqueness only via PRIMARY KEY. **Flexible connection**: the ladybug backend
   accepts an injected `Connection` + namespace prefix (NVM leases it under label tenancy;
   the core never closes it) *and* can open/manage its own (`:memory:` or file) for
-  standalone use. The DI seam stays NVM↔core, not core↔database (no storage abstraction).
+  standalone use. The DI seam stays NVM↔core (the `BackendPort`), not core↔database.
 - **Discipline**: append-only — no operation removes or rewrites `BeliefState` nodes or
   `HAS_REVISION` edges; revision is forward-only. World-scope `contract()` is an error.
 - **Boundary**: no game/narrative/LLM concepts in core code; each such appearance is the
@@ -55,7 +68,7 @@ deferred, the formal core and its property-test suite must be right.
 | **pydantic** | `>=2.11,<3` | Typed value/model layer at the API boundary (`Scope`, `BeliefState`, `EdgeType`) | v2 is the current line (2.13.4). Rust core, fast validation, frozen models for immutable `BeliefState`. `requires-python >=3.9` — no floor problem. |
 ### The UUID7 decision (RESOLVED — floor raised to 3.14)
 - **Python 3.14** ships `uuid.uuid7()` natively (new in 3.14, RFC 9562 §5.7, monotonic — verified). The core mints `state_id` UUID7 keys from the stdlib — **no runtime dependency, no dev shim**.
-- **Locked (CONTEXT decision #2, Phase 1):** `requires-python>=3.14`. The earlier 3.11–3.13 gap (no stdlib `uuid.uuid7()`) is moot — the floor was deliberately raised to 3.14 so UUID7 minting is native and runtime deps stay at exactly `ladybug` + `pydantic`. NVM is assumed to target 3.14.
+- **Locked (CONTEXT decision #2, Phase 1):** `requires-python>=3.14`. The earlier 3.11–3.13 gap (no stdlib `uuid.uuid7()`) is moot — the floor was deliberately raised to 3.14 so UUID7 minting is native — the core has no runtime UUID dependency. (Per the Phase 2 D-03 reversal above, `pydantic` is the sole required runtime dep and `ladybug` is the reference-backend extra; UUID7 minting adds no third runtime dep regardless.) NVM is assumed to target 3.14.
 ### Development Tools (from cookiecutter — verified current, no re-litigation)
 | Tool | Template pin | Current (2026-06) | Notes |
 |------|--------------|-------------------|-------|
@@ -69,7 +82,9 @@ deferred, the formal core and its property-test suite must be right.
 | git-cliff | `.cliff.toml` present | — | Conventional-commits changelog. |
 | mkdocs-material | docs group pinned | 9.7.x | Chosen docs framework (the cookiecutter also offers sphinx-shibuya; PROJECT wants a docs site — mkdocs-material is the lower-friction pick and is already wired with mkdocstrings). |
 ## Installation
-# Runtime (the ONLY two runtime deps)
+# Runtime: pydantic is the only REQUIRED dep; ladybug is the reference-backend extra (D-03)
+#   pip install doxastica            -> pydantic + working in-memory backend
+#   pip install doxastica[ladybug]   -> adds the ladybug reference backend
 # Dev / test tooling (hypothesis is the addition over the template defaults)
 # pytest, pytest-cov, basedpyright, ruff, ipython, pdbpp come from the template
 # (No UUID7 shim — the floor is 3.14, so `uuid.uuid7()` is in the stdlib. See "Python version posture".)
@@ -122,7 +137,7 @@ deferred, the formal core and its property-test suite must be right.
 | mkdocs-material | sphinx-shibuya | Both offered by the template; mkdocs-material + mkdocstrings is already wired and lower-friction for an API-reference docs site. Either satisfies the publishable-docs requirement. |
 ## What NOT to Use
 - **`ladybugdb` as a package/import name** — does not exist on PyPI (404). The dependency string and all imports must be `ladybug`. This is the single most likely scaffolding bug; flag it loudly in the roadmap. (PROJECT.md's "`ladybugdb`" is the project/brand, not the installable.)
-- **Any third runtime dependency** (orjson, msgspec, networkx, a UUID lib at runtime, an ORM/graph-OGM, a storage-abstraction layer). The constraint is `ladybug` + `pydantic` only, and the "no storage abstraction over the DB" non-goal is explicit. Graph traversal (`get_impact`, `get_scope_at`) is **Cypher**, not networkx.
+- **Any third runtime dependency** (orjson, msgspec, networkx, a UUID lib at runtime, an ORM/graph-OGM, a storage-abstraction layer). After the Phase 2 D-03 reversal the constraint is: **`pydantic` is the only required runtime dep; `ladybug` is the reference-backend extra**; additional backends may ONLY be added as further extras (never new required deps). The "no storage-abstraction layer over the DB" non-goal still holds — `BackendPort` is a narrow port, not a repository abstraction. Ladybug-backend graph traversal (`get_impact`, `get_scope_at`) is **Cypher**, not networkx.
 - **Async core API** — `lb.AsyncConnection` exists but M0 is the deterministic sync side. Don't build the core around async.
 - **String-interpolated Cypher** — docs "strongly discourage" it (injection risk). Always `parameters={...}` with `$name`.
 - **A custom graph-storage abstraction / repository pattern over Ladybug** — explicitly a non-goal; the DI seam is NVM↔core (the Protocol + injected `Connection`), not core↔DB.
