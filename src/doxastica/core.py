@@ -292,21 +292,31 @@ class MemoryCore:
 
         The world-scope guard (D-03) is the FIRST statement — it fires BEFORE ``unit_of_work`` and
         before any backend access, so ``contract(WORLD_SCOPE_ID, …)`` leaks no write even if the
-        world node was never created. Otherwise, inside ONE unit_of_work: compute the prior
-        current; if absent, return ``None`` (D-05 vacuity — silent no-op, no state appended); else
-        append exactly one ``retracted`` state copying the prior STORED value VERBATIM (already
+        world node was never created. Otherwise, inside ONE unit_of_work: probe the prior current
+        FIRST (a read-only ``_current``); if absent, return ``None`` (D-05 vacuity — a TRUE silent
+        no-op that leaks NO write, scope node included — WR-01); else materialise the scope (D-06)
+        and append exactly one ``retracted`` state copying the prior STORED value VERBATIM (already
         json-encoded — do NOT re-encode, Pitfall 2) and lay ``HAS_REVISION`` + ``SUPERSEDES
         new(retracted) → prior``. Always returns ``None``.
+
+        Ordering note (WR-01): the world-scope structural guard (D-03) stays FIRST, before the
+        vacuity probe and before any backend access — only AFTER it passes do we read ``_current``,
+        and only AFTER a non-vacuous probe do we ``_ensure_scope``. ``_current`` is read-only, so
+        probing before scope creation is safe and a vacuous contract on an absent belief/scope is a
+        genuine no-op (no ``Scope`` node leaks).
         """
         if scope_id == WORLD_SCOPE_ID:  # D-03 STRUCTURAL guard, before any backend access
             raise WorldScopeContractionError(
                 "contract() is forbidden on the privileged world scope"
             )
         with self._backend.unit_of_work():  # exactly one (CHAIN-03)
-            self._ensure_scope(scope_id)
+            # WR-01: probe vacuity BEFORE creating the scope — `_current` only reads, so a vacuous
+            # contract on an absent belief leaks NO write (Scope node included). D-03 guard above
+            # still fires first; this only reorders the scope-create relative to the vacuity check.
             prior = self._current(scope_id, belief_id)
             if prior is None:
-                return None  # D-05 vacuity: silent no-op
+                return None  # D-05 vacuity: genuine silent no-op, no Scope/BeliefState write
+            self._ensure_scope(scope_id)  # D-06 — only materialise the scope on the acting branch
             state_id = uuid.uuid7()
             props: dict[str, Any] = {
                 "state_id": str(state_id),
