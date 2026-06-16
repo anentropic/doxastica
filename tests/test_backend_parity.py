@@ -35,6 +35,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from doxastica import MemoryCore
+from doxastica.models import WORLD_SCOPE_ID
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -272,6 +273,55 @@ def test_both_backends_match_nodes_byte_identical() -> None:
         )
     assert results["memory"] == results["ladybug"], (
         f"match_nodes must be byte-identical across backends; got {results}"
+    )
+
+
+# --------------------------------------------------------------------------------------------
+# WR-02: is_world BOOLEAN round-trip through the PRODUCTION write path (get_or_create_scope).
+# --------------------------------------------------------------------------------------------
+
+
+def test_is_world_boolean_round_trips_production_write_path() -> None:
+    """
+    Pin the ``is_world`` BOOLEAN round-trip on the PRODUCTION writer for both backends (WR-02).
+
+    ``MemoryCore.get_or_create_scope`` is the only production code path that writes ``is_world``;
+    the prior parity coverage (``test_scope_upsert_parity``) only inserted the boolean via the bare
+    ``_scope`` helper, never through the core. This test writes BOTH a world scope
+    (``is_world=True``) and a non-world scope (``is_world=False``) via ``get_or_create_scope`` on
+    each backend, then
+    filters ``match_nodes("Scope", {"is_world": ...})`` with BOTH boolean literals — proving the
+    ``BOOLEAN`` column round-trips (no coercion) on the production write path, so a future
+    ``query_scope``/``get_scope_at`` that filters on ``is_world`` inherits a TESTED boolean parity
+    rather than the latent coercion surface the reviewer flagged. (Note: per D-02 / Pitfall 4 the
+    core still DERIVES ``is_world`` from ``scope_id`` and never trusts the stored column — see
+    ``core.py``; this test guards the stored-column parity without weakening that derive contract.)
+    """
+    true_hits: dict[str, list[str]] = {}
+    false_hits: dict[str, list[str]] = {}
+    for name, be in _both_backends():
+        core = MemoryCore(be)
+        with core.unit_of_work():
+            core.get_or_create_scope(WORLD_SCOPE_ID)  # is_world=True (the reserved id)
+            core.get_or_create_scope("local")  # is_world=False
+        true_hits[name] = sorted(
+            str(r["scope_id"]) for r in be.match_nodes("Scope", {"is_world": True})
+        )
+        false_hits[name] = sorted(
+            str(r["scope_id"]) for r in be.match_nodes("Scope", {"is_world": False})
+        )
+    assert true_hits["memory"] == true_hits["ladybug"], (
+        f"is_world=True match must be byte-identical across backends; got {true_hits}"
+    )
+    assert false_hits["memory"] == false_hits["ladybug"], (
+        f"is_world=False match must be byte-identical across backends; got {false_hits}"
+    )
+    # The world scope is the only reserved id, so it is the sole is_world=True hit on both backends.
+    assert true_hits["memory"] == [WORLD_SCOPE_ID], (
+        f"only the world scope is is_world=True; got {true_hits}"
+    )
+    assert false_hits["memory"] == ["local"], (
+        f"only the local scope is is_world=False; got {false_hits}"
     )
 
 
