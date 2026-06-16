@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Protocol, Backend Port & Data-Model Decisions** - Two seams (public `BeliefStore` Protocol + internal backend port), backend port granularity decided, frozen models, and the decision-grade choices (no DB contact) that a rewrite would otherwise cost (completed 2026-06-14)
 - [x] **Phase 2: Backend Adapters & Schema Bootstrap (De-risking Spike)** - First real LadybugDB contact: the `ladybug` reference backend (flexible connection, idempotent DDL) AND the in-memory backend, both behind the port, plus the `:memory:` test harness (completed 2026-06-15)
-- [ ] **Phase 3: Append-Only Revision Spine (Keystone)** - Scopes, `Belief`/`BeliefState` split, immutable chains, `CURRENT_STATE` pointer, and `revise`/`expand`/`contract` — written against the port, running on both backends
+- [x] **Phase 3: Append-Only Revision Spine (Keystone)** - Scopes, `Belief`/`BeliefState` split, immutable chains, derived current (D-01: no stored `CURRENT_STATE` pointer), and `revise`/`expand`/`contract` — written against the port, running on both backends; SC3 verified as a Hypothesis consistency check
 - [ ] **Phase 4: Retrieval & Observation Surface** - `query_scope` with closed typed filter + deprecated/superseded matrix; full `get_revision_chain`
 - [ ] **Phase 5: Edge Model & Contraction Cascade** - `add_edge` and bounded, cycle-safe `get_impact` with a truncation signal
 - [ ] **Phase 6: Structural Time-Travel** - `get_scope_at` reconstruction under an explicit UUID7 ordering contract
@@ -127,7 +127,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 03-04-PLAN.md — Hypothesis stateful SC3 consistency check + chain-immutability invariants (both backends) + flip the DEF-02-01 xfail
+- [x] 03-04-PLAN.md — Hypothesis stateful SC3 consistency check + chain-immutability invariants (both backends) + flip the DEF-02-01 xfail
 
 ### Phase 4: Retrieval & Observation Surface
 

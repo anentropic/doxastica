@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-06-15T23:51:20.700Z"
-last_activity: 2026-06-15 -- Phase 03 execution started
+stopped_at: Completed 03-04-PLAN.md
+last_updated: "2026-06-16T00:05:33.000Z"
+last_activity: 2026-06-16 -- Completed 03-04-PLAN.md (spine keystone consistency check)
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 12
-  completed_plans: 11
-  percent: 25
+  completed_plans: 12
+  percent: 33
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 ## Current Position
 
 Phase: 03 (append-only-revision-spine-keystone) — EXECUTING
-Plan: 4 of 4
-Status: Ready to execute
-Last activity: 2026-06-15 -- Phase 03 execution started
+Plan: 4 of 4 — COMPLETE (all phase-3 plans done)
+Status: Phase 03 plans complete; ready for phase verification
+Last activity: 2026-06-16 -- Completed 03-04-PLAN.md (spine keystone consistency check)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████████] 100% (4/4 plans)
 
 ## Performance Metrics
 
@@ -64,6 +64,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03 P01 | 3min | 2 tasks | 3 files |
 | Phase 03 P03 | 2min | 1 tasks | 1 files |
 | Phase 03 P02 | 6min | 2 tasks | 1 files |
+| Phase 03 P04 | 11min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -97,6 +98,10 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase ?]: 03-03: test_revision_spine.py constructs MemoryCore(backend) over the parametrized fixture port so spine behaviors run on both backends; verified collect-only (RED until 03-02)
 - [Phase ?]: 03-02: DEF-02-01 closed via base64-over-JSON value codec in core.py (bare json.dumps corrupted by ladybug STRING brace-coercion); identical on both backends
 - [Phase ?]: 03-02: current is DERIVED ordering-max over active states, no CURRENT_STATE pointer (D-01); expand is an explicit one-line delegate to _append (D-04)
+- [Phase 03]: 03-04: SC3/D-01 keystone is a Hypothesis RuleBasedStateMachine + shadow oracle (tests/test_invariants.py) proving derived-current total+single-valued+≡chain-tail and chain immutability on BOTH backends
+- [Phase 03]: 03-04: [Rule 1 fix] _current now selects ordering-max over ALL statuses and returns None on a retracted tail — a contraction correctly clears the derived current (prior active-filter left contracted beliefs reporting a current). Phase 4/7 query-current must align with this.
+- [Phase 03]: 03-04: DEF-02-01 CLOSED — regression flipped from xfail to a passing assertion routed through MemoryCore.revise + get_revision_chain (the core encode boundary) on both backends
+- [Phase 03]: 03-04: stateful-test both-backends idiom = two machine subclasses each exposing .TestCase + bounded ladybug Database(max_db_size) to cap per-example mmap reservation
 
 ### Pending Todos
 
@@ -117,6 +122,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-15T23:50:59.519Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-06-16T00:05:33.000Z
+Stopped at: Completed 03-04-PLAN.md
 Resume file: None
