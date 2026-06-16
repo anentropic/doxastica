@@ -60,6 +60,19 @@ if TYPE_CHECKING:
     # from_connection() factories use function-local imports to keep this module driver-blind.
 
 
+def _order_key(state: dict[str, Any]) -> tuple[str, str]:
+    """
+    The ONE UUID7 ordering contract — ``(str(source_event_id), str(state_id))`` (IN-03).
+
+    Centralized here so ``_current`` (the ordering-``max``) and ``get_revision_chain`` (the full
+    ``sort``) cannot drift apart: they MUST agree on the primary key (``source_event_id``) and the
+    ``state_id`` tiebreak, or the derived-current selection would desynchronise from the history
+    chain (DATA-03 / the keystone invariant). Previously the lambda was written inline in two
+    places; this is now the single definition both call.
+    """
+    return (str(state["source_event_id"]), str(state["state_id"]))
+
+
 class MemoryCore:
     """
     Backend-agnostic AGM engine composing a :class:`doxastica.ports.BackendPort` (D-01).
@@ -175,7 +188,7 @@ class MemoryCore:
         )
         if not states:
             return None
-        tail = max(states, key=lambda s: (str(s["source_event_id"]), str(s["state_id"])))
+        tail = max(states, key=_order_key)  # IN-03: the ONE ordering contract
         if tail["status"] == Status.retracted.value:  # D-05: retracted tail ⇒ no active current
             return None
         return tail
@@ -341,5 +354,5 @@ class MemoryCore:
         a ``max``. The chain is the immutable append-only history (D-07).
         """
         states = self._backend.match_nodes("BeliefState", {"belief_id": belief_id})
-        states.sort(key=lambda s: (str(s["source_event_id"]), str(s["state_id"])))
+        states.sort(key=_order_key)  # IN-03: the same ONE ordering contract as `_current`
         return [self._hydrate(s) for s in states]
