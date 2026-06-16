@@ -206,7 +206,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 |-------|----------------|--------|-----------|
 | 1. Protocol, Backend Port & Data-Model Decisions | 4/4 | Complete    | 2026-06-14 |
 | 2. Backend Adapters & Schema Bootstrap | 4/4 | Complete    | 2026-06-15 |
-| 3. Append-Only Revision Spine | 3/4 | In Progress|  |
+| 3. Append-Only Revision Spine | 4/4 | Complete    | 2026-06-16 |
 | 4. Retrieval & Observation Surface | 0/TBD | Not started | - |
 | 5. Edge Model & Contraction Cascade | 0/TBD | Not started | - |
 | 6. Structural Time-Travel | 0/TBD | Not started | - |
