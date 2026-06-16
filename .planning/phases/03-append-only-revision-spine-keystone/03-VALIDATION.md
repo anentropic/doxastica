@@ -1,9 +1,9 @@
 ---
 phase: 3
 slug: append-only-revision-spine-keystone
-status: draft
+status: validated
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-06-16
 ---
 
@@ -39,13 +39,13 @@ created: 2026-06-16
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 03-01-01 | 01 | 1 | SCOPE-02 (D-02) | — | N/A (constant + barrel export) | smoke | `UV_NO_SYNC=1 uv run python -c "from doxastica import WORLD_SCOPE_ID; assert WORLD_SCOPE_ID == '__world__'; print('ok')"` | ✅ (edits models.py/__init__.py) | ⬜ pending |
-| 03-01-02 | 01 | 1 | CHAIN-02, HIST-02 (D-07) | T-03-01 / T-03-02 | DDL interpolates only `_NS_RE`-validated `{ns}` + fixed labels; edge endpoint ids are `$param` binds | smoke | `UV_NO_SYNC=1 uv run --extra ladybug python -c "<HAS_REVISION hub-edge probe>"` (prints `hub edge ok`) | ✅ (edits ladybug.py) | ⬜ pending |
-| 03-03-01 | 03 | 1 | SCOPE-01/02/03, CHAIN-01, OPS-01/02/03, HIST-02 | T-03-07 / T-03-08 | authors the DEF-02-01 round-trip + retracted byte-identity + world-guard regression tests | scaffold (collect-only RED) | `UV_NO_SYNC=1 uv run --extra ladybug python -m pytest tests/test_revision_spine.py --collect-only -q` | ❌ W0 (this task creates it) | ⬜ pending |
-| 03-02-01 | 02 | 2 | SCOPE-01/02/03, CHAIN-01 (D-01/D-02/D-06) | T-03-03 / T-03-05 | derives `is_world` in-core; values pass as `$param` binds (no Cypher in core) | unit (tdd) | `UV_NO_SYNC=1 uv run --extra ladybug pytest tests/test_revision_spine.py::test_get_or_create_scope tests/test_revision_spine.py::test_cross_scope_divergence -x` | ❌ W0 (03-03-01) | ⬜ pending |
-| 03-02-02 | 02 | 2 | OPS-01/02/03, CHAIN-02/03, HIST-02 (D-03/D-04/D-05/D-07) | T-03-03 / T-03-04 / T-03-06 | json.dumps/json.loads value-encoding (DEF-02-01); world-guard before any write; append-only by construction | unit (tdd) | `UV_NO_SYNC=1 uv run --extra ladybug pytest tests/test_revision_spine.py -x` | ❌ W0 (03-03-01) | ⬜ pending |
-| 03-04-01 | 04 | 3 | CHAIN-02, CHAIN-03 (D-01, SC3) | T-03-09 / T-03-10 | Hypothesis stateful: proves derived-current total+single-valued ≡ chain tail; chain immutability (monotonic state count) | invariant (stateful) | `UV_NO_SYNC=1 uv run --extra ladybug pytest tests/test_invariants.py -x` | ❌ W0 (this task creates it) | ⬜ pending |
-| 03-04-02 | 04 | 3 | CHAIN-02 (DEF-02-01) | T-03-10 | flips the DEF-02-01 xfail to a passing core-routed regression (brace value round-trips byte-identically) | regression (xfail flip) | `UV_NO_SYNC=1 uv run --extra ladybug pytest tests/test_backend_parity.py -x` | ⚠️ exists as xfail — flip to passing | ⬜ pending |
+| 03-01-01 | 01 | 1 | SCOPE-02 (D-02) | — | N/A (constant + barrel export) | smoke | `UV_NO_SYNC=1 uv run python -c "from doxastica import WORLD_SCOPE_ID; assert WORLD_SCOPE_ID == '__world__'; print('ok')"` | ✅ (edits models.py/__init__.py) | ✅ green |
+| 03-01-02 | 01 | 1 | CHAIN-02, HIST-02 (D-07) | T-03-01 / T-03-02 | DDL interpolates only `_NS_RE`-validated `{ns}` + fixed labels; edge endpoint ids are `$param` binds | smoke | `UV_NO_SYNC=1 uv run --extra ladybug python -c "<HAS_REVISION hub-edge probe>"` (prints `hub edge ok`) | ✅ (edits ladybug.py) | ✅ green |
+| 03-03-01 | 03 | 1 | SCOPE-01/02/03, CHAIN-01, OPS-01/02/03, HIST-02 | T-03-07 / T-03-08 | authors the DEF-02-01 round-trip + retracted byte-identity + world-guard regression tests | scaffold (collect-only RED) | `UV_NO_SYNC=1 uv run --extra ladybug python -m pytest tests/test_revision_spine.py --collect-only -q` | ❌ W0 (this task creates it) | ✅ green |
+| 03-02-01 | 02 | 2 | SCOPE-01/02/03, CHAIN-01 (D-01/D-02/D-06) | T-03-03 / T-03-05 | derives `is_world` in-core; values pass as `$param` binds (no Cypher in core) | unit (tdd) | `UV_NO_SYNC=1 uv run --extra ladybug pytest tests/test_revision_spine.py::test_get_or_create_scope tests/test_revision_spine.py::test_cross_scope_divergence -x` | ❌ W0 (03-03-01) | ✅ green |
+| 03-02-02 | 02 | 2 | OPS-01/02/03, CHAIN-02/03, HIST-02 (D-03/D-04/D-05/D-07) | T-03-03 / T-03-04 / T-03-06 | json.dumps/json.loads value-encoding (DEF-02-01); world-guard before any write; append-only by construction | unit (tdd) | `UV_NO_SYNC=1 uv run --extra ladybug pytest tests/test_revision_spine.py -x` | ❌ W0 (03-03-01) | ✅ green |
+| 03-04-01 | 04 | 3 | CHAIN-02, CHAIN-03 (D-01, SC3) | T-03-09 / T-03-10 | Hypothesis stateful: proves derived-current total+single-valued ≡ chain tail; chain immutability (monotonic state count) | invariant (stateful) | `UV_NO_SYNC=1 uv run --extra ladybug pytest tests/test_invariants.py -x` | ❌ W0 (this task creates it) | ✅ green |
+| 03-04-02 | 04 | 3 | CHAIN-02 (DEF-02-01) | T-03-10 | flips the DEF-02-01 xfail to a passing core-routed regression (brace value round-trips byte-identically) | regression (xfail flip) | `UV_NO_SYNC=1 uv run --extra ladybug pytest tests/test_backend_parity.py -x` | ⚠️ exists as xfail — flip to passing | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -76,6 +76,21 @@ created: 2026-06-16
 - [x] No watch-mode flags (all commands are one-shot `pytest`/`python -c`)
 - [x] Feedback latency < 30s
 - [x] `nyquist_compliant: true` set in frontmatter (strategy fully populated; every task has an automated verify; plans already satisfy Nyquist sampling)
-- [ ] `wave_0_complete: false` — Wave 0 (the test scaffolds in 03-03 / 03-04) has not executed yet
+- [x] `wave_0_complete: true` — Wave 0 scaffolds (03-03 `test_revision_spine.py`, 03-04 `test_invariants.py`) executed and green
 
 **Approval:** approved 2026-06-16
+
+---
+
+## Validation Audit 2026-06-16
+
+State A audit (VALIDATION.md existed; post-execution coverage verification).
+
+| Metric | Count |
+|--------|-------|
+| Requirements in scope | 10 |
+| Gaps found | 0 |
+| Resolved | 0 (none needed) |
+| Escalated | 0 |
+
+**Result: NYQUIST-COMPLIANT.** Every phase requirement (SCOPE-01/02/03, CHAIN-01/02/03, OPS-01/02/03, HIST-02) maps to a dedicated automated test parametrized over both backends (`memory`, `ladybug`), all green — full suite `106 passed` via `UV_NO_SYNC=1 uv run --extra ladybug pytest`. Requirement→test map: SCOPE-01 `test_get_or_create_scope`; SCOPE-02 `test_world_contract_raises`; SCOPE-03 `test_cross_scope_divergence`; CHAIN-01 `test_belief_state_split`; CHAIN-02 `test_invariants.py::chain_is_immutable` (exact-equality, WR-02-tightened) + `test_revise_supersedes`; CHAIN-03 `test_invariants.py` derived-current consistency `@invariant`; OPS-01 `test_revise_supersedes`; OPS-02 `test_expand_equals_revise`; OPS-03 `test_contract_vacuity_and_acts`; HIST-02 `test_revision_chain_order`. Integrity regressions additionally cover DEF-02-01 (`test_brace_value_round_trips`, byte-identity, and the flipped parity regression). No auditor pass required — zero gaps. No manual-only verifications (in-process library; no visual/network/interactive surface).
