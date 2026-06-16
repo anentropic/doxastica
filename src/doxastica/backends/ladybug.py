@@ -259,7 +259,7 @@ class LadybugBackend:
         edge_type: EdgeType | str,
         from_id: UUID | str,
         to_id: UUID | str,
-        props: dict[str, Any] | None = None,  # noqa: ARG002  (edge props unused; kept for port parity)
+        props: dict[str, Any] | None = None,
     ) -> None:
         """
         Add a typed directed edge; idempotent — a repeated edge yields exactly one (BACK-02).
@@ -272,7 +272,16 @@ class LadybugBackend:
         ``BeliefState``->``BeliefState`` (keyed ``state_id``). ``HAS_REVISION`` arrives as a raw
         string, never an ``EdgeType`` member (D-07). Endpoint ids are ``$param`` binds; only the
         validated namespace + fixed endpoint labels + edge-type label are interpolated.
+
+        Edge properties are NOT yet implemented (no Phase-3 edge carries any). ``props`` stays in
+        the signature for port parity, but a non-empty ``props`` is REJECTED with
+        ``NotImplementedError`` rather than silently dropped (IN-01) — a silent no-op would mask a
+        future consumer-facing edge that expects its properties stored.
         """
+        if props:
+            raise NotImplementedError(
+                "add_edge does not yet store edge properties; got non-empty props"
+            )
         from_label, to_label = _EDGE_ENDPOINTS[str(edge_type)]
         rel = f"{self._ns}_{edge_type}"
         a_node = f"{self._ns}_{from_label}"

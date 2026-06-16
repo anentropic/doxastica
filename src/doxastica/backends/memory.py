@@ -73,9 +73,20 @@ class InMemoryBackend:
         edge_type: EdgeType | str,
         from_id: UUID | str,
         to_id: UUID | str,
-        props: dict[str, Any] | None = None,  # noqa: ARG002  (edge props unused in-memory; kept for port parity)
+        props: dict[str, Any] | None = None,
     ) -> None:
-        """Add a typed directed edge; idempotent — a repeated edge yields exactly one."""
+        """
+        Add a typed directed edge; idempotent — a repeated edge yields exactly one.
+
+        Edge properties are NOT yet implemented (IN-01): ``props`` stays in the signature for port
+        parity, but a non-empty ``props`` is REJECTED with ``NotImplementedError`` rather than
+        silently dropped — matching the ladybug adapter so both backends fail identically on a
+        caller that expects edge properties stored.
+        """
+        if props:
+            raise NotImplementedError(
+                "add_edge does not yet store edge properties; got non-empty props"
+            )
         et = str(edge_type)
         src, dst = str(from_id), str(to_id)
         adjacency = self._edges.setdefault(et, {}).setdefault(src, [])
