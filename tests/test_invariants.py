@@ -297,15 +297,20 @@ class _SpineMachine(RuleBasedStateMachine):
     @invariant()
     def chain_is_immutable(self) -> None:
         """
-        Chain immutability (CHAIN-02): total BeliefState count is monotonic non-decreasing.
+        Chain immutability (CHAIN-02): total BeliefState count EQUALS the appends performed.
 
-        Every op is a pure append (or the contract no-op / world-scope raise); no op deletes or
-        mutates a state, so the total ``BeliefState`` count can only grow. The watermark equals the
-        number of appends the rules performed, which the store must match exactly.
+        Every op is a pure append (or the contract no-op / world-scope raise); no op deletes,
+        mutates, OR duplicates a state, so the total ``BeliefState`` count must equal the number of
+        appends the rules performed EXACTLY. The exact-equality form (WR-02) catches the
+        append-only/duplication defects this keystone invariant exists to detect — a ``>=`` form
+        would silently pass a double-append or an over-write. The monotonic-watermark intent is
+        already covered by ``_state_count`` only ever incrementing; this store-side check is the
+        strong one.
         """
         total = len(self._be.match_nodes("BeliefState", {}))
-        assert total >= self._state_count, (
-            f"BeliefState count must be monotonic non-decreasing (no deletes, CHAIN-02): "
+        assert total == self._state_count, (
+            f"BeliefState count must equal the number of appends performed exactly "
+            f"(no deletes AND no duplicate writes, CHAIN-02): "
             f"store has {total} states but {self._state_count} appends were performed"
         )
 
