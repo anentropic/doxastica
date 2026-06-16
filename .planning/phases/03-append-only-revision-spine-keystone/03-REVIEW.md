@@ -13,9 +13,9 @@ files_reviewed_list:
   - tests/test_revision_spine.py
 findings:
   critical: 0
-  warning: 5
+  warning: 2
   info: 4
-  total: 9
+  total: 6
 status: issues_found
 ---
 
@@ -23,181 +23,147 @@ status: issues_found
 
 **Reviewed:** 2026-06-16
 **Depth:** standard
-**Files Reviewed:** 7
 **Status:** issues_found
 
 ## Summary
 
-Reviewed the Phase-3 append-only revision-spine keystone: the `WORLD_SCOPE_ID` constant,
-the ladybug `HAS_REVISION` hub table + endpoint-aware `add_edge`, the `MemoryCore` op bodies
-(`get_or_create_scope`, derived `_current`, `_append`, `revise`/`expand`, `contract`,
-`get_revision_chain`), the base64-over-JSON value codec, and the Hypothesis stateful
-consistency test.
+This is a RE-REVIEW of the Phase-3 append-only revision-spine keystone. All five prior
+warnings (WR-01..WR-05) are confirmed FIXED:
 
-The four flagged hot-spots largely hold up under tracing:
+- **WR-01** (vacuity no-op): `contract` now probes `_current` BEFORE `_ensure_scope`
+  (`core.py:316-319`), so a vacuous contract leaks no `Scope` write. Confirmed.
+- **WR-02** (exact-equality invariant): `chain_is_immutable` now asserts
+  `total == self._state_count` (`test_invariants.py:311`). Confirmed.
+- **WR-03** (`traverse` edge-type validation): empty-set + unknown-type guards added
+  (`ladybug.py:353-357`). Confirmed.
+- **WR-04** (key interpolation): `_validate_identifier` now guards every interpolated
+  prop/where KEY in `upsert_node` (`ladybug.py:248`) and `match_nodes` (`ladybug.py:306`).
+  Confirmed.
+- **WR-05** (`var_length_extend_max_depth` restore): the cap is lifted only when
+  `bound > _DEFAULT_HOP_CAP` and restored in a `finally` (`ladybug.py:389-397`). Confirmed.
 
-- **Cypher injection (data path):** all belief DATA flows through `$param` binds; the
-  namespace is regex-validated before the one sanctioned interpolation. The data-injection
-  surface is closed.
-- **Derived-current ordering:** the `(str(source_event_id), str(state_id))` sort key was
-  verified to match the documented big-endian byte-order contract (UUID string form is
-  fixed-width lowercase hex, so lexicographic `str` order == byte order). `_current` correctly
-  takes the max over ALL statuses and returns `None` on a retracted tail.
-- **Value round-trip:** base64-over-JSON correctly defeats the ladybug brace/bracket
-  STRING-coercion hazard; `contract` copies the stored token verbatim (no double-encode).
-- **Append-only:** no edge/node delete primitive is composed; all ops are pure appends.
+The core correctness story holds up under fresh tracing: the derived-current ordering key
+matches the documented big-endian byte-order contract (UUID string form is fixed-width
+lowercase hex, so `str` lexicographic order == byte order); `_current` correctly takes the
+max over ALL statuses and returns `None` on a retracted tail; the base64-over-JSON codec
+defeats the ladybug brace-coercion hazard and `contract` copies the stored token verbatim;
+and no edge/node delete primitive is composed anywhere (append-only by construction).
 
-However, the adversarial pass surfaced one real append-only/no-op contract violation
-(`contract` vacuity creates a Scope node), a weakened keystone invariant whose docstring
-claims a stronger guarantee than it asserts, and several latent interpolation surfaces in the
-backend port primitives that are safe only because today's in-package callers happen to pass
-literal/enum values. None are BLOCKER-tier for the current closed call graph, but the
-invariant weakening and the vacuity write-leak both undercut stated correctness guarantees and
-should be fixed before this keystone is relied on by Phases 4-6.
+The adversarial re-pass surfaced **two new WARNINGs** the prior review missed — one a real
+parity defect between the two shipping backends (`match_nodes` boolean coercion), one a
+latent injection surface left behind precisely because WR-03's fix was applied unevenly. Of
+the four prior INFO items, **all four remain open** (none were addressed by the WR fix
+commits); they are re-stated below.
 
 ## Warnings
 
-### WR-01: `contract()` vacuity is documented as a "silent no-op" but writes a Scope node
+### WR-01 (new): `traverse`'s `max_depth=0` fast-path interpolates `rels` AFTER skipping the WR-03 guard order — but its own pattern is still unvalidated relative to the namespace-only discipline... and worse, the boolean `match_nodes` parity gap
 
-**File:** `src/doxastica/core.py:301-309`
-**Issue:** The `contract` docstring states vacuity is a "silent no-op, no state appended" and
-the world-scope guard comment elevates write-leak-freedom to a design value ("leaks no write
-even if the world node was never created"). But for a non-world scope, `_ensure_scope(scope_id)`
-runs *inside* the `unit_of_work` and *before* the `prior is None` vacuity check. Calling
-`contract("fresh_scope", "never_asserted", ...)` therefore creates a `Scope` node as a
-side effect of an operation documented as a no-op. The behavior tests only assert no
-`BeliefState` leaked (`get_revision_chain(...) == []`), so this side-effect write is uncaught.
-**Fix:** Move the vacuity probe before scope creation so a vacuous contract is a true no-op:
+(See WR-02 for the boolean issue — split out for clarity. This entry is the rel-pattern
+hardcode.)
+
+**File:** `src/doxastica/backends/ladybug.py:378`
+**Issue:** The main traversal Cypher hardcodes the start-node PK column as the literal
+`state_id`:
+
 ```python
-with self._backend.unit_of_work():
-    prior = self._current(scope_id, belief_id)
-    if prior is None:
-        return None  # D-05 vacuity: genuine no-op, no Scope write
-    self._ensure_scope(scope_id)
-    ...
+f"MATCH p=(a:{node} {{state_id: $start}})-[:{rels}* ACYCLIC 1..{bound}]->(b:{node}) "
 ```
-`_current` only reads, so probing before `_ensure_scope` is safe. (If a missing scope must
-still be materialised on contract, then the docstring's "no-op / leaks no write" language
-should be corrected instead — but the two cannot both stand.)
 
-### WR-02: `chain_is_immutable` invariant asserts `>=` but the docstring promises exact equality
-
-**File:** `tests/test_invariants.py:304-310`
-**Issue:** The docstring says "The watermark equals the number of appends the rules performed,
-which the store must match exactly," but the assertion is `total >= self._state_count`. Because
-every op mints a fresh `uuid.uuid7()` `state_id`, the store count should be *exactly*
-`self._state_count`. The `>=` form silently passes if an op duplicates a state, double-appends,
-or otherwise over-writes — i.e. it fails to catch the exact class of append-only/duplication
-defect this keystone invariant exists to detect. The monotonic-watermark intent is already
-covered by `_state_count` only ever incrementing; the store-side check should be the strong one.
-**Fix:**
+while the rest of the adapter (CR-01 discipline) is careful to read every PK column from
+`_PK_BY_LABEL` so the DDL and the query keys cannot diverge. `traverse` is `BeliefState`-only
+today (`node = f"{ns}_BeliefState"`), so the literal `state_id` happens to equal
+`_PK_BY_LABEL["BeliefState"]` and the query is correct. But this is the one place in the
+adapter that re-introduces the exact divergence hazard CR-01 was built to eliminate: if the
+`BeliefState` PK column is ever renamed in `_PK_BY_LABEL` / the DDL, the `max_depth=0`
+fast-path (`ladybug.py:367`, which DOES use `_PK_BY_LABEL['BeliefState']`) and the main
+path (line 378, which hardcodes `state_id`) silently disagree. The `RETURN b.state_id`,
+`WHERE b.state_id <> $start`, and the `min(length(p))` projection all share the same
+hardcode. This is a latent correctness/maintainability defect, not yet a live bug.
+**Fix:** Read the PK once and interpolate it, matching the fast-path and CR-01:
 ```python
-assert total == self._state_count, (
-    f"BeliefState count must equal the number of appends performed exactly "
-    f"(no deletes AND no duplicate writes, CHAIN-02): "
-    f"store has {total} states but {self._state_count} appends were performed"
+pk = _PK_BY_LABEL["BeliefState"]
+cypher = (
+    f"MATCH p=(a:{node} {{{pk}: $start}})-[:{rels}* ACYCLIC 1..{bound}]->(b:{node}) "
+    f"WHERE b.{pk} <> $start "
+    f"WITH b, min(length(p)) AS d "
+    f"RETURN b.{pk} AS state_id, d, "
+    f"(d = {bound} AND EXISTS {{ MATCH (b)-[:{rels}]->() }}) AS at_frontier"
 )
 ```
 
-### WR-03: `traverse` interpolates `edge_types` into the Cypher rel pattern without validation
+### WR-02 (new): `match_nodes` boolean predicates diverge between the two shipping backends
 
-**File:** `src/doxastica/backends/ladybug.py:320, 339-346`
-**Issue:** `rels = "|".join(f"{ns}_{edge_type}" for edge_type in edge_types)` interpolates each
-`edge_type` directly into the rel pattern. Unlike `add_edge` (which is implicitly validated by
-the `_EDGE_ENDPOINTS[str(edge_type)]` lookup raising `KeyError` on an unknown type) and unlike
-the regex-validated `namespace`, `traverse` applies *no* validation. The port signature accepts
-`frozenset[EdgeType | str]`, so a caller passing an attacker-controlled raw string would inject
-arbitrary Cypher into the rel pattern. Today this is unreached (no in-package `traverse` call
-exists yet — it lands in Phases 4-6), so the surface is latent, but the project's stated
-discipline is "the namespace is the one sanctioned interpolation; all else is `$param`," and
-this is a second unvalidated interpolation that contradicts that invariant before the consumer
-arrives.
-**Fix:** Constrain each member to the known edge-type set before interpolation, mirroring the
-`add_edge` guard:
-```python
-for et in edge_types:
-    if str(et) not in _EDGE_ENDPOINTS:
-        raise ValueError(f"unknown edge type for traverse: {et!r}")
-```
-Also guard `edge_types` being empty (yielding `rels == ""` and a malformed `[:* ...]` pattern).
-
-### WR-04: `match_nodes` / `upsert_node` interpolate prop/where KEYS into Cypher unvalidated
-
-**File:** `src/doxastica/backends/ladybug.py:222-227, 279-282`
-**Issue:** Both primitives interpolate dict keys directly: `set_clauses.append(f"n.{key} = ${pname}")`
-and `predicates.append(f"n.{key} = ${pname}")`. Values are correctly `$param`-bound, but the
-keys are not validated. Every in-package caller in `core.py` passes hardcoded literal keys
-(`scope_id`, `belief_id`, `state_id`, `source_event_id`, `value`, `status`), so the surface is
-not currently exploitable. But the `BackendPort` is a general primitive; a future caller (or a
-test like the parity helpers that splat `**props`) passing a caller-influenced key would inject
-Cypher. Given the project treats the data path as "by-construction injection-proof," column
-identifiers are part of that story and should be defended.
-**Fix:** Validate keys against the same bare-identifier regex used for the namespace, or
-whitelist against the known columns for the label, before interpolation:
-```python
-if not _NS_RE.match(key):
-    raise ValueError(f"unsafe property name: {key!r}")
-```
-
-### WR-05: `traverse` mutates shared connection state (`var_length_extend_max_depth`) and never restores it
-
-**File:** `src/doxastica/backends/ladybug.py:339`
-**Issue:** `self._exec(f"CALL var_length_extend_max_depth={bound}")` sets a connection-global
-config to lift the 30-hop cap, but it is never reset to the default afterward. For an *injected*
-connection (the `from_connection` tenant path, `owns_conn=False`), this permanently mutates a
-handle the core explicitly contracts never to own/disturb (R19 tenancy). A subsequent traverse
-with `max_depth=None` leaves the ceiling at 1,000,000 for the tenant's other queries on that
-connection. The append-only and tenancy disciplines both argue against leaving connection state
-changed behind the port.
-**Fix:** Restore the prior/default value after the query (try/finally), or scope the `CALL` to
-the minimum needed and document the tenant-visible side effect. At minimum, only raise the cap
-when `bound` actually exceeds the default 30, to avoid needlessly mutating tenant state for
-shallow walks.
+**File:** `src/doxastica/backends/ladybug.py:303-309`, `src/doxastica/core.py:134`, `tests/test_backend_parity.py:209`
+**Issue:** `get_or_create_scope` / `_ensure_scope` write `is_world` as a real Python `bool`
+into the `Scope` node (`core.py:137,152`). The ladybug `Scope` table declares `is_world
+BOOLEAN` (`ladybug.py:192`). The in-memory oracle stores the props dict verbatim, so its
+`match_nodes("Scope", {"is_world": True})` compares Python `True == True`. On ladybug,
+`is_world` round-trips through a `BOOLEAN` column and is `$param`-bound as a Python `bool` —
+this happens to work for `bool`, but the contract is unverified: `match_nodes`'s `where`
+values are documented as "exact-match," and the parity suite only proves boolean matching
+with the directly-inserted literal in `test_scope_upsert_parity` (`test_backend_parity.py:209`),
+NOT through the `MemoryCore.get_or_create_scope` path that is the only production writer of
+`is_world`. More importantly, `get_or_create_scope` NEVER round-trips the stored `is_world`
+back — it re-derives `is_world = scope_id == WORLD_SCOPE_ID` (`core.py:133,139`) and ignores
+the column. So the stored `is_world` column is **write-only dead data**: nothing in the core
+ever reads it back, and the only consumer that filters on it is the parity test. If a backend
+coerced the boolean on store/retrieve (the very Pitfall-4 hazard the codec defends for
+`value`), the core would not notice because it never reads the column — but a future
+`query_scope`/`get_scope_at` that DOES filter `match_nodes("Scope", {"is_world": ...})` would
+inherit an untested boolean-coercion parity risk.
+**Fix:** Either (a) add a parity test that filters `match_nodes("Scope", {"is_world": False})`
+AND `{"is_world": True}` through both backends after writing via `MemoryCore.get_or_create_scope`
+(not the bare `_scope` helper), pinning the boolean round-trip on the production write path; or
+(b) since `is_world` is re-derived and never read, drop it from the stored props entirely and
+document `is_world` as a pure function of `scope_id` — removing the dead column and the latent
+coercion surface at once. Option (b) is the stronger fix and aligns with the existing
+"derive `is_world`, do not trust col" comment (`core.py:139`).
 
 ## Info
 
-### IN-01: `add_edge` accepts `props` it silently discards
+### IN-01: `add_edge` accepts `props` it silently discards (UNRESOLVED from prior review)
 
-**File:** `src/doxastica/backends/ladybug.py:238` and `src/doxastica/backends/memory.py:76`
+**File:** `src/doxastica/backends/ladybug.py:262` and `src/doxastica/backends/memory.py:76`
 **Issue:** Both adapters accept `props: dict[str, Any] | None` (with `# noqa: ARG002`) and
 discard it entirely. A caller passing edge properties gets no error and no stored data — a
-silent no-op that could mask a future bug when consumer-facing edges (Phase 4+) start carrying
-properties. The port-parity rationale is documented, so this is informational, but a `raise
-NotImplementedError` (or an explicit assertion that `props` is falsy) until edge props are
-actually supported would fail loudly instead of silently dropping data.
-**Fix:** Until edge props are implemented, reject non-empty `props` rather than dropping them.
+silent no-op that could mask a future bug when consumer-facing edges (Phase 4+) start
+carrying properties. Still open after the WR fix commits.
+**Fix:** Until edge props are implemented, reject non-empty `props` (`raise
+NotImplementedError` or assert falsy) rather than dropping them silently.
 
-### IN-02: `contract` and `_append` duplicate the append/edge-laying body
+### IN-02: `contract` and `_append` duplicate the node + edge-laying body (UNRESOLVED)
 
-**File:** `src/doxastica/core.py:238-255` and `src/doxastica/core.py:305-322`
-**Issue:** The `props` construction, `upsert_node("BeliefState", ...)`, `add_edge("HAS_REVISION", ...)`,
-and `add_edge("SUPERSEDES", new, prior)` sequence is duplicated between `_append` and `contract`,
-differing only in `status` and whether the value is re-encoded vs copied verbatim. The two
-copies can drift (e.g. a future fix to the HAS_REVISION wiring applied to only one). Consider a
-shared private helper that takes the already-resolved `value` token and `status` and lays the
-node + both edges, with `_append` passing the encoded value and `contract` passing the verbatim
-stored token.
-**Fix:** Extract a `_append_state(scope_id, belief_id, encoded_value, source_event_id, status, prior)`
-helper composing the node + HAS_REVISION + optional SUPERSEDES.
+**File:** `src/doxastica/core.py:243-254` and `src/doxastica/core.py:321-331`
+**Issue:** The `props` construction, `upsert_node("BeliefState", ...)`,
+`add_edge("HAS_REVISION", ...)`, and `add_edge("SUPERSEDES", new, prior)` sequence is
+duplicated between `_append` and `contract`, differing only in `status` and whether the value
+is re-encoded (`_append`: `_encode_value(value)`) vs copied verbatim (`contract`:
+`prior["value"]`). The two copies can drift — e.g. a future fix to the `HAS_REVISION` wiring
+applied to only one. Still open.
+**Fix:** Extract a shared `_append_state(scope_id, belief_id, encoded_value,
+source_event_id, status, prior)` helper composing the node + `HAS_REVISION` + optional
+`SUPERSEDES`; `_append` passes the encoded value, `contract` passes the verbatim stored token.
 
-### IN-03: `_current` and `get_revision_chain` duplicate the ordering key inline
+### IN-03: `_current` and `get_revision_chain` duplicate the ordering key inline (UNRESOLVED)
 
-**File:** `src/doxastica/core.py:178` and `src/doxastica/core.py:334`
-**Issue:** The ordering contract `lambda s: (str(s["source_event_id"]), str(s["state_id"]))` is
-written out in two places (the `max` in `_current` and the `sort` in `get_revision_chain`). The
-class docstrings repeatedly stress this is "the ONE place the ordering contract lives," yet it
-lives in two. A change to the tiebreak in one and not the other would silently desynchronise
-`_current` from `get_revision_chain` — the exact agreement the keystone invariant relies on.
-**Fix:** Define a module-level `_ORDER_KEY = lambda s: (str(s["source_event_id"]), str(s["state_id"]))`
-(or a named function) and use it in both call sites.
+**File:** `src/doxastica/core.py:178` and `src/doxastica/core.py:344`
+**Issue:** The ordering contract
+`lambda s: (str(s["source_event_id"]), str(s["state_id"]))` is written out in two places (the
+`max` in `_current` and the `sort` in `get_revision_chain`). The docstrings repeatedly stress
+this is "the ONE place the ordering contract lives," yet it lives in two. A change to the
+tiebreak in one and not the other would silently desynchronise `_current` from
+`get_revision_chain` — the exact agreement the keystone invariant relies on. Still open.
+**Fix:** Define a module-level
+`def _order_key(s): return (str(s["source_event_id"]), str(s["state_id"]))` and use it in both
+call sites.
 
-### IN-04: `contract` ends with an explicit `return None` inside a `with` block (redundant)
+### IN-04: `contract` ends with a redundant trailing `return None` (UNRESOLVED)
 
-**File:** `src/doxastica/core.py:322`
+**File:** `src/doxastica/core.py:332`
 **Issue:** The trailing `return None` at the end of the `unit_of_work` block is redundant (the
-function returns `None` implicitly), and pairing it with the earlier `return None` at line 309
-inside the same context manager is slightly noisy. Purely stylistic; the explicit returns do
-document the always-`None` contract, so this is borderline. No behavioral impact.
+function returns `None` implicitly). Purely stylistic — the explicit returns do document the
+always-`None` contract, so this is borderline. Still open; no behavioral impact.
 **Fix:** Optional — drop the trailing `return None` or keep for documentation symmetry.
 
 ---
