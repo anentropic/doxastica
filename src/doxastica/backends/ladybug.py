@@ -78,6 +78,12 @@ _NS_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 # approaches a million deep, so the unbounded frontier is empty in practice (A1, RESEARCH).
 _DEPTH_CEILING = 1_000_000
 
+# Ladybug's default var-length upper-hop cap. `traverse` only raises this (and only restores it)
+# when the requested bound exceeds it, so a shallow walk never mutates the connection's global
+# config — and even a deep walk restores the default afterward, so an INJECTED tenant connection
+# (R19) is never left with a changed ceiling behind the port (WR-05).
+_DEFAULT_HOP_CAP = 30
+
 # Label -> PRIMARY KEY column. The SINGLE source of truth for each node table's PK: the
 # bootstrap DDL (``_bootstrap_schema``) and the ``upsert_node`` MERGE key both read from here,
 # so a schema change cannot silently diverge from the upsert key (CR-01). The port keys upsert
@@ -103,6 +109,19 @@ def _validate_namespace(ns: str) -> None:
     """Reject a namespace that is not a safe bare identifier (D-04, mitigates T-02-01)."""
     if not _NS_RE.match(ns):
         raise ValueError(f"namespace must match {_NS_RE.pattern!r}; got {ns!r}")
+
+
+def _validate_identifier(name: str) -> None:
+    """
+    Reject a property/column name that is not a safe bare identifier (WR-04).
+
+    Column identifiers cannot be ``$param``-bound, so ``upsert_node`` / ``match_nodes`` interpolate
+    prop/where KEYS directly into ``n.{key}``. Every such key is validated against the SAME bare-
+    identifier regex the namespace uses, so the column-identifier surface is part of the data path's
+    by-construction injection-proofing — not just the values.
+    """
+    if not _NS_RE.match(name):
+        raise ValueError(f"property name must match {_NS_RE.pattern!r}; got {name!r}")
 
 
 class LadybugBackend:
@@ -222,6 +241,11 @@ class LadybugBackend:
         for i, (key, value) in enumerate(props.items()):
             if key == pk:
                 continue  # never SET the PK — it is the MERGE key (ladybug rejects re-SET).
+            # WR-04: prop KEYS are interpolated into `n.{key}` (column identifiers cannot be
+            # $param-bound), so each must be a safe bare identifier — the same guard the namespace
+            # uses. Values are still $param-bound; this defends the column-identifier surface so the
+            # data path stays injection-proof even for a future key-splatting caller.
+            _validate_identifier(key)
             pname = f"p{i}"
             params[pname] = value
             set_clauses.append(f"n.{key} = ${pname}")
@@ -277,6 +301,9 @@ class LadybugBackend:
         params: dict[str, Any] = {}
         predicates: list[str] = []
         for i, (key, value) in enumerate(where.items()):
+            # WR-04: predicate KEYS are interpolated into `n.{key}` (column identifiers cannot be
+            # $param-bound), so each must be a safe bare identifier. Values stay $param-bound.
+            _validate_identifier(key)
             pname = f"p{i}"
             params[pname] = value
             predicates.append(f"n.{key} = ${pname}")
@@ -317,6 +344,17 @@ class LadybugBackend:
         # (not `assert`) keeps the check alive under `python -O`.
         if bound < 0:
             raise ValueError(f"max_depth must be non-negative; got {bound}")
+        # WR-03: `edge_types` members are INTERPOLATED into the rel pattern (`[:{rels}* ...]`),
+        # never $param-bound — so each must be constrained to the known edge-type set before
+        # interpolation, mirroring `add_edge`'s `_EDGE_ENDPOINTS` lookup. An empty `edge_types`
+        # would also yield `rels == ""` and a malformed `[:* ...]` pattern, so reject it too.
+        # This keeps the rel-pattern interpolation inside the same injection-safety story as the
+        # namespace (the one sanctioned interpolation) rather than a second unvalidated surface.
+        if not edge_types:
+            raise ValueError("traverse requires at least one edge type")
+        for et in edge_types:
+            if str(et) not in _EDGE_ENDPOINTS:
+                raise ValueError(f"unknown edge type for traverse: {et!r}")
         rels = "|".join(f"{ns}_{edge_type}" for edge_type in edge_types)
         node = f"{ns}_BeliefState"
         # WR-02: `max_depth=0` would compile to the degenerate var-length range `*1..0`. Match the
@@ -336,7 +374,6 @@ class LadybugBackend:
                 frozenset({str(start)}) if has_out_edge else frozenset()
             )
             return [], frontier_zero
-        self._exec(f"CALL var_length_extend_max_depth={bound}")  # lift the 30-hop cap
         cypher = (
             f"MATCH p=(a:{node} {{state_id: $start}})-[:{rels}* ACYCLIC 1..{bound}]->(b:{node}) "
             f"WHERE b.state_id <> $start "
@@ -344,7 +381,20 @@ class LadybugBackend:
             f"RETURN b.state_id AS state_id, d, "
             f"(d = {bound} AND EXISTS {{ MATCH (b)-[:{rels}]->() }}) AS at_frontier"
         )
-        rows = self._rows(self._exec(cypher, {"start": str(start)}))
+        # WR-05: `var_length_extend_max_depth` is a connection-GLOBAL config. Only raise it when the
+        # bound actually exceeds the default cap (a shallow walk never touches tenant state), and
+        # restore the default in a `finally` so an INJECTED tenant connection (R19, owns_conn=False)
+        # is never left with a changed ceiling behind the port — a subsequent unrelated query on the
+        # tenant's handle sees the original 30-hop cap.
+        lifted = bound > _DEFAULT_HOP_CAP
+        if lifted:
+            self._exec(f"CALL var_length_extend_max_depth={bound}")  # lift the 30-hop cap
+        try:
+            rows = self._rows(self._exec(cypher, {"start": str(start)}))
+        finally:
+            if lifted:
+                # restore the default cap so an injected tenant connection is unchanged (WR-05)
+                self._exec(f"CALL var_length_extend_max_depth={_DEFAULT_HOP_CAP}")
         reached = [{"state_id": r["state_id"]} for r in rows]
         frontier: frozenset[UUID | str] = frozenset(r["state_id"] for r in rows if r["at_frontier"])
         return reached, frontier
