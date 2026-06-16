@@ -25,7 +25,13 @@ deferred, the formal core and its property-test suite must be right.
 
 ### Validated
 
-(None yet — ship to validate)
+- **`BeliefStore` Protocol + `BackendPort` seam, frozen taxonomy, UUID7 ordering contract** — landed and import-purity-guarded (Phase 1).
+- **Ports & adapters / dual backends** — in-memory + ladybug reference backend run the same parity suite behind `BackendPort` (Phases 1–2).
+- **Flexible connection (ladybug)** — injected-connection + namespace tenancy and self-managed modes, throwaway test DBs (Phase 2).
+- **Scopes + privileged world scope** where `contract()` raises `WorldScopeContractionError` before any write (Phase 3, SCOPE-01/02/03).
+- **`Belief`/`BeliefState` split + immutable append-only `HAS_REVISION` chain**, with the *current* per belief-in-scope **derived** (D-01: no stored `CURRENT_STATE` pointer) (Phase 3, CHAIN-01/02/03).
+- **Core operations `revise`/`expand`/`contract`/`get_or_create_scope` + `get_revision_chain`** on both backends, each write atomic in one `unit_of_work` (Phase 3, OPS-01/02/03, HIST-02).
+- **Structural-invariant test** reframed as a Hypothesis consistency check (derived-current total + single-valued ≡ chain tail) on both backends (Phase 3, SC3).
 
 ### Active
 
@@ -46,7 +52,9 @@ deferred, the formal core and its property-test suite must be right.
 - [ ] **Scopes** as named belief-holders, including a privileged **world scope** where
       `contract()` is an error (append-only / no-retcon enforcement point)
 - [ ] **`Belief` / `BeliefState` split** — stable identity + immutable, append-only
-      revision chain; single mutable `CURRENT_STATE` pointer; one belief per `Belief` node
+      revision chain; current per belief-in-scope is **derived** (D-01: no stored
+      `CURRENT_STATE` pointer — a profiling-driven optimization, addable without changing
+      the public surface); one belief per `Belief` node
 - [ ] Core belief operations: `revise`, `expand`, `contract`, `get_or_create_scope`
 - [ ] **Generic typed edges** — `SUPERSEDES`, `DEPENDS_ON`, `DERIVED_FROM` (no epistemic
       semantics; NVM layers meaning on top) via `add_edge`
@@ -203,6 +211,8 @@ This document evolves at phase transitions and milestone boundaries.
 
 **Phase history:**
 - **Phase 1 — Protocol, Backend Port & Data-Model Decisions** (complete 2026-06-14): typed `basedpyright`-strict foundation landed. Public `BeliefStore` Protocol (pydantic/typing-only, import-purity-guarded), a distinct internal LPG-primitive `BackendPort`, frozen pydantic v2 taxonomy (`extra="forbid"`, opaque `value`/UUID7), closed `BeliefFilter`, `ImpactResult` truncation contract, the UUID7 ordering contract, and the drafted `docs/backend-contract.md`. Decision-grade only — zero storage code; runtime behavior begins Phase 2 (backend adapters & schema-bootstrap spike).
+- **Phase 2 — Backend Adapters, Schema Bootstrap & De-risking Spike** (complete 2026-06-15): the two backends behind `BackendPort` landed and run a shared parity suite — the zero-dep `InMemoryBackend` (oracle) and the ladybug reference backend (idempotent schema bootstrap, injected-connection + namespace tenancy, self-managed modes). D-03 reversal recorded: `pydantic` is the sole required runtime dep; `ladybug` moved to the `[ladybug]` extra. The 5 LPG primitives + `unit_of_work` are parity-tested; op bodies left for Phase 3.
+- **Phase 3 — Append-Only Revision Spine (Keystone)** (complete 2026-06-16): the AGM write spine. `WORLD_SCOPE_ID="__world__"` + structural world-scope `contract()` guard; `Belief`/`BeliefState` split with immutable `HAS_REVISION` hub chains; **derived current** (D-01 — no stored `CURRENT_STATE` pointer; uniqueness is a theorem, SC3 verified as a Hypothesis consistency check on both backends); `revise`≡`expand` and vacuity-aware `contract`, plus `get_revision_chain`, each atomic in one `unit_of_work`. Closed the inherited DEF-02-01 value-corruption defect via a base64-over-JSON codec at the core↔port boundary. Suite green (105 passed) on both backends. Advisory code review left 5 warnings (no blockers) for follow-up.
 
 ---
-*Last updated: 2026-06-14 after Phase 1 completion*
+*Last updated: 2026-06-16 after Phase 3 completion*
