@@ -229,6 +229,45 @@ class MemoryCore:
         )
 
     # --- Shared revise/expand append (D-04) ---------------------------------
+    def _append_state(
+        self,
+        scope_id: str,
+        belief_id: str,
+        encoded_value: str,
+        source_event_id: UUID,
+        status: Status,
+        prior: dict[str, Any] | None,
+    ) -> BeliefState:
+        """
+        The shared node + edge-laying body for ``_append`` and ``contract`` (IN-02, D-07).
+
+        Mints a fresh ``state_id`` (stdlib ``uuid.uuid7()``); builds the ``BeliefState`` props with
+        the ALREADY-ENCODED ``value`` (the caller owns the encode policy — ``_append`` passes
+        ``_encode_value(value)``; ``contract`` passes the prior STORED token VERBATIM, Pitfall 2);
+        upserts the ``BeliefState``; lays the ``HAS_REVISION`` hub edge (raw string — NOT an
+        ``EdgeType`` member, D-07); and, when ``prior`` is non-``None``, lays ``SUPERSEDES new →
+        prior`` (raw string). Returns the hydrated new state. Centralizing this body means a future
+        fix to the ``HAS_REVISION``/``SUPERSEDES`` wiring lands in ONE place, not two that drift.
+
+        The caller owns everything that genuinely differs between the two ops: the enclosing
+        ``unit_of_work``, the scope/``Belief`` materialization order, the vacuity probe, and how
+        ``prior`` is computed — so this helper is behavior-preserving for both call sites.
+        """
+        state_id = uuid.uuid7()
+        props: dict[str, Any] = {
+            "state_id": str(state_id),
+            "belief_id": belief_id,
+            "scope_id": scope_id,
+            "source_event_id": str(source_event_id),
+            "value": encoded_value,  # caller-supplied stored form (encode policy is the caller's)
+            "status": status.value,
+        }
+        self._backend.upsert_node("BeliefState", state_id, props)
+        self._backend.add_edge("HAS_REVISION", belief_id, str(state_id))  # hub form (D-07)
+        if prior is not None:
+            self._backend.add_edge("SUPERSEDES", str(state_id), prior["state_id"])
+        return self._hydrate(props)
+
     def _append(
         self,
         scope_id: str,
@@ -242,30 +281,22 @@ class MemoryCore:
 
         Steps (CHAIN-02/03, D-06, D-07, DEF-02-01), all composing the port primitives:
         auto-create the scope and ``Belief`` node (D-06); compute ``prior`` BEFORE the new
-        append (Pitfall 3); mint a fresh ``state_id`` (stdlib ``uuid.uuid7()``); ``json.dumps``
-        the opaque value once (DEF-02-01); append the active ``BeliefState``; lay the
-        ``HAS_REVISION`` hub edge (raw string — NOT an ``EdgeType`` member, D-07); and, when a
-        prior current existed, lay ``SUPERSEDES new → prior`` (raw string). Returns the hydrated
-        new state.
+        append (Pitfall 3); ``json.dumps`` the opaque value once (DEF-02-01); then delegate the
+        node + ``HAS_REVISION`` + optional ``SUPERSEDES`` body to the shared ``_append_state``
+        helper (IN-02). Returns the hydrated new state.
         """
         with self._backend.unit_of_work():  # exactly one (CHAIN-03)
             self._ensure_scope(scope_id)  # D-06
             self._backend.upsert_node("Belief", belief_id, {"belief_id": belief_id})  # D-06
             prior = self._current(scope_id, belief_id)  # derived, BEFORE append (Pitfall 3)
-            state_id = uuid.uuid7()
-            props: dict[str, Any] = {
-                "state_id": str(state_id),
-                "belief_id": belief_id,
-                "scope_id": scope_id,
-                "source_event_id": str(source_event_id),
-                "value": self._encode_value(value),  # encode once on write (DEF-02-01)
-                "status": status.value,
-            }
-            self._backend.upsert_node("BeliefState", state_id, props)
-            self._backend.add_edge("HAS_REVISION", belief_id, str(state_id))  # hub form (D-07)
-            if prior is not None:
-                self._backend.add_edge("SUPERSEDES", str(state_id), prior["state_id"])
-            return self._hydrate(props)
+            return self._append_state(
+                scope_id,
+                belief_id,
+                self._encode_value(value),  # encode once on write (DEF-02-01)
+                source_event_id,
+                status,
+                prior,
+            )
 
     # --- Core belief operations ---------------------------------------------
     def revise(
@@ -330,19 +361,16 @@ class MemoryCore:
             if prior is None:
                 return None  # D-05 vacuity: genuine silent no-op, no Scope/BeliefState write
             self._ensure_scope(scope_id)  # D-06 — only materialise the scope on the acting branch
-            state_id = uuid.uuid7()
-            props: dict[str, Any] = {
-                "state_id": str(state_id),
-                "belief_id": belief_id,
-                "scope_id": scope_id,
-                "source_event_id": str(source_event_id),
-                "value": prior["value"],  # D-05: copy STORED form verbatim (no re-dumps, Pitfall 2)
-                "status": Status.retracted.value,
-            }
-            self._backend.upsert_node("BeliefState", state_id, props)
-            self._backend.add_edge("HAS_REVISION", belief_id, str(state_id))
-            self._backend.add_edge("SUPERSEDES", str(state_id), prior["state_id"])
-            return None
+            # IN-02: delegate the node + HAS_REVISION + SUPERSEDES body to the shared helper,
+            # passing the prior STORED value VERBATIM (already encoded — no re-encode, Pitfall 2).
+            self._append_state(
+                scope_id,
+                belief_id,
+                prior["value"],  # D-05: copy STORED form verbatim (no re-dumps, Pitfall 2)
+                source_event_id,
+                Status.retracted,
+                prior,
+            )
 
     # --- History ------------------------------------------------------------
     def get_revision_chain(self, belief_id: str) -> list[BeliefState]:
