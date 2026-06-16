@@ -21,16 +21,20 @@ frontier). All ids are normalized to ``str`` and sorted before comparison — th
 ordering to the core (BACK-04 §5).
 
 DEF-02-01: a value-round-trip regression pins ladybug 0.17.1's brace/bracket-shaped-string
-coercion. The in-memory oracle MUST round-trip such a value byte-identically; the ladybug
-case is ``xfail`` because the driver coerces JSON-object-shaped strings (deferred to the
-Phase 3 value-encoding contract). The regression stays visible, not masked.
+coercion. As of Phase 3 (03-02 core value-encoding contract, base64-over-JSON) it is CLOSED:
+the regression is no longer an ``xfail`` but a PASSING assertion routed THROUGH ``MemoryCore``
+(``revise`` encodes, ``get_revision_chain`` decodes) on BOTH backends — the encoding contract
+lives at the core boundary, not the bare port, so the regression is proven there.
 """
 
 from __future__ import annotations
 
+import uuid
 from typing import TYPE_CHECKING, Any
 
 import pytest
+
+from doxastica import MemoryCore
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -276,36 +280,48 @@ def test_both_backends_match_nodes_byte_identical() -> None:
 # --------------------------------------------------------------------------------------------
 
 
-_SHAPED_VALUE = '{"x": 2}'  # a JSON-object-shaped STRING (the value-opacity hazard, DEF-02-01)
+_SHAPED_VALUE: dict[str, int] = {"x": 2}  # a brace-shaped value (the value-opacity hazard)
 
 
 def _assert_value_round_trips(backend: BackendPort) -> None:
-    """Store ``_SHAPED_VALUE`` as a node ``value`` and assert it round-trips byte-identically."""
-    _node(backend, "n1", value=_SHAPED_VALUE)
-    rows = backend.match_nodes("BeliefState", {"state_id": "n1"})
-    assert len(rows) == 1, f"expected exactly one node; got {rows}"
-    assert rows[0]["value"] == _SHAPED_VALUE, (
-        f"value must round-trip byte-identically; got {rows[0]['value']!r}"
+    """
+    Assert a brace-shaped ``value`` round-trips byte-identically THROUGH ``MemoryCore`` (DEF-02-01).
+
+    Routed through the CORE encode/decode boundary (``revise`` writes via ``_encode_value``;
+    ``get_revision_chain`` hydrates via ``_decode_value``) — NOT the bare port. The encoding
+    contract that closes the ladybug brace/bracket coercion lives in ``core.py`` (03-02:
+    base64-over-JSON), so the regression is proven at the core boundary, where the fix applies, on
+    whatever backend the caller supplies. A bare ``backend.upsert_node`` would still coerce on
+    ladybug — that is the deliberately-rejected level (PATTERNS Flag 3).
+    """
+    core = MemoryCore(backend)
+    state = core.revise("alice", "b1", _SHAPED_VALUE, uuid.uuid7())
+    assert state.value == _SHAPED_VALUE, (
+        f"revise must return the brace-shaped value verbatim; got {state.value!r}"
+    )
+    chain = core.get_revision_chain("b1")
+    assert len(chain) == 1, f"expected a single-state chain; got {len(chain)}"
+    assert chain[0].value == _SHAPED_VALUE, (
+        f"value must round-trip byte-identically through the core; got {chain[0].value!r}"
     )
 
 
 def test_value_string_round_trips_memory() -> None:
-    """The in-memory oracle round-trips a JSON-object-shaped STRING value verbatim (DEF-02-01)."""
+    """In-memory backend round-trips a brace-shaped value verbatim through the core (DEF-02-01)."""
     from doxastica.backends.memory import InMemoryBackend
 
     _assert_value_round_trips(InMemoryBackend())
 
 
-@pytest.mark.xfail(
-    reason="DEF-02-01: ladybug STRUCT/LIST coercion, deferred to Phase 3 value-encoding contract",
-    strict=False,
-)
 def test_value_string_round_trips_ladybug() -> None:
     """
-    Ladybug 0.17.1 coerces brace/bracket-shaped string params to STRUCT/LIST (DEF-02-01).
+    DEF-02-01 CLOSED: a brace-shaped value round-trips through the core on ladybug (was xfail).
 
-    Tracked, not masked: the regression is a visible ``xfail`` until the Phase 3 value-encoding
-    contract resolves it. The in-memory oracle (the test above) MUST pass the same assertion.
+    Ladybug 0.17.1 coerces brace/bracket-shaped STRING params to STRUCT/LIST at the bare port; the
+    Phase-3 core value-encoding contract (03-02, base64-over-JSON in ``_encode_value``) resolves it.
+    This regression — formerly a visible ``xfail`` — is now a PASSING assertion routed through
+    ``MemoryCore.revise`` + ``get_revision_chain`` on both backends, mirroring the Phase-2
+    security-verification flip discipline (xfail → passing once the control closes).
     """
     lb = pytest.importorskip("ladybug")
     from doxastica.backends.ladybug import LadybugBackend
