@@ -374,11 +374,18 @@ class LadybugBackend:
                 frozenset({str(start)}) if has_out_edge else frozenset()
             )
             return [], frontier_zero
+        # WR-01: read the BeliefState PK from `_PK_BY_LABEL` (the SINGLE source of truth) rather
+        # than hardcoding the literal `state_id`, matching the max_depth=0 fast-path above and the
+        # CR-01 discipline — so a future PK rename in `_PK_BY_LABEL`/DDL stays in lockstep with the
+        # main traversal query instead of silently diverging. The interpolated identifier is a
+        # fixed internal constant (not caller input), so this stays inside the sanctioned-
+        # interpolation story (no untrusted value reaches the Cypher text; `$start` stays bound).
+        pk = _PK_BY_LABEL["BeliefState"]
         cypher = (
-            f"MATCH p=(a:{node} {{state_id: $start}})-[:{rels}* ACYCLIC 1..{bound}]->(b:{node}) "
-            f"WHERE b.state_id <> $start "
+            f"MATCH p=(a:{node} {{{pk}: $start}})-[:{rels}* ACYCLIC 1..{bound}]->(b:{node}) "
+            f"WHERE b.{pk} <> $start "
             f"WITH b, min(length(p)) AS d "
-            f"RETURN b.state_id AS state_id, d, "
+            f"RETURN b.{pk} AS state_id, d, "
             f"(d = {bound} AND EXISTS {{ MATCH (b)-[:{rels}]->() }}) AS at_frontier"
         )
         # WR-05: `var_length_extend_max_depth` is a connection-GLOBAL config. Only raise it when the
