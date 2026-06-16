@@ -3,8 +3,8 @@ phase: 03-append-only-revision-spine-keystone
 fixed_at: 2026-06-16T00:00:00Z
 review_path: .planning/phases/03-append-only-revision-spine-keystone/03-REVIEW.md
 iteration: 1
-findings_in_scope: 5
-fixed: 5
+findings_in_scope: 6
+fixed: 6
 skipped: 0
 status: all_fixed
 ---
@@ -16,80 +16,107 @@ status: all_fixed
 **Iteration:** 1
 
 **Summary:**
-- Findings in scope: 5 (the WARNING tier — WR-01..WR-05; INFO findings out of scope)
-- Fixed: 5
+- Findings in scope: 6 (WR-01, WR-02, IN-01, IN-02, IN-03, IN-04)
+- Fixed: 6
 - Skipped: 0
 
-All five in-scope warnings were fixed. After fixes the full suite stays green on BOTH
-backends (`UV_NO_SYNC=1 uv run --extra ladybug pytest -q` → 105 passed), basedpyright-strict
-reports 0 errors, and ruff lint + format are clean.
+All fixes were applied in an isolated git worktree on branch `gsd-reviewfix/03-22244`.
+After all fixes the FULL suite is green on BOTH backends
+(`uv run --extra ladybug pytest -q` → 106 passed), basedpyright-strict reports
+0 errors/0 warnings, and `ruff check .` + `ruff format --check .` are clean.
 
 ## Fixed Issues
 
-### WR-01: `contract()` vacuity is documented as a "silent no-op" but writes a Scope node
+### WR-01: `traverse` hardcodes the `state_id` PK literal in the main traversal Cypher
+
+**Files modified:** `src/doxastica/backends/ladybug.py`
+**Commit:** ad2f33a
+**Status:** fixed
+**Applied fix:** Replaced the four hardcoded `state_id` occurrences in the main
+(`max_depth>0`) traversal Cypher with `pk = _PK_BY_LABEL["BeliefState"]`, matching the
+`max_depth=0` fast-path and the CR-01 single-source-of-truth discipline. The MATCH
+start-node key, the `WHERE b.{pk} <> $start` filter, and the `RETURN b.{pk}` projection
+all read the PK from `_PK_BY_LABEL`. The RETURN keeps `AS state_id` as the output column
+alias so the downstream `r["state_id"]` unpacking is unchanged. Parameter-safe: the
+interpolated identifier is a fixed internal constant; `$start` stays `$param`-bound.
+
+### WR-02: `match_nodes` boolean `is_world` round-trip untested on the production write path
+
+**Files modified:** `tests/test_backend_parity.py`
+**Commit:** fe50029
+**Status:** fixed
+**Applied fix:** Took the NON-invasive option (a) from the guardrail. Added
+`test_is_world_boolean_round_trips_production_write_path`, which writes a world scope
+(`is_world=True`) and a non-world scope (`is_world=False`) through the PRODUCTION writer
+`MemoryCore.get_or_create_scope` on BOTH backends (via the existing in-process
+`_both_backends` helper), then filters `match_nodes("Scope", {"is_world": True})` AND
+`{"is_world": False}` and asserts byte-identical results across backends. This pins the
+`BOOLEAN` round-trip on the only production code path that writes `is_world`, so a future
+`query_scope`/`get_scope_at` filtering on `is_world` inherits a TESTED parity rather than
+the latent coercion surface the reviewer flagged.
+
+Option (b) (drop the stored `is_world` column / change the `Scope` model) was deliberately
+NOT taken: it would mutate the FROZEN Phase-1 taxonomy (`Scope(scope_id, is_world)`, D-02),
+which is out of code-review scope. The reviewer's secondary suggestion in option (a) —
+making `get_or_create_scope` read the stored column back — was also NOT applied, because it
+would contradict the existing deliberate Pitfall-4 defense (`core.py`: "derive is_world, do
+not trust col"): trusting a coerced column is exactly what that comment guards against. The
+added test covers the stored-column parity without weakening the derive-don't-trust
+contract, which is the behavior-preserving intersection of the guardrail's allowed options.
+
+### IN-01: `add_edge` silently discards the `props` it accepts
+
+**Files modified:** `src/doxastica/backends/ladybug.py`, `src/doxastica/backends/memory.py`
+**Commit:** 50930fc
+**Status:** fixed
+**Applied fix:** Both adapters now `raise NotImplementedError` on a non-empty `props`
+(`if props:`) instead of silently dropping it, and the `# noqa: ARG002` suppressions were
+removed (the param is now used). Edge properties remain unimplemented (no Phase-3 edge
+carries any), but the silent no-op that could mask a future consumer-facing edge is gone.
+No existing caller passes `props` (`_append`/`contract`/`_append_state` call `add_edge`
+without props), so no current behavior changes; the full suite stays green.
+
+### IN-02: `contract` and `_append` duplicate the node + edge-laying body
 
 **Files modified:** `src/doxastica/core.py`
-**Commit:** 97b9ace
-**Applied fix:** Reordered `contract` so the read-only `_current` vacuity probe runs BEFORE
-`_ensure_scope`. A vacuous contraction (`prior is None`) now returns immediately and leaks no
-write — no `Scope` node is materialised. The D-03 world-scope structural guard is preserved as
-the FIRST statement (it still fires before `unit_of_work` and before any backend access, per the
-guardrail), so guard ordering is unchanged; only the scope-create moved below the vacuity check.
-Docstring updated to describe the genuine-no-op semantics and the preserved guard ordering.
+**Commit:** bf8f1ff
+**Status:** fixed: requires human verification
+**Applied fix:** Extracted `_append_state(scope_id, belief_id, encoded_value,
+source_event_id, status, prior)` composing the `BeliefState` props build + `upsert_node` +
+`HAS_REVISION` hub edge + optional `SUPERSEDES new → prior` + hydrate-and-return. `_append`
+now passes `_encode_value(value)`; `contract` passes the prior STORED token VERBATIM
+(Pitfall 2). The caller still owns everything that genuinely differs (the enclosing
+`unit_of_work`, the scope/`Belief` materialization order, the vacuity probe, how `prior` is
+computed), so the helper is behavior-preserving for both sites — in particular `contract`
+still does NOT upsert a `Belief` node (kept out of the helper) and still lays `SUPERSEDES`
+(its `prior` is always non-`None` after the vacuity check, so the helper's
+`if prior is not None` branch always fires there). Flagged for human verification because
+it is a logic-touching refactor of the keystone write path; the full suite (106 tests,
+both backends) passing is the primary evidence behavior is preserved.
 
-### WR-02: `chain_is_immutable` invariant asserts `>=` but the docstring promises exact equality
+### IN-03: `_current` and `get_revision_chain` duplicate the ordering key inline
 
-**Files modified:** `tests/test_invariants.py`
-**Commit:** e1661dd
-**Applied fix:** Tightened the assertion from `total >= self._state_count` to
-`total == self._state_count`, with the strengthened message from the review. The shadow oracle's
-`_state_count` increments exactly once per real append (revise/expand and the contract acting-
-branch via `_record`); the vacuous-contract path is gated out by `@precondition` and
-`world_contract_raises` records nothing, so exact equality holds across every op sequence the
-stateful machine generates. Verified green on both backends (the WR-01 reorder does not affect
-this — the machine's `contract` rule only runs on existing-current keys, never the vacuous path).
+**Files modified:** `src/doxastica/core.py`
+**Commit:** ead691c
+**Status:** fixed
+**Applied fix:** Added a module-level
+`_order_key(state) -> (str(state["source_event_id"]), str(state["state_id"]))` and use it
+in both the `_current` `max(..., key=_order_key)` and the `get_revision_chain`
+`states.sort(key=_order_key)`. The helper is byte-for-byte equivalent to the two inlined
+lambdas, so the ordering contract is genuinely centralized in one place (matching the
+docstrings' "the ONE place the ordering contract lives") without changing the selection
+behavior.
 
-### WR-03: `traverse` interpolates `edge_types` into the Cypher rel pattern without validation
+### IN-04: `contract` ends with a redundant trailing `return None`
 
-**Files modified:** `src/doxastica/backends/ladybug.py`
-**Commit:** ba82d8d
-**Applied fix:** Before building the interpolated rel pattern, each `edge_type` is constrained to
-the known `_EDGE_ENDPOINTS` set (`raise ValueError` on an unknown type, mirroring `add_edge`'s
-implicit guard), and an empty `edge_types` frozenset is rejected (it would otherwise yield
-`rels == ""` and a malformed `[:* ...]` pattern). The rel-pattern interpolation now sits inside
-the same injection-safety story as the sanctioned namespace interpolation.
-
-### WR-04: `match_nodes` / `upsert_node` interpolate prop/where KEYS into Cypher unvalidated
-
-**Files modified:** `src/doxastica/backends/ladybug.py`
-**Commit:** ba82d8d
-**Applied fix:** Added a `_validate_identifier` helper (reusing the existing bare-identifier
-`_NS_RE`) and call it on every interpolated prop key in `upsert_node` and every predicate key in
-`match_nodes`, before the key reaches `n.{key}`. Values remain `$param`-bound; this extends the
-"by-construction injection-proof" guarantee to the column-identifier surface for any future
-key-splatting caller.
-
-### WR-05: `traverse` mutates shared connection state (`var_length_extend_max_depth`) and never restores it
-
-**Files modified:** `src/doxastica/backends/ladybug.py`
-**Commit:** ba82d8d
-**Applied fix:** Introduced a `_DEFAULT_HOP_CAP = 30` constant. `traverse` now raises the cap only
-when the requested `bound` actually exceeds the default (a shallow walk never touches connection
-state at all), and restores the default in a `try/finally` around the traversal query. An injected
-tenant connection (`owns_conn=False`, R19) is therefore never left with a changed ceiling behind
-the port — a subsequent unrelated query on the tenant's handle sees the original 30-hop cap.
-
-## Notes on commit grouping
-
-WR-03, WR-04, and WR-05 all touch interleaved regions of the single `ladybug.py` adapter (the
-file header for the new constant + helper, and the shared `traverse` method body). They were
-committed together as one atomic backend-port-hardening commit (ba82d8d) to keep the module
-compilable at every commit boundary; per-hunk splitting would have produced fragile intermediate
-states that did not parse/import cleanly. WR-01 and WR-02 are independent single-file commits.
-
-## INFO findings (out of scope)
-
-IN-01..IN-04 are INFO-tier and outside the `critical_warning` fix scope; they were not addressed.
+**Files modified:** `src/doxastica/core.py`
+**Commit:** bf8f1ff
+**Status:** fixed
+**Applied fix:** Resolved as a byproduct of the IN-02 `contract` rewrite — the trailing
+`return None` at the end of the `unit_of_work` block was removed when the body was replaced
+by the `_append_state` delegation. The meaningful early `return None` on the vacuity branch
+is retained. The docstring's "Always returns `None`" remains accurate (implicit `None`).
+Committed together with IN-02 (same file, same atomic rewrite of the `contract` body).
 
 ---
 
