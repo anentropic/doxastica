@@ -157,20 +157,28 @@ class MemoryCore:
         """
         Return the DERIVED current state for ``(scope_id, belief_id)`` — or ``None`` (D-01).
 
-        Current is the ordering-MAX active state under the UUID7 ordering contract
+        Current is the ordering-MAX state under the UUID7 ordering contract
         ``(str(source_event_id), str(state_id))`` (DATA-03 — primary key ``source_event_id``,
-        ``state_id`` tiebreak). There is NO stored ``CURRENT_STATE`` pointer; the selection is
-        computed over the immutable append-only states, scoped to the exact ``(scope, belief)``
-        (SCOPE-03 cross-scope divergence). The port has no ORDER-BY/aggregate primitive, so the
-        max is taken core-side.
+        ``state_id`` tiebreak) — equivalently the state with no incoming ``SUPERSEDES`` (D-04). If
+        that ordering-max tail is ``retracted`` the belief has NO active current and the result is
+        ``None`` (D-05: a contraction appends a retracted tail that supersedes the prior current,
+        clearing it without mutating any earlier state). The max is taken over ALL statuses — NOT
+        pre-filtered to ``active`` — so a retracted tail correctly clears the current rather than
+        the now-superseded active state below it remaining visible. There is NO stored
+        ``CURRENT_STATE`` pointer; the selection is computed over the immutable append-only states,
+        scoped to the exact ``(scope, belief)`` (SCOPE-03 cross-scope divergence). The port has no
+        ORDER-BY/aggregate primitive, so the max is taken core-side.
         """
         states = self._backend.match_nodes(
             "BeliefState",
-            {"scope_id": scope_id, "belief_id": belief_id, "status": "active"},
+            {"scope_id": scope_id, "belief_id": belief_id},
         )
         if not states:
             return None
-        return max(states, key=lambda s: (str(s["source_event_id"]), str(s["state_id"])))
+        tail = max(states, key=lambda s: (str(s["source_event_id"]), str(s["state_id"])))
+        if tail["status"] == Status.retracted.value:  # D-05: retracted tail ⇒ no active current
+            return None
+        return tail
 
     # --- Value encode/decode boundary (DEF-02-01, identical on both backends) -
     @staticmethod
