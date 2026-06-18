@@ -51,7 +51,7 @@ from __future__ import annotations
 
 import contextlib
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from doxastica import errors
 
@@ -332,6 +332,7 @@ class LadybugBackend:
         start: UUID | str,
         edge_types: frozenset[EdgeType | str],
         max_depth: int | None,
+        direction: Literal["in", "out"] = "out",
     ) -> tuple[list[dict[str, Any]], frozenset[UUID | str]]:
         """
         The single graph-walk primitive — the SC4 resolution, in ONE query (BACK-02 / SC4).
@@ -343,9 +344,24 @@ class LadybugBackend:
         depth bound is a validated ``int`` interpolated into ``*1..N`` (``$param`` is rejected
         there — Pitfall 2); ``$start`` is a ``$param`` bind. The ``(reached, frontier)`` shape is
         computed in one query via ``min(length(p))`` + an ``EXISTS{}`` subquery: a node is on the
-        frontier iff its min depth equals the bound AND it has an unexpanded successor (parity
+        frontier iff its min depth equals the bound AND it has an unexpanded neighbour (parity
         with the oracle, asserted in plan 02-03).
+
+        ``direction`` (D-05) selects which edges to follow: ``"out"`` (default) walks edges FROM
+        ``start`` (the original outgoing query); ``"in"`` walks edges INTO ``start`` (the cascade
+        ``get_impact`` needs). It flips the relationship arrow in exactly three places — the main
+        var-length query, its ``EXISTS{}`` frontier subquery, and the ``bound==0`` probe — by
+        deriving an ``(lhs, rhs)`` arrow pair from the closed ``Literal``. ``direction`` is a
+        validated, closed-``Literal`` internal token (like the namespace), NEVER a ``$param``
+        position and NEVER caller free-text, so it stays inside the one sanctioned-interpolation
+        story; ``$start`` stays ``$param``-bound, ``edge_types`` stays ``_EDGE_ENDPOINTS``-checked,
+        ``bound`` stays the runtime-guarded interpolated int. The ``var_length_extend_max_depth``
+        cap-raise/restore is direction-AGNOSTIC and wraps BOTH directions identically (Pitfall 4).
         """
+        # D-05: derive the reverse/forward arrow pair ONCE from the closed Literal. For "in" the
+        # pattern becomes (a)<-[:rels]-(b); for "out" it stays (a)-[:rels]->(b). This is the ONLY
+        # direction-dependent interpolation; everything else below is direction-agnostic.
+        lhs, rhs = ("<-", "-") if direction == "in" else ("-", "->")
         ns = self._ns
         bound = max_depth if max_depth is not None else _DEPTH_CEILING
         # Runtime guard on the typed int (WR-03): the bound is INTERPOLATED into `*1..N`, never
@@ -367,20 +383,22 @@ class LadybugBackend:
         rels = "|".join(f"{ns}_{edge_type}" for edge_type in edge_types)
         node = f"{ns}_BeliefState"
         # WR-02: `max_depth=0` would compile to the degenerate var-length range `*1..0`. Match the
-        # in-memory oracle (memory.py:122-124): layer 0 is `start`, every out-edge exceeds the
-        # bound, so nothing is reached and `start` is on the frontier iff it has any out-edge.
+        # in-memory oracle (memory.py:122-124): layer 0 is `start`, every neighbour-edge exceeds the
+        # bound, so nothing is reached and `start` is on the frontier iff it has any neighbour edge
+        # in the walked direction. FLIP 1: the probe arrow flips with `direction` (an out-edge for
+        # "out", an in-edge for "in") so max_depth=0 reports the correct directional frontier.
         if bound == 0:
-            has_out_edge = bool(
+            has_neighbour_edge = bool(
                 self._rows(
                     self._exec(
                         f"MATCH (a:{node} {{{_PK_BY_LABEL['BeliefState']}: $start}})"
-                        f"-[:{rels}]->() RETURN a LIMIT 1",
+                        f"{lhs}[:{rels}]{rhs}() RETURN a LIMIT 1",
                         {"start": str(start)},
                     )
                 )
             )
             frontier_zero: frozenset[UUID | str] = (
-                frozenset({str(start)}) if has_out_edge else frozenset()
+                frozenset({str(start)}) if has_neighbour_edge else frozenset()
             )
             return [], frontier_zero
         # WR-01: read the BeliefState PK from `_PK_BY_LABEL` (the SINGLE source of truth) rather
@@ -390,12 +408,15 @@ class LadybugBackend:
         # fixed internal constant (not caller input), so this stays inside the sanctioned-
         # interpolation story (no untrusted value reaches the Cypher text; `$start` stays bound).
         pk = _PK_BY_LABEL["BeliefState"]
+        # FLIP 2 (main var-length pattern) + FLIP 3 (EXISTS frontier subquery): both arrows flip
+        # with `direction` via the (lhs, rhs) pair. Flipping only some would leave a direction
+        # inconsistency (Pitfall 3) — the frontier probe must match the walk direction.
         cypher = (
-            f"MATCH p=(a:{node} {{{pk}: $start}})-[:{rels}* ACYCLIC 1..{bound}]->(b:{node}) "
+            f"MATCH p=(a:{node} {{{pk}: $start}}){lhs}[:{rels}* ACYCLIC 1..{bound}]{rhs}(b:{node}) "
             f"WHERE b.{pk} <> $start "
             f"WITH b, min(length(p)) AS d "
             f"RETURN b.{pk} AS state_id, d, "
-            f"(d = {bound} AND EXISTS {{ MATCH (b)-[:{rels}]->() }}) AS at_frontier"
+            f"(d = {bound} AND EXISTS {{ MATCH (b){lhs}[:{rels}]{rhs}() }}) AS at_frontier"
         )
         # WR-05: `var_length_extend_max_depth` is a connection-GLOBAL config. Only raise it when the
         # bound actually exceeds the default cap (a shallow walk never touches tenant state), and
