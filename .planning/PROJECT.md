@@ -32,6 +32,7 @@ deferred, the formal core and its property-test suite must be right.
 - **`Belief`/`BeliefState` split + immutable append-only `HAS_REVISION` chain**, with the *current* per belief-in-scope **derived** (D-01: no stored `CURRENT_STATE` pointer) (Phase 3, CHAIN-01/02/03).
 - **Core operations `revise`/`expand`/`contract`/`get_or_create_scope` + `get_revision_chain`** on both backends, each write atomic in one `unit_of_work` (Phase 3, OPS-01/02/03, HIST-02).
 - **Structural-invariant test** reframed as a Hypothesis consistency check (derived-current total + single-valued ≡ chain tail) on both backends (Phase 3, SC3).
+- **`query_scope` observation surface** — the read every postulate test sees the belief base through: closed typed `BeliefFilter`, one derived-current tail per `(scope, belief)`, `include_retracted` flag, deterministic `_order_key` order, empty-scope `[]`; plus the four-cell **retracted vs superseded** matrix (observed via `get_revision_chain` + `SUPERSEDES`, never `query_scope`) on both backends (Phase 4, CHAIN-04/HIST-01). D-03 reversal: public flag `include_deprecated` → `include_retracted`.
 
 ### Active
 
@@ -62,7 +63,7 @@ deferred, the formal core and its property-test suite must be right.
       (mechanism only; policy is NVM's)
 - [ ] **`get_scope_at`** — structural time-travel query ("what did this scope hold as of
       event E"), answerable from immutable event-id-ordered states
-- [ ] `get_revision_chain` and `query_scope` (with `include_deprecated` flag) retrieval
+- [x] `get_revision_chain` and `query_scope` (with `include_retracted` flag) retrieval — *shipped Phase 4*
 - [ ] **Opaque values + opaque event ids** — the core stores `value: Any` and UUID7
       event ids it never interprets (no triple structure, no provenance semantics inside)
 - [ ] **Deprecated vs. superseded** as a structural/query distinction (core), with meaning
@@ -215,4 +216,6 @@ This document evolves at phase transitions and milestone boundaries.
 - **Phase 3 — Append-Only Revision Spine (Keystone)** (complete 2026-06-16): the AGM write spine. `WORLD_SCOPE_ID="__world__"` + structural world-scope `contract()` guard; `Belief`/`BeliefState` split with immutable `HAS_REVISION` hub chains; **derived current** (D-01 — no stored `CURRENT_STATE` pointer; uniqueness is a theorem, SC3 verified as a Hypothesis consistency check on both backends); `revise`≡`expand` and vacuity-aware `contract`, plus `get_revision_chain`, each atomic in one `unit_of_work`. Closed the inherited DEF-02-01 value-corruption defect via a base64-over-JSON codec at the core↔port boundary. Suite green (105 passed) on both backends. Advisory code review left 5 warnings (no blockers) for follow-up.
 
 ---
-*Last updated: 2026-06-16 after Phase 3 completion*
+- **Phase 4 — Retrieval & Observation Surface** (complete 2026-06-18): `query_scope` — the read the whole AGM postulate suite observes the belief base through — landed driver-blind in `MemoryCore` on both backends. Single scope-wide `match_nodes` scan + core-side group-by-belief per-group `_order_key` max → closed `BeliefFilter` post-filters (status precedence, `belief_ids`, inclusive event-range — a post-filter, NOT an as-of cut) → `_order_key` sort → hydrate; pure read (no `_ensure_scope`/`unit_of_work`, empty scope → `[]`). Factored a status-agnostic `_current_tail` (the `include_retracted=True` path) without breaking `_current`'s retracted-tail→`None` write-side contract. D-03 reversal: public flag `include_deprecated` → `include_retracted` (status taxonomy unchanged). Four-cell retracted-vs-superseded matrix proven on both backends (superseded cells via `get_revision_chain` + `SUPERSEDES`, never `query_scope`). Suite green (128 passed) on both backends; advisory code review left 2 warnings (test-coverage gaps: cross-scope isolation + multi-axis filter combos — no blockers).
+
+*Last updated: 2026-06-18 after Phase 4 completion*
