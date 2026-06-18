@@ -112,7 +112,7 @@ class BeliefStore(Protocol):
         self,
         scope_id: str,
         belief_filter: BeliefFilter,
-        include_deprecated: bool = False,
+        include_retracted: bool = False,
     ) -> list[BeliefState]:
         """
         Return the belief states in ``scope_id`` matching ``belief_filter`` (DATA-02).
@@ -120,10 +120,10 @@ class BeliefStore(Protocol):
         ``belief_filter`` is a closed, AND-combined ``BeliefFilter`` — never a free query
         string.
 
-        ``include_deprecated`` is ergonomic sugar over the filter's ``status`` field:
+        ``include_retracted`` is ergonomic sugar over the filter's ``status`` field:
         ``False`` means ``{active}`` and ``True`` means ``{active, retracted}``. An explicit
         ``belief_filter.status`` governs — when the caller sets ``status`` it takes
-        precedence over the ``include_deprecated`` shorthand.
+        precedence over the ``include_retracted`` shorthand.
         """
         ...
 

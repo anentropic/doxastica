@@ -57,8 +57,8 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [x] **CHAIN-03**: Exactly one mutable `CURRENT_STATE` pointer per belief, re-pointed
       atomically (single transaction) on each write
 
-- [ ] **CHAIN-04**: Deprecated vs. superseded is a **structural/query** distinction
-      (`include_deprecated` flag + `SUPERSEDES` edge); meaning is left to consumers
+- [ ] **CHAIN-04**: Retracted vs. superseded is a **structural/query** distinction
+      (`include_retracted` flag + `SUPERSEDES` edge); meaning is left to consumers
 
 ### Core Belief Operations
 
@@ -81,8 +81,8 @@ Foundational, decision-grade choices that must be settled before storage code ex
 
 ### History & Retrieval
 
-- [ ] **HIST-01**: `query_scope(scope, filter, include_deprecated=False)` returns active (or,
-      with the flag, deprecated) belief states — the observation surface
+- [ ] **HIST-01**: `query_scope(scope, filter, include_retracted=False)` returns active (or,
+      with the flag, retracted) belief states — the observation surface
 
 - [x] **HIST-02**: `get_revision_chain(belief_id)` returns the full immutable version chain
 - [ ] **HIST-03**: `get_scope_at(scope, as_of_event_id)` reconstructs the active base as of an

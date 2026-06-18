@@ -35,7 +35,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Protocol, Backend Port & Data-Model Decisions** - Two seams (public `BeliefStore` Protocol + internal backend port), backend port granularity decided, frozen models, and the decision-grade choices (no DB contact) that a rewrite would otherwise cost (completed 2026-06-14)
 - [x] **Phase 2: Backend Adapters & Schema Bootstrap (De-risking Spike)** - First real LadybugDB contact: the `ladybug` reference backend (flexible connection, idempotent DDL) AND the in-memory backend, both behind the port, plus the `:memory:` test harness (completed 2026-06-15)
 - [x] **Phase 3: Append-Only Revision Spine (Keystone)** - Scopes, `Belief`/`BeliefState` split, immutable chains, derived current (D-01: no stored `CURRENT_STATE` pointer), and `revise`/`expand`/`contract` — written against the port, running on both backends; SC3 verified as a Hypothesis consistency check
-- [ ] **Phase 4: Retrieval & Observation Surface** - `query_scope` with closed typed filter + deprecated/superseded matrix; full `get_revision_chain`
+- [ ] **Phase 4: Retrieval & Observation Surface** - `query_scope` with closed typed filter + retracted/superseded matrix; full `get_revision_chain`
 - [ ] **Phase 5: Edge Model & Contraction Cascade** - `add_edge` and bounded, cycle-safe `get_impact` with a truncation signal
 - [ ] **Phase 6: Structural Time-Travel** - `get_scope_at` reconstruction under an explicit UUID7 ordering contract
 - [ ] **Phase 7: AGM/Hansson Backend Conformance Suite & Irony Join (M0 Exit Gate)** - Assembled, green property suite + structural invariants + recovery xfail + irony join, parameterised over every registered backend (in-memory oracle vs. ladybug)
@@ -131,20 +131,20 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 ### Phase 4: Retrieval & Observation Surface
 
-**Goal**: The observation surface every postulate test reads through — `query_scope` with the closed typed filter and the deprecated-vs-superseded query matrix — implemented against the port.
+**Goal**: The observation surface every postulate test reads through — `query_scope` with the closed typed filter and the retracted-vs-superseded query matrix — implemented against the port.
 **Depends on**: Phase 3
 **Requirements**: CHAIN-04, HIST-01
 **Success Criteria** (what must be TRUE):
 
-  1. `query_scope(scope, filter, include_deprecated=False)` returns active belief states, and with `include_deprecated=True` also returns deprecated ones, using the Phase 1 closed typed filter (no triple-structure leak)
-  2. Deprecated vs. superseded is observable as a structural/query distinction (`include_deprecated` flag + `SUPERSEDES` edge), with the four-cell status matrix (current/superseded x deprecated/active) tested
+  1. `query_scope(scope, filter, include_retracted=False)` returns active belief states, and with `include_retracted=True` also returns retracted ones, using the Phase 1 closed typed filter (no triple-structure leak)
+  2. Retracted vs. superseded is observable as a structural/query distinction (`include_retracted` flag + `SUPERSEDES` edge), with the four-cell status matrix (current/superseded x retracted/active) tested
   3. Under correctly-maintained `CURRENT_STATE` invariants, `query_scope` returns no duplicate beliefs
 
 **Plans**: 2 plans
 
 **Wave 1**
 
-- [ ] 04-01-PLAN.md — D-03 rename (include_deprecated→include_retracted) on protocol.py + REQUIREMENTS/ROADMAP text + failing Wave-0 tests/test_query_scope.py (both backends)
+- [ ] 04-01-PLAN.md — D-03 public-flag rename to `include_retracted` on protocol.py + REQUIREMENTS/ROADMAP text + failing Wave-0 tests/test_query_scope.py (both backends)
 
 **Wave 2** *(blocked on Wave 1)*
 
