@@ -57,7 +57,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [x] **CHAIN-03**: Exactly one mutable `CURRENT_STATE` pointer per belief, re-pointed
       atomically (single transaction) on each write
 
-- [ ] **CHAIN-04**: Retracted vs. superseded is a **structural/query** distinction
+- [x] **CHAIN-04**: Retracted vs. superseded is a **structural/query** distinction
       (`include_retracted` flag + `SUPERSEDES` edge); meaning is left to consumers
 
 ### Core Belief Operations
@@ -81,7 +81,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 
 ### History & Retrieval
 
-- [ ] **HIST-01**: `query_scope(scope, filter, include_retracted=False)` returns active (or,
+- [x] **HIST-01**: `query_scope(scope, filter, include_retracted=False)` returns active (or,
       with the flag, retracted) belief states — the observation surface
 
 - [x] **HIST-02**: `get_revision_chain(belief_id)` returns the full immutable version chain
@@ -206,8 +206,8 @@ Which phases cover which requirements. Populated during roadmap creation.
 | OPS-02 | Phase 3 | Complete |
 | OPS-03 | Phase 3 | Complete |
 | HIST-02 | Phase 3 | Complete |
-| CHAIN-04 | Phase 4 | Pending |
-| HIST-01 | Phase 4 | Pending |
+| CHAIN-04 | Phase 4 | Complete |
+| HIST-01 | Phase 4 | Complete |
 | EDGE-01 | Phase 5 | Pending |
 | EDGE-02 | Phase 5 | Pending |
 | HIST-03 | Phase 6 | Pending |
