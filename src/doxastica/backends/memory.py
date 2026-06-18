@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import contextlib
 from copy import deepcopy
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -111,27 +111,35 @@ class InMemoryBackend:
         start: UUID | str,
         edge_types: frozenset[EdgeType | str],
         max_depth: int | None,
+        direction: Literal["in", "out"] = "out",
     ) -> tuple[list[dict[str, Any]], frozenset[UUID | str]]:
         """
         Visited-set BFS over ``edge_types`` from ``start`` — the reference implementation.
 
         Returns the de-duplicated, cycle-safe set of reachable nodes (``reached``, excluding
         ``start`` itself) plus the ``frontier``: nodes at exactly ``max_depth`` that still
-        have an unexpanded successor. ``max_depth=None`` ⇒ full transitive closure with an
+        have an unexpanded neighbour. ``max_depth=None`` ⇒ full transitive closure with an
         empty frontier. Terminates on cycles via the ``seen`` set.
+
+        ``direction`` (D-05) selects the neighbour relation: ``"out"`` (default) walks edges
+        FROM ``start`` (successors, via :meth:`_out_edges`); ``"in"`` walks edges INTO
+        ``start`` (predecessors, via :meth:`_in_edges`) — the cascade ``get_impact`` needs.
+        The layer/frontier/seen BFS logic is otherwise direction-agnostic.
         """
         start_key = str(start)
         reached: dict[str, dict[str, Any]] = {}
         frontier: set[str] = set()
         seen: set[str] = {start_key}
         layer: list[tuple[str, int]] = [(start_key, 0)]
+        neighbours = self._in_edges if direction == "in" else self._out_edges
 
         while layer:
             nxt: list[tuple[str, int]] = []
             for node_key, depth in layer:
-                for to_key in self._out_edges(node_key, edge_types):
+                for to_key in neighbours(node_key, edge_types):
                     if max_depth is not None and depth + 1 > max_depth:
-                        # node_key sits at the bound with an unexpanded successor.
+                        # node_key sits at the bound with an unexpanded neighbour (a successor
+                        # under direction="out", a predecessor under direction="in").
                         frontier.add(node_key)
                         continue
                     if to_key in seen:
@@ -173,6 +181,28 @@ class InMemoryBackend:
         for edge_type in edge_types:
             adjacency = self._edges.get(str(edge_type), {})
             out.extend(adjacency.get(node_key, ()))
+        return out
+
+    def _in_edges(
+        self,
+        node_key: str,
+        edge_types: frozenset[EdgeType | str],
+    ) -> list[str]:
+        """
+        Predecessor node keys with an edge INTO ``node_key`` over any of ``edge_types``.
+
+        The mirror of :meth:`_out_edges` for ``direction="in"`` (D-05). The edge store is
+        ``edge_type -> {src -> [dst, ...]}``, so this scans each edge-type adjacency for any
+        ``src`` whose destination list contains ``node_key``. The scan is O(edges) per node —
+        acceptable per the D-05 discretion area for in-scope belief-graph sizes; no reverse
+        index is maintained (so ``_reindex`` / ``unit_of_work`` need no extension).
+        """
+        out: list[str] = []
+        for edge_type in edge_types:
+            adjacency = self._edges.get(str(edge_type), {})
+            for src, dsts in adjacency.items():
+                if node_key in dsts:
+                    out.append(src)
         return out
 
     def _reindex(self) -> None:
