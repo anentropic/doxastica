@@ -161,7 +161,16 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. `get_impact(belief_state_id, depth)` performs bounded-depth dependency traversal that terminates on cyclic graphs and returns exactly the reachable-within-depth set
   3. `get_impact` returns the accurate truncation/frontier signal (from the Phase 1 return shape) whenever the cascade is cut off at the depth bound
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+**Wave 1**
+
+- [ ] 05-01-PLAN.md — `direction: Literal["in","out"]` port extension on `traverse` + reverse-adjacency (memory) / 3-arrow-flip (ladybug) impls + BACK-04 doc + reverse parity tests (D-05, EDGE-02 enabler)
+- [ ] 05-02-PLAN.md — `MemoryCore.add_edge` passthrough inside one `unit_of_work` + idempotency / closed-enum / D-07 silent-no-op tests (EDGE-01)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 05-03-PLAN.md — `MemoryCore.get_impact` composing `direction="in"` over `{DEPENDS_ON, DERIVED_FROM}` + `match_nodes` re-fetch hydration (gap close) + cascade mechanism/property tests (EDGE-02)
 
 ### Phase 6: Structural Time-Travel
 
@@ -216,7 +225,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 2. Backend Adapters & Schema Bootstrap | 4/4 | Complete    | 2026-06-15 |
 | 3. Append-Only Revision Spine | 4/4 | Complete    | 2026-06-16 |
 | 4. Retrieval & Observation Surface | 2/2 | Complete    | 2026-06-18 |
-| 5. Edge Model & Contraction Cascade | 0/TBD | Not started | - |
+| 5. Edge Model & Contraction Cascade | 0/3 | Not started | - |
 | 6. Structural Time-Travel | 0/TBD | Not started | - |
 | 7. AGM/Hansson Backend Conformance Suite & Irony Join | 0/TBD | Not started | - |
 | 8. Publishable Polish | 0/TBD | Not started | - |
