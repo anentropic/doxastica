@@ -49,7 +49,7 @@ import uuid
 from typing import TYPE_CHECKING, Any, cast
 
 from doxastica.errors import WorldScopeContractionError
-from doxastica.models import WORLD_SCOPE_ID, BeliefState, Scope, Status
+from doxastica.models import WORLD_SCOPE_ID, BeliefFilter, BeliefState, Scope, Status
 
 if TYPE_CHECKING:
     from contextlib import AbstractContextManager
@@ -399,3 +399,69 @@ class MemoryCore:
         states = self._backend.match_nodes("BeliefState", {"belief_id": belief_id})
         states.sort(key=_order_key)  # IN-03: the same ONE ordering contract as `_current`
         return [self._hydrate(s) for s in states]
+
+    # --- Observation surface (the AGM belief base B, observed "as of now") ----
+    def query_scope(
+        self,
+        scope_id: str,
+        belief_filter: BeliefFilter,
+        include_retracted: bool = False,
+    ) -> list[BeliefState]:
+        """
+        Return the current belief base of ``scope_id`` under ``belief_filter`` (HIST-01).
+
+        ``query_scope`` *is* the AGM belief base B observed "as of now": exactly ONE current tail
+        per ``(scope, belief)`` (D-01 — never the full history; the no-duplicate property falls out
+        of the per-belief ordering-max, not a dedup pass), never a superseded (non-tail) state
+        (D-05). A single scope-wide ``match_nodes`` scan → group-by-``belief_id`` → per-group
+        ordering-MAX (the status-agnostic current tail) → status filter → ``belief_ids`` narrow →
+        event-range post-filter → ``_order_key`` sort → ``_hydrate``.
+
+        The status set resolves with the locked precedence (D-02/D-03): an explicit
+        ``belief_filter.status`` GOVERNS; otherwise ``include_retracted`` is sugar —
+        ``False`` ≡ ``{active}``, ``True`` ≡ ``{active, retracted}``. The status filter runs AFTER
+        the per-belief max (Pitfall 2: pre-filtering to ``active`` would leak a stale active value
+        below a retracted tail).
+
+        ``event_id_min``/``event_id_max`` POST-FILTER the derived tails inclusively (D-06, A1): a
+        belief whose current tail is newer than ``event_id_max`` is simply ABSENT — never rewound to
+        an older value (that is ``get_scope_at``, Phase 6). Comparison is str-vs-str, the SAME form
+        ``_order_key`` uses (Pitfall 3 — never str-vs-UUID).
+
+        A pure read (D-08): a non-existent or empty scope returns ``[]`` and creates NO ``Scope``
+        node — no ``_ensure_scope``, no ``unit_of_work``, no error surface. Consumes ONLY the four
+        closed ``BeliefFilter`` fields (DATA-02 — no free query string).
+        """
+        # 1. resolve the allowed status set — explicit filter.status WINS over the flag (D-02/D-03)
+        if belief_filter.status is not None:
+            allowed = belief_filter.status
+        else:
+            allowed = (
+                frozenset({Status.active, Status.retracted})
+                if include_retracted
+                else frozenset({Status.active})
+            )
+        # 2. ONE scope-wide round-trip; absent scope → [] (D-08: pure read, no auto-create)
+        rows = self._backend.match_nodes("BeliefState", {"scope_id": scope_id})
+        # 3. group by belief_id, keep the per-group ordering-MAX over ALL statuses (reuse the key)
+        by_belief: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            current = by_belief.get(row["belief_id"])
+            if current is None or _order_key(row) > _order_key(current):
+                by_belief[row["belief_id"]] = row  # the status-agnostic current tail
+        tails = list(by_belief.values())
+        # 4. status filter AFTER the max (Pitfall 2) — Status(...) rebuilds the enum (like hydrate)
+        tails = [t for t in tails if Status(t["status"]) in allowed]
+        # 5. belief_ids narrowing
+        if belief_filter.belief_ids is not None:
+            tails = [t for t in tails if t["belief_id"] in belief_filter.belief_ids]
+        # 6. event-range POST-filter (D-06: drop, never rewind) — str-vs-str, inclusive (Pitfall 3)
+        if belief_filter.event_id_min is not None:
+            event_min = str(belief_filter.event_id_min)
+            tails = [t for t in tails if t["source_event_id"] >= event_min]
+        if belief_filter.event_id_max is not None:
+            event_max = str(belief_filter.event_id_max)
+            tails = [t for t in tails if t["source_event_id"] <= event_max]
+        # 7. deterministic order (D-07: reuse the ONE _order_key) then 8. hydrate
+        tails.sort(key=_order_key)
+        return [self._hydrate(t) for t in tails]
