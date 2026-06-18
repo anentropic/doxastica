@@ -76,7 +76,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [x] **EDGE-01**: `add_edge(from_state, to_state, edge_type)` for generic typed edges
       `SUPERSEDES` / `DEPENDS_ON` / `DERIVED_FROM` (no epistemic semantics in core)
 
-- [ ] **EDGE-02**: `get_impact(belief_state_id, depth)` performs bounded-depth, cycle-safe
+- [x] **EDGE-02**: `get_impact(belief_state_id, depth)` performs bounded-depth, cycle-safe
       dependency traversal (the contraction cascade *mechanism*; policy is the consumer's)
 
 ### History & Retrieval
@@ -209,7 +209,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | CHAIN-04 | Phase 4 | Complete |
 | HIST-01 | Phase 4 | Complete |
 | EDGE-01 | Phase 5 | Complete |
-| EDGE-02 | Phase 5 | Pending |
+| EDGE-02 | Phase 5 | Complete |
 | HIST-03 | Phase 6 | Pending |
 | FORMAL-01 | Phase 7 | Pending |
 | FORMAL-02 | Phase 7 | Pending |
