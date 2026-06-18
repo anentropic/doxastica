@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-06-18T22:04:57.804Z"
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-06-18T22:22:31.515Z"
 last_activity: 2026-06-18 -- Completed 05-01-PLAN.md
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 17
-  completed_plans: 15
-  percent: 53
+  completed_plans: 16
+  percent: 50
 ---
 
 # Project State
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 ## Current Position
 
 Phase: 05 (edge-model-contraction-cascade) — EXECUTING
-Plan: 2 of 3
-Status: Executing Phase 05 (05-01 complete)
+Plan: 3 of 3
+Status: Ready to execute
 Last activity: 2026-06-18 -- Completed 05-01-PLAN.md
 
 Progress: [██████████] 100% (4/4 plans)
@@ -70,6 +70,7 @@ Progress: [██████████] 100% (4/4 plans)
 | Phase 04 P01 | 9min | 2 tasks | 4 files |
 | Phase 04 P02 | 3min | 2 tasks | 1 files |
 | Phase 05 P01 | 4min | 4 tasks | 5 files |
+| Phase 05 P02 | 5 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -113,6 +114,8 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase 05]: 05-01: in-memory reverse walk = _in_edges O(edges) predecessor SCAN (no reverse index, per D-05 discretion) so _reindex/unit_of_work need no extension
 - [Phase 05]: 05-01: ladybug direction flips ALL THREE arrows from one (lhs,rhs)=('<-','-') if 'in' else ('-','->') pair (main query, EXISTS frontier subquery, bound==0 probe); cap-raise/restore stays direction-agnostic; direction is a closed-Literal internal token, no new $param/interpolation surface
 - [Phase 05]: 05-01: hydration gap persists for Plan 05-03 — ladybug traverse still returns state_id-only rows, so get_impact must re-fetch props via match_nodes (Option A)
+- [Phase ?]: 05-02: MemoryCore.add_edge is a one-call passthrough to backend.add_edge inside exactly one unit_of_work (D-06); idempotency left to the backend, no endpoint-existence raise (D-07)
+- [Phase ?]: 05-02: [Rule 1] InMemoryBackend.add_edge now silently no-ops on a missing endpoint (MATCH-MERGE parity with ladybug) so the oracle honors the documented D-07 behavior
 
 ### Pending Todos
 
@@ -133,6 +136,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-18T22:11:47.000Z
+Last session: 2026-06-18T22:22:18.412Z
 Stopped at: Completed 05-01-PLAN.md
 Resume file: .planning/phases/05-edge-model-contraction-cascade/05-02-PLAN.md

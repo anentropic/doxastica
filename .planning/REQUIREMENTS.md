@@ -73,7 +73,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 
 ### Edges & Contraction Cascade
 
-- [ ] **EDGE-01**: `add_edge(from_state, to_state, edge_type)` for generic typed edges
+- [x] **EDGE-01**: `add_edge(from_state, to_state, edge_type)` for generic typed edges
       `SUPERSEDES` / `DEPENDS_ON` / `DERIVED_FROM` (no epistemic semantics in core)
 
 - [ ] **EDGE-02**: `get_impact(belief_state_id, depth)` performs bounded-depth, cycle-safe
@@ -208,7 +208,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | HIST-02 | Phase 3 | Complete |
 | CHAIN-04 | Phase 4 | Complete |
 | HIST-01 | Phase 4 | Complete |
-| EDGE-01 | Phase 5 | Pending |
+| EDGE-01 | Phase 5 | Complete |
 | EDGE-02 | Phase 5 | Pending |
 | HIST-03 | Phase 6 | Pending |
 | FORMAL-01 | Phase 7 | Pending |
