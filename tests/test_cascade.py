@@ -180,6 +180,18 @@ def _impact_ids(impact: ImpactResult) -> list[str]:
     return sorted(str(s.state_id) for s in impact.reached)
 
 
+def _impact_belief_ids(impact: ImpactResult) -> list[str]:
+    """
+    Normalize ``reached`` to sorted ``belief_id``s — the backend-STABLE cross-backend projection.
+
+    The two backends mint INDEPENDENT ``state_id`` UUID7s for the same logical graph, so raw
+    ``state_id`` comparison across backends is meaningless (the 05-02 parity lesson). Each belief in
+    these tests has a stable literal ``belief_id`` (``ba``/``bb``/``b0``/``b1``/…), so projecting
+    ``reached`` to its belief_ids yields a shape both backends MUST agree on.
+    """
+    return sorted(s.belief_id for s in impact.reached)
+
+
 def _chain_of_dependents(core: MemoryCore, n: int) -> list[BeliefState]:
     """
     Build a DEPENDS_ON chain of ``n`` beliefs where each later state depends on the prior.
@@ -197,6 +209,7 @@ def _chain_of_dependents(core: MemoryCore, n: int) -> list[BeliefState]:
 
 def test_get_impact_dependents_only_parity() -> None:
     """B depends on A (A<-B): get_impact(A) == {B}; get_impact(B) == {} — on both backends."""
+    # cross-backend comparison uses belief_ids (state_ids are independently minted per backend).
     results: dict[str, tuple[list[str], list[str]]] = {}
     for name, be in _both_backends():
         core = MemoryCore(be)
@@ -205,11 +218,15 @@ def test_get_impact_dependents_only_parity() -> None:
         core.add_edge(b.state_id, a.state_id, EdgeType.DEPENDS_ON)  # B --DEPENDS_ON--> A
         impact_a = core.get_impact(a.state_id)
         impact_b = core.get_impact(b.state_id)
-        results[name] = (_impact_ids(impact_a), _impact_ids(impact_b))
-        assert results[name] == ([str(b.state_id)], []), (
-            f"[{name}] A's dependent is B; B has none; got {results[name]}"
+        # per-backend: the RAW state_id literal (A's dependent is exactly B; B has none).
+        assert _impact_ids(impact_a) == [str(b.state_id)], (
+            f"[{name}] A's dependent is exactly B; got {_impact_ids(impact_a)}"
         )
-    assert results["memory"] == results["ladybug"], (
+        assert _impact_ids(impact_b) == [], (
+            f"[{name}] B has no dependent; got {_impact_ids(impact_b)}"
+        )
+        results[name] = (_impact_belief_ids(impact_a), _impact_belief_ids(impact_b))
+    assert results["memory"] == results["ladybug"] == (["bb"], []), (
         f"both backends must agree on the dependents-only shape; got {results}"
     )
 
@@ -253,65 +270,60 @@ def test_get_impact_supersedes_excluded_parity(backend: BackendPort) -> None:
 
 def test_get_impact_full_closure_parity() -> None:
     """depth=None ⇒ full closure {all later dependents}, empty frontier, truncated=False (D-02)."""
-    results: dict[str, tuple[list[str], bool, list[str]]] = {}
+    results: dict[str, tuple[list[str], bool, int]] = {}
     for name, be in _both_backends():
         core = MemoryCore(be)
         states = _chain_of_dependents(core, 4)  # s0 <- s1 <- s2 <- s3
         impact = core.get_impact(states[0].state_id)  # depth=None default
-        results[name] = (
-            _impact_ids(impact),
-            impact.truncated,
-            sorted(str(f) for f in impact.frontier),
+        # per-backend: raw state_id literals (full closure reaches s1..s3, empty frontier).
+        assert _impact_ids(impact) == sorted(str(s.state_id) for s in states[1:]), (
+            f"[{name}] full closure reaches s1..s3; got {_impact_ids(impact)}"
         )
-        expected = sorted(str(s.state_id) for s in states[1:])
-        assert results[name] == (expected, False, []), (
-            f"[{name}] full closure reaches s1..s3, empty frontier, truncated=False; "
-            f"got {results[name]}"
-        )
-    assert results["memory"] == results["ladybug"], (
+        assert impact.frontier == frozenset(), f"[{name}] full closure has an empty frontier"
+        assert impact.truncated is False, f"[{name}] full closure is not truncated"
+        # cross-backend: belief_id-normalized shape (state_ids are independently minted).
+        results[name] = (_impact_belief_ids(impact), impact.truncated, len(impact.frontier))
+    assert results["memory"] == results["ladybug"] == (["b1", "b2", "b3"], False, 0), (
         f"both backends must agree on full-closure get_impact; got {results}"
     )
 
 
 def test_get_impact_depth_bounded_frontier_parity() -> None:
     """depth=2 on s0<-s1<-s2<-s3: reach {s1,s2}; s2 on frontier; truncated=True (both backends)."""
-    results: dict[str, tuple[list[str], bool, list[str]]] = {}
+    results: dict[str, tuple[list[str], bool, int]] = {}
     for name, be in _both_backends():
         core = MemoryCore(be)
         states = _chain_of_dependents(core, 4)  # s0 <- s1 <- s2 <- s3
         impact = core.get_impact(states[0].state_id, 2)
-        results[name] = (
-            _impact_ids(impact),
-            impact.truncated,
-            sorted(str(f) for f in impact.frontier),
+        # per-backend: raw state_id literals — reach s1,s2; s2 sits at the bound (s3 unexpanded).
+        assert _impact_ids(impact) == sorted(str(s.state_id) for s in states[1:3]), (
+            f"[{name}] depth-2 reaches s1,s2; got {_impact_ids(impact)}"
         )
-        reached_expected = sorted(str(s.state_id) for s in states[1:3])  # s1, s2
-        frontier_expected = [str(states[2].state_id)]  # s2 sits at the bound with s3 unexpanded
-        assert results[name] == (reached_expected, True, frontier_expected), (
-            f"[{name}] depth-2 reaches s1,s2; s2 frontier; truncated=True; got {results[name]}"
+        assert impact.frontier == frozenset({states[2].state_id}), (
+            f"[{name}] s2 is the frontier (s3 unexpanded); got {impact.frontier}"
         )
-    assert results["memory"] == results["ladybug"], (
+        assert impact.truncated is True, f"[{name}] a cut-off bound is truncated"
+        results[name] = (_impact_belief_ids(impact), impact.truncated, len(impact.frontier))
+    assert results["memory"] == results["ladybug"] == (["b1", "b2"], True, 1), (
         f"both backends must agree on the depth-bounded cut-off; got {results}"
     )
 
 
 def test_get_impact_depth_zero_parity() -> None:
     """depth=0 ⇒ empty reached, start on the frontier, truncated=True (both backends)."""
-    results: dict[str, tuple[list[str], bool, list[str]]] = {}
+    results: dict[str, tuple[list[str], bool, int]] = {}
     for name, be in _both_backends():
         core = MemoryCore(be)
         states = _chain_of_dependents(core, 3)  # s0 <- s1 <- s2
         impact = core.get_impact(states[0].state_id, 0)
-        results[name] = (
-            _impact_ids(impact),
-            impact.truncated,
-            sorted(str(f) for f in impact.frontier),
+        # per-backend: empty reached; the start (s0) is the sole frontier node; truncated.
+        assert impact.reached == (), f"[{name}] depth-0 reaches nothing; got {_impact_ids(impact)}"
+        assert impact.frontier == frozenset({states[0].state_id}), (
+            f"[{name}] depth-0 frontier is exactly the start; got {impact.frontier}"
         )
-        assert results[name] == ([], True, [str(states[0].state_id)]), (
-            f"[{name}] depth-0 reaches nothing; start is the frontier; truncated=True; "
-            f"got {results[name]}"
-        )
-    assert results["memory"] == results["ladybug"], (
+        assert impact.truncated is True, f"[{name}] depth-0 over an in-edged start is truncated"
+        results[name] = (_impact_belief_ids(impact), impact.truncated, len(impact.frontier))
+    assert results["memory"] == results["ladybug"] == ([], True, 1), (
         f"both backends must agree on the depth-0 frontier; got {results}"
     )
 

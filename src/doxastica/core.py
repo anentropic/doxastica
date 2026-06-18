@@ -54,6 +54,7 @@ from doxastica.models import (
     BeliefFilter,
     BeliefState,
     EdgeType,
+    ImpactResult,
     Scope,
     Status,
 )
@@ -65,6 +66,21 @@ if TYPE_CHECKING:
     from doxastica.ports import BackendPort
     # NOTE (D-02): do NOT import ladybug here, even under TYPE_CHECKING — the open() /
     # from_connection() factories use function-local imports to keep this module driver-blind.
+
+
+_CASCADE_EDGE_TYPES: frozenset[EdgeType] = frozenset(
+    {EdgeType.DEPENDS_ON, EdgeType.DERIVED_FROM}
+)
+"""
+The cascade edge set ``get_impact`` traverses (D-03 — the ONE place this set is defined).
+
+EXACTLY ``{DEPENDS_ON, DERIVED_FROM}``. ``DERIVED_FROM`` is REQUIRED — NVM's invalidation edges
+(``INFERRED_FROM``/``TOLD_BY``/``WITNESSED_BY``) are all ``DERIVED_FROM`` specialisations, so
+omitting it makes NVM's real cascade structurally invisible at the core level. ``SUPERSEDES`` is
+EXCLUDED by construction: it is the internal revision-spine edge ``_append_state`` lays on every
+``revise``/``expand``/``contract``; following it would report a belief's own version history as
+"impact" for every belief.
+"""
 
 
 def _order_key(state: dict[str, Any]) -> tuple[str, str]:
@@ -426,6 +442,72 @@ class MemoryCore:
             # passthrough — the port MERGE is idempotent and silently no-ops on a missing
             # endpoint (D-07). Arg order is (edge_type, from_id, to_id) per the port contract.
             self._backend.add_edge(edge_type, str(from_state_id), str(to_state_id))
+
+    # --- Cascade ------------------------------------------------------------
+    def get_impact(
+        self,
+        belief_state_id: UUID,
+        depth: int | None = None,
+    ) -> ImpactResult:
+        """
+        Return the dependency cascade reachable from ``belief_state_id`` (EDGE-02, D-01..D-05).
+
+        ``get_impact(X)`` returns the transitive set of ``BeliefState``s that DEPEND ON ``X`` — its
+        downstream dependents (D-01), the contraction-cascade impact set a consumer marks for
+        revision. It is called ON the retracted/contracted node and returns what is AFFECTED; it
+        does NOT return "what ``X`` depends on." The walk runs over EXACTLY
+        ``_CASCADE_EDGE_TYPES`` = ``{DEPENDS_ON, DERIVED_FROM}`` (D-03 — ``SUPERSEDES`` excluded),
+        in the ``direction="in"`` sense (D-04/D-05): the core's edge-storage convention is
+        dependent → source, so the impact walk runs AGAINST the arrows (INTO ``X``). ``reached``
+        EXCLUDES ``X`` itself (D-02 — the port ``traverse`` contract already excludes the start).
+
+        ``depth=None`` (default) walks to full transitive closure with an empty frontier and
+        ``truncated=False``; a finite ``depth`` bounds the BFS and ``truncated = len(frontier) >
+        0`` — so a bounded cascade can never silently under-report (DATA-04). ``depth=0`` ⇒ empty
+        ``reached`` with ``X`` on the frontier (when it has an in-edge). The walk is cycle-safe and
+        de-duplicating (inherited from the ``traverse`` visited-set), so a cyclic dependency graph
+        terminates.
+
+        HYDRATION GAP (RESEARCH Pitfall 1, the single most likely parity bug): the ladybug
+        ``traverse`` returns ``reached`` rows shaped ``{"state_id": ...}`` ONLY, while the in-memory
+        backend returns full props — so ``reached`` CANNOT be hydrated directly (``_hydrate`` needs
+        all six ``BeliefState`` fields). Option A (driver-blind, parity-clean): take each reached
+        row's ``state_id`` and RE-FETCH its full props via the already-parity-tested
+        ``match_nodes("BeliefState", {"state_id": sid})``, then ``_hydrate`` — identical on both
+        backends. A re-fetch that returns nothing is skipped defensively (it should not happen for a
+        reached node; the core does not raise).
+
+        A pure READ (mirrors ``query_scope``): NO ``unit_of_work``. Driver-blind (D-02): NO Cypher,
+        NO ``ladybug`` import, NO ``direction`` logic — the core passes the literal
+        ``direction="in"`` and both backends own the arrow flip. The hydrated ``reached`` tuple is
+        sorted by the ONE ``_order_key`` contract for deterministic output (``reached`` order is
+        non-contractual per BACK-04 §5, but determinism keeps cross-backend parity assertions
+        stable).
+        """
+        reached_rows, frontier = self._backend.traverse(
+            str(belief_state_id),  # stringify to match the stored STRING PKs
+            _CASCADE_EDGE_TYPES,  # D-03 — SUPERSEDES excluded by construction
+            depth,  # depth=None ⇒ full closure, empty frontier (D-02)
+            direction="in",  # D-04/D-05: walk AGAINST the arrows (X's dependents)
+        )
+        # close the hydration gap (Option A): re-fetch full props per reached state_id, then
+        # _hydrate — both backends agree because match_nodes props are already parity-tested.
+        props: list[dict[str, Any]] = []
+        for row in reached_rows:
+            fetched = self._backend.match_nodes(
+                "BeliefState", {"state_id": str(row["state_id"])}
+            )
+            if fetched:  # defensive: a reached node should always re-fetch; skip if it does not
+                props.append(fetched[0])
+        props.sort(key=_order_key)  # deterministic order (reuse the ONE ordering contract)
+        # the port frontier carries opaque state_id handles (str on both backends); coerce each to
+        # UUID for the typed ImpactResult.frontier (frozenset[UUID]) — uuid.UUID(str(...)) is the
+        # str→UUID boundary, identical to pydantic's seam coercion on the hydrated reached states.
+        return ImpactResult(
+            reached=tuple(self._hydrate(p) for p in props),  # excludes start X (D-02)
+            frontier=frozenset(uuid.UUID(str(f)) for f in frontier),
+            truncated=len(frontier) > 0,  # D-02 derivation
+        )
 
     # --- History ------------------------------------------------------------
     def get_revision_chain(self, belief_id: str) -> list[BeliefState]:
