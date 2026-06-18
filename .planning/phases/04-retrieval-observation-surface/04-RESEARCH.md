@@ -399,17 +399,17 @@ def test_retracted_superseded_matrix(backend: BackendPort) -> None:
 
 **All other claims are VERIFIED against read source or CITED from the locked CONTEXT/Phase-3 decisions.** A1/A2 are the only genuinely open choices, both low-risk and both inside Claude's discretion per CONTEXT.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Event-range boundary inclusivity (A1)**
+1. **Event-range boundary inclusivity (A1)** — **RESOLVED: inclusive `>=` / `<=`.**
    - What we know: D-06 says the range "filters which current beliefs you see"; `[min, max]` notation implies inclusive.
    - What's unclear: whether `event_id_max` equal to a tail's `source_event_id` includes or excludes it.
-   - Recommendation: Implement inclusive (`>=` / `<=`), pin with an explicit boundary test in VALIDATION.md. Trivially reversible.
+   - Resolution: Implement inclusive (`>=` / `<=`), pinned by an explicit boundary test (`test_event_range_boundary_inclusive`) in VALIDATION.md and Plan 04-01. Trivially reversible.
 
-2. **Whether to assert the `SUPERSEDES` edge structurally in the matrix test, or only the ordinal `chain[:-1]` form**
+2. **Whether to assert the `SUPERSEDES` edge structurally in the matrix test, or only the ordinal `chain[:-1]` form** — **RESOLVED: ordinal form primary; structural edge optional (Claude's Discretion per CONTEXT).**
    - What we know: D-05 names both the chain AND the `SUPERSEDES` edges as the superseded-cell witnesses; the edge is laid by `_append_state` and queryable via the port.
    - What's unclear: whether the matrix test should assert the structural edge (stronger, proves the displacement edge exists) or rely on the ordinal "non-tail" definition (simpler).
-   - Recommendation: Assert the ordinal form as the primary check (it is what `query_scope`/`get_revision_chain` expose); optionally add one structural `SUPERSEDES`-edge presence assertion since CHAIN-04 literally names the edge. Test-design discretion per CONTEXT.
+   - Resolution: Assert the ordinal `chain[:-1]` form as the primary check (it is what `query_scope`/`get_revision_chain` expose); a structural `SUPERSEDES`-edge presence assertion is optional since CHAIN-04 literally names the edge. Test-design discretion per CONTEXT; reflected in Plan 04-01's matrix task.
 
 ## Environment Availability
 
