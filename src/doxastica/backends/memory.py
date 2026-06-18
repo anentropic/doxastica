@@ -82,6 +82,13 @@ class InMemoryBackend:
         parity, but a non-empty ``props`` is REJECTED with ``NotImplementedError`` rather than
         silently dropped — matching the ladybug adapter so both backends fail identically on a
         caller that expects edge properties stored.
+
+        Endpoint-existence (D-07, oracle parity): the edge is laid ONLY when BOTH endpoints are
+        already known nodes. A missing endpoint is a SILENT NO-OP — no edge, no raise — exactly
+        mirroring the ladybug adapter's ``MATCH ... MERGE`` (which matches nothing, so MERGEs
+        nothing, when an endpoint row is absent). Without this guard the oracle would
+        unconditionally append a dangling adjacency entry to a phantom key, diverging from the
+        reference backend on the documented D-07 missing-endpoint behaviour.
         """
         if props:
             raise NotImplementedError(
@@ -89,6 +96,8 @@ class InMemoryBackend:
             )
         et = str(edge_type)
         src, dst = str(from_id), str(to_id)
+        if src not in self._node_index or dst not in self._node_index:
+            return  # D-07: silent no-op on a missing endpoint (mirror ladybug MATCH...MERGE)
         adjacency = self._edges.setdefault(et, {}).setdefault(src, [])
         if dst not in adjacency:
             adjacency.append(dst)

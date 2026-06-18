@@ -49,7 +49,14 @@ import uuid
 from typing import TYPE_CHECKING, Any, cast
 
 from doxastica.errors import WorldScopeContractionError
-from doxastica.models import WORLD_SCOPE_ID, BeliefFilter, BeliefState, Scope, Status
+from doxastica.models import (
+    WORLD_SCOPE_ID,
+    BeliefFilter,
+    BeliefState,
+    EdgeType,
+    Scope,
+    Status,
+)
 
 if TYPE_CHECKING:
     from contextlib import AbstractContextManager
@@ -386,6 +393,39 @@ class MemoryCore:
                 Status.retracted,
                 prior,
             )
+
+    # --- Edge operations ----------------------------------------------------
+    def add_edge(
+        self,
+        from_state_id: UUID,
+        to_state_id: UUID,
+        edge_type: EdgeType,
+    ) -> None:
+        """
+        Lay a consumer-facing typed edge between two belief states (EDGE-01, D-06/D-07).
+
+        A near-passthrough to the backend's idempotent ``add_edge`` primitive wrapped in exactly
+        ONE ``unit_of_work`` (D-06): the core adds nothing beyond the passthrough. Idempotency
+        (double-add ⇒ one edge) is ALREADY guaranteed by both backends, so the core does NOT
+        re-implement it. The public signature takes the CLOSED ``EdgeType`` enum — only the three
+        generic types (``SUPERSEDES``/``DEPENDS_ON``/``DERIVED_FROM``) are layable via this seam;
+        the structural ``HAS_REVISION``/internal-``SUPERSEDES`` wiring stays inside
+        ``_append_state``. basedpyright-strict rejects a raw string at this boundary (T-05-04).
+
+        D-07 (mechanism, not policy): NO endpoint-existence validation. The port's
+        ``MATCH ... MERGE`` silently no-ops if an endpoint is missing — the edge simply is not
+        laid and NOTHING is raised. This is the INTENDED behaviour, pinned by
+        ``test_add_edge_missing_endpoint_is_silent_no_op``; the core adds no raise.
+
+        Both UUIDs are stringified (``str(...)``) so they match the stored STRING PKs on the
+        ladybug side — the same UUID-at-the-boundary convention every other backend call in this
+        module follows (``_append_state`` precedent). Driver-blind (D-02): no Cypher, no
+        ``ladybug`` import; the backend owns the edge storage.
+        """
+        with self._backend.unit_of_work():  # exactly one atomic scope (D-06)
+            # passthrough — the port MERGE is idempotent and silently no-ops on a missing
+            # endpoint (D-07). Arg order is (edge_type, from_id, to_id) per the port contract.
+            self._backend.add_edge(edge_type, str(from_state_id), str(to_state_id))
 
     # --- History ------------------------------------------------------------
     def get_revision_chain(self, belief_id: str) -> list[BeliefState]:

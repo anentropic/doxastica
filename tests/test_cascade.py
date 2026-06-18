@@ -137,15 +137,23 @@ def test_add_edge_missing_endpoint_is_silent_no_op(backend: BackendPort) -> None
 
 
 def test_add_edge_idempotency_both_backends_agree() -> None:
-    """The double-add result (one edge reached) is byte-identical across both backends."""
-    results: dict[str, list[str]] = {}
+    """
+    Double-add yields the SAME edge STRUCTURE across both backends (one edge: b -> a).
+
+    The two backends mint independent ``state_id`` UUID7s (the core mints them per construction),
+    so the raw ids differ by design — this case compares the STRUCTURE the idempotent double-add
+    produces, normalized to ``dependent reaches its single dependency``: exactly one reached node,
+    and that node is the dependency ``a``. Both backends must agree on that shape.
+    """
+    results: dict[str, bool] = {}
     for name, be in _both_backends():
         core = MemoryCore(be)
         a, b = _two_beliefs(core)
         core.add_edge(b.state_id, a.state_id, EdgeType.DEPENDS_ON)
         core.add_edge(b.state_id, a.state_id, EdgeType.DEPENDS_ON)
         reached, _ = be.traverse(str(b.state_id), frozenset({EdgeType.DEPENDS_ON}), None)
-        results[name] = _reached_ids(reached)
-    assert results["memory"] == results["ladybug"], (
-        f"both backends must agree on the idempotent add_edge result; got {results}"
+        # normalize to the structural shape: b reaches exactly its dependency a (one edge).
+        results[name] = _reached_ids(reached) == [str(a.state_id)] and len(reached) == 1
+    assert results["memory"] and results["ladybug"], (
+        f"both backends must lay exactly one idempotent edge b->a; got {results}"
     )
