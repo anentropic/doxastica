@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Phase 4 context gathered
-last_updated: "2026-06-18T15:31:01.511Z"
+status: verifying
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-06-18T15:36:40.859Z"
 last_activity: 2026-06-18 -- Phase 04 execution started
 progress:
   total_phases: 8
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 14
-  completed_plans: 13
-  percent: 38
+  completed_plans: 14
+  percent: 50
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 
 Phase: 04 (retrieval-observation-surface) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-18 -- Phase 04 execution started
 
 Progress: [██████████] 100% (4/4 plans)
@@ -67,6 +67,7 @@ Progress: [██████████] 100% (4/4 plans)
 | Phase 03 P02 | 6min | 2 tasks | 1 files |
 | Phase 03 P04 | 11min | 2 tasks | 3 files |
 | Phase 04 P01 | 9min | 2 tasks | 4 files |
+| Phase 04 P02 | 3min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,8 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase 03]: 03-04: [Rule 1 fix] _current now selects ordering-max over ALL statuses and returns None on a retracted tail — a contraction correctly clears the derived current (prior active-filter left contracted beliefs reporting a current). Phase 4/7 query-current must align with this.
 - [Phase 03]: 03-04: DEF-02-01 CLOSED — regression flipped from xfail to a passing assertion routed through MemoryCore.revise + get_revision_chain (the core encode boundary) on both backends
 - [Phase 03]: 03-04: stateful-test both-backends idiom = two machine subclasses each exposing .TestCase + bounded ladybug Database(max_db_size) to cap per-example mmap reservation
+- [Phase ?]: query_scope reuses the ONE _order_key for both the per-belief group-by max and the result sort (D-07) — no second ordering
+- [Phase ?]: Factor-then-specialise: _current_tail is the status-agnostic ordering-max tail; _current delegates then applies the retracted->None collapse (behaviour-preserving)
 
 ### Pending Todos
 
@@ -124,6 +127,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-18T15:30:56.061Z
-Stopped at: Phase 4 context gathered
+Last session: 2026-06-18T15:36:29.758Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: .planning/phases/04-retrieval-observation-surface/04-CONTEXT.md
