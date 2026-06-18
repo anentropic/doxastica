@@ -33,6 +33,7 @@ deferred, the formal core and its property-test suite must be right.
 - **Core operations `revise`/`expand`/`contract`/`get_or_create_scope` + `get_revision_chain`** on both backends, each write atomic in one `unit_of_work` (Phase 3, OPS-01/02/03, HIST-02).
 - **Structural-invariant test** reframed as a Hypothesis consistency check (derived-current total + single-valued ≡ chain tail) on both backends (Phase 3, SC3).
 - **`query_scope` observation surface** — the read every postulate test sees the belief base through: closed typed `BeliefFilter`, one derived-current tail per `(scope, belief)`, `include_retracted` flag, deterministic `_order_key` order, empty-scope `[]`; plus the four-cell **retracted vs superseded** matrix (observed via `get_revision_chain` + `SUPERSEDES`, never `query_scope`) on both backends (Phase 4, CHAIN-04/HIST-01). D-03 reversal: public flag `include_deprecated` → `include_retracted`.
+- **Generic typed edges + bounded contraction cascade** — `add_edge` lays closed-`EdgeType` (`SUPERSEDES`/`DEPENDS_ON`/`DERIVED_FROM`) edges with no epistemic semantics; `get_impact` is the cycle-safe, depth-bounded cascade returning `ImpactResult(reached, frontier, truncated)` over `{DEPENDS_ON, DERIVED_FROM}` in the **dependent→source (`direction="in"`)** sense, the start excluded, hydration-gap closed via `match_nodes` re-fetch. Enabled by a new keyword-only `direction` parameter on the `BackendPort.traverse` primitive (default `"out"`, a cross-phase contract for Phase 6) — reverse-adjacency in-memory, 3-site arrow-flip in ladybug. Mechanism only; AGM Relevance/Core-Retainment postulate tests deferred to Phase 7 (Phase 5, EDGE-01/EDGE-02).
 
 ### Active
 
@@ -57,10 +58,10 @@ deferred, the formal core and its property-test suite must be right.
       `CURRENT_STATE` pointer — a profiling-driven optimization, addable without changing
       the public surface); one belief per `Belief` node
 - [ ] Core belief operations: `revise`, `expand`, `contract`, `get_or_create_scope`
-- [ ] **Generic typed edges** — `SUPERSEDES`, `DEPENDS_ON`, `DERIVED_FROM` (no epistemic
-      semantics; NVM layers meaning on top) via `add_edge`
-- [ ] **`get_impact`** — bounded-depth contraction-cascade traversal over dependency edges
-      (mechanism only; policy is NVM's)
+- [x] **Generic typed edges** — `SUPERSEDES`, `DEPENDS_ON`, `DERIVED_FROM` (no epistemic
+      semantics; NVM layers meaning on top) via `add_edge` — *shipped Phase 5 (EDGE-01)*
+- [x] **`get_impact`** — bounded-depth contraction-cascade traversal over dependency edges
+      (mechanism only; policy is NVM's) — *shipped Phase 5 (EDGE-02)*
 - [ ] **`get_scope_at`** — structural time-travel query ("what did this scope hold as of
       event E"), answerable from immutable event-id-ordered states
 - [x] `get_revision_chain` and `query_scope` (with `include_retracted` flag) retrieval — *shipped Phase 4*
@@ -217,5 +218,6 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 - **Phase 4 — Retrieval & Observation Surface** (complete 2026-06-18): `query_scope` — the read the whole AGM postulate suite observes the belief base through — landed driver-blind in `MemoryCore` on both backends. Single scope-wide `match_nodes` scan + core-side group-by-belief per-group `_order_key` max → closed `BeliefFilter` post-filters (status precedence, `belief_ids`, inclusive event-range — a post-filter, NOT an as-of cut) → `_order_key` sort → hydrate; pure read (no `_ensure_scope`/`unit_of_work`, empty scope → `[]`). Factored a status-agnostic `_current_tail` (the `include_retracted=True` path) without breaking `_current`'s retracted-tail→`None` write-side contract. D-03 reversal: public flag `include_deprecated` → `include_retracted` (status taxonomy unchanged). Four-cell retracted-vs-superseded matrix proven on both backends (superseded cells via `get_revision_chain` + `SUPERSEDES`, never `query_scope`). Suite green (128 passed) on both backends; advisory code review left 2 warnings (test-coverage gaps: cross-scope isolation + multi-axis filter combos — no blockers).
+- **Phase 5 — Edge Model & Contraction Cascade** (complete 2026-06-18): the generic edge surface and the cascade *mechanism* the Phase-7 Relevance/Core-Retainment postulates will be tested against. `MemoryCore.add_edge` (EDGE-01) is a closed-`EdgeType` passthrough inside one `unit_of_work` (idempotent; D-07 silent no-op on a missing endpoint, pinned by tests). `get_impact` (EDGE-02) composes a new keyword-only `direction="in"` traversal over `{DEPENDS_ON, DERIVED_FROM}` (SUPERSEDES excluded), returning `ImpactResult(reached, frontier, truncated=len(frontier)>0)` with the start excluded; the ladybug `state_id`-only-rows **hydration gap** is closed by a `match_nodes` re-fetch (RESEARCH Option A). The one genuine port change: `BackendPort.traverse` grew a `direction: Literal["in","out"]="out"` parameter (default `"out"` is a cross-phase contract for Phase 6 `get_scope_at`) — reverse-adjacency `_in_edges` in-memory, 3-site arrow-flip in ladybug, both injection-safe and cycle-safe. Direction grounded in narrative-vm `17 §2` (cascade = dependents of the contracted belief). Suite green (165 passed) on both backends, basedpyright strict clean; advisory code review left 3 warnings (WR-01 tenant `var_length_extend_max_depth` cap-restore clobber; WR-02 unbatched `get_impact` re-fetch lacks an atomic read scope; WR-03 `_DEPTH_CEILING` magic literal — all non-blocking, future hardening).
 
-*Last updated: 2026-06-18 after Phase 4 completion*
+*Last updated: 2026-06-18 after Phase 5 completion*
