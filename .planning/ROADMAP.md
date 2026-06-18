@@ -165,7 +165,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 1**
 
-- [ ] 05-01-PLAN.md — `direction: Literal["in","out"]` port extension on `traverse` + reverse-adjacency (memory) / 3-arrow-flip (ladybug) impls + BACK-04 doc + reverse parity tests (D-05, EDGE-02 enabler)
+- [x] 05-01-PLAN.md — `direction: Literal["in","out"]` port extension on `traverse` + reverse-adjacency (memory) / 3-arrow-flip (ladybug) impls + BACK-04 doc + reverse parity tests (D-05, EDGE-02 enabler)
 - [ ] 05-02-PLAN.md — `MemoryCore.add_edge` passthrough inside one `unit_of_work` + idempotency / closed-enum / D-07 silent-no-op tests (EDGE-01)
 
 **Wave 2** *(blocked on Wave 1)*

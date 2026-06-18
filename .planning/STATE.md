@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-06-18T22:03:56.621Z"
-last_activity: 2026-06-18 -- Phase 05 planning complete
+last_updated: "2026-06-18T22:04:57.804Z"
+last_activity: 2026-06-18 -- Completed 05-01-PLAN.md
 progress:
   total_phases: 8
   completed_phases: 4
-  total_plans: 14
-  completed_plans: 14
-  percent: 50
+  total_plans: 17
+  completed_plans: 15
+  percent: 53
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-13)
 
 **Core value:** A correct, append-only belief-revision core behind a clean `BeliefStore` Protocol whose correctness is *provable* — AGM/Hansson postulate compliance and structural invariants verified mechanically, zero narrative semantics leaking in.
-**Current focus:** Phase 04 — retrieval-observation-surface
+**Current focus:** Phase 05 — edge-model-contraction-cascade
 
 ## Current Position
 
-Phase: 5
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-06-18 -- Phase 05 planning complete
+Phase: 05 (edge-model-contraction-cascade) — EXECUTING
+Plan: 2 of 3
+Status: Executing Phase 05 (05-01 complete)
+Last activity: 2026-06-18 -- Completed 05-01-PLAN.md
 
 Progress: [██████████] 100% (4/4 plans)
 
@@ -69,6 +69,7 @@ Progress: [██████████] 100% (4/4 plans)
 | Phase 03 P04 | 11min | 2 tasks | 3 files |
 | Phase 04 P01 | 9min | 2 tasks | 4 files |
 | Phase 04 P02 | 3min | 2 tasks | 1 files |
+| Phase 05 P01 | 4min | 4 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -108,6 +109,10 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase 03]: 03-04: stateful-test both-backends idiom = two machine subclasses each exposing .TestCase + bounded ladybug Database(max_db_size) to cap per-example mmap reservation
 - [Phase ?]: query_scope reuses the ONE _order_key for both the per-belief group-by max and the result sort (D-07) — no second ordering
 - [Phase ?]: Factor-then-specialise: _current_tail is the status-agnostic ordering-max tail; _current delegates then applies the retracted->None collapse (behaviour-preserving)
+- [Phase 05]: 05-01: BackendPort.traverse gains keyword-only direction: Literal['in','out']='out' (D-05) — the ONE genuine Phase-5 port change; default 'out' is a cross-phase contract keeping 27 positional callers + Phase-6 get_scope_at green
+- [Phase 05]: 05-01: in-memory reverse walk = _in_edges O(edges) predecessor SCAN (no reverse index, per D-05 discretion) so _reindex/unit_of_work need no extension
+- [Phase 05]: 05-01: ladybug direction flips ALL THREE arrows from one (lhs,rhs)=('<-','-') if 'in' else ('-','->') pair (main query, EXISTS frontier subquery, bound==0 probe); cap-raise/restore stays direction-agnostic; direction is a closed-Literal internal token, no new $param/interpolation surface
+- [Phase 05]: 05-01: hydration gap persists for Plan 05-03 — ladybug traverse still returns state_id-only rows, so get_impact must re-fetch props via match_nodes (Option A)
 
 ### Pending Todos
 
@@ -128,6 +133,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-18T15:36:29.758Z
-Stopped at: Completed 04-02-PLAN.md
-Resume file: .planning/phases/04-retrieval-observation-surface/04-CONTEXT.md
+Last session: 2026-06-18T22:11:47.000Z
+Stopped at: Completed 05-01-PLAN.md
+Resume file: .planning/phases/05-edge-model-contraction-cascade/05-02-PLAN.md
