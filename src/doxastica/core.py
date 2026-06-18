@@ -166,21 +166,20 @@ class MemoryCore:
             )
 
     # --- Derived current (the ONE place the ordering contract lives) ---------
-    def _current(self, scope_id: str, belief_id: str) -> dict[str, Any] | None:
+    def _current_tail(self, scope_id: str, belief_id: str) -> dict[str, Any] | None:
         """
-        Return the DERIVED current state for ``(scope_id, belief_id)`` — or ``None`` (D-01).
+        Return the status-AGNOSTIC ordering-MAX tail for ``(scope_id, belief_id)`` — or ``None``.
 
-        Current is the ordering-MAX state under the UUID7 ordering contract
+        The raw derived current tail under the UUID7 ordering contract
         ``(str(source_event_id), str(state_id))`` (DATA-03 — primary key ``source_event_id``,
-        ``state_id`` tiebreak) — equivalently the state with no incoming ``SUPERSEDES`` (D-04). If
-        that ordering-max tail is ``retracted`` the belief has NO active current and the result is
-        ``None`` (D-05: a contraction appends a retracted tail that supersedes the prior current,
-        clearing it without mutating any earlier state). The max is taken over ALL statuses — NOT
-        pre-filtered to ``active`` — so a retracted tail correctly clears the current rather than
-        the now-superseded active state below it remaining visible. There is NO stored
-        ``CURRENT_STATE`` pointer; the selection is computed over the immutable append-only states,
-        scoped to the exact ``(scope, belief)`` (SCOPE-03 cross-scope divergence). The port has no
-        ORDER-BY/aggregate primitive, so the max is taken core-side.
+        ``state_id`` tiebreak), taken over ALL statuses — BEFORE the retracted→``None`` collapse.
+        ``_current`` applies that collapse on top (write-side: a retracted tail means NO ACTIVE
+        current, D-05); ``query_scope`` needs THIS raw tail so ``include_retracted=True`` can
+        surface a belief whose current tail is ``retracted`` (D-02). Reuses the ONE ``_order_key``
+        contract — never a second ordering (D-07) — so the read surface cannot desynchronise from
+        the write spine. There is NO stored ``CURRENT_STATE`` pointer; the selection is computed
+        over the immutable append-only states, scoped to the exact ``(scope, belief)``. The port
+        has no ORDER-BY/aggregate primitive, so the max is taken core-side.
         """
         states = self._backend.match_nodes(
             "BeliefState",
@@ -188,9 +187,25 @@ class MemoryCore:
         )
         if not states:
             return None
-        tail = max(states, key=_order_key)  # IN-03: the ONE ordering contract
-        if tail["status"] == Status.retracted.value:  # D-05: retracted tail ⇒ no active current
-            return None
+        return max(states, key=_order_key)  # IN-03: the ONE ordering contract
+
+    def _current(self, scope_id: str, belief_id: str) -> dict[str, Any] | None:
+        """
+        Return the DERIVED ACTIVE current state for ``(scope_id, belief_id)`` — or ``None`` (D-01).
+
+        Delegates the ordering-MAX selection to the status-agnostic ``_current_tail`` (the ONE
+        ordering contract lives there), then applies ONLY the retracted→``None`` collapse on top: if
+        the ordering-max tail is ``retracted`` the belief has NO active current and the result is
+        ``None`` (D-05: a contraction appends a retracted tail that supersedes the prior current,
+        clearing it without mutating any earlier state). Taking the max over ALL statuses (in
+        ``_current_tail``) — NOT pre-filtering to ``active`` — is what lets a retracted tail
+        correctly clear the current rather than the now-superseded active state below it remaining
+        visible. This is the unchanged Phase-3 write-side contract every ``revise``/``expand``/
+        ``contract`` ``prior`` computation depends on.
+        """
+        tail = self._current_tail(scope_id, belief_id)
+        if tail is None or tail["status"] == Status.retracted.value:
+            return None  # D-05: retracted tail ⇒ no active current
         return tail
 
     # --- Value encode/decode boundary (DEF-02-01, identical on both backends) -
