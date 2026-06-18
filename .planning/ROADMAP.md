@@ -140,7 +140,15 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Deprecated vs. superseded is observable as a structural/query distinction (`include_deprecated` flag + `SUPERSEDES` edge), with the four-cell status matrix (current/superseded x deprecated/active) tested
   3. Under correctly-maintained `CURRENT_STATE` invariants, `query_scope` returns no duplicate beliefs
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+**Wave 1**
+
+- [ ] 04-01-PLAN.md — D-03 rename (include_deprecated→include_retracted) on protocol.py + REQUIREMENTS/ROADMAP text + failing Wave-0 tests/test_query_scope.py (both backends)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 04-02-PLAN.md — query_scope body + status-agnostic _current_tail helper + behaviour-preserving _current refactor (CHAIN-04 four-cell matrix green on both backends)
 
 ### Phase 5: Edge Model & Contraction Cascade
 
