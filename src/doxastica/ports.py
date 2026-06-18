@@ -44,7 +44,7 @@ Pure interface; no behavior, no storage code (adapters are Phase 2).
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 if TYPE_CHECKING:
     from contextlib import AbstractContextManager
@@ -98,6 +98,7 @@ class BackendPort(Protocol):
         start: UUID | str,
         edge_types: frozenset[EdgeType | str],
         max_depth: int | None,
+        direction: Literal["in", "out"] = "out",
     ) -> tuple[list[dict[str, Any]], frozenset[UUID | str]]:
         """
         The single generic graph-walk primitive — returns ``(reached, frontier)``.
@@ -107,6 +108,20 @@ class BackendPort(Protocol):
         when ``max_depth`` is reached. ``max_depth=None`` ⇒ full transitive closure with an
         empty frontier. ``get_impact`` and ``get_scope_at`` compose from this primitive
         (Phases 3+) — there is no separate query method.
+
+        ``direction`` (D-05) selects which edges to follow from ``start``:
+
+        - ``"out"`` (the default) follows edges FROM ``start`` (its successors) — the
+          OUTGOING walk that ``get_scope_at`` composes (Phase 6). The default is ``"out"``
+          precisely so every existing positional caller and the not-yet-written
+          ``get_scope_at`` stay green unchanged: it is a cross-phase contract.
+        - ``"in"`` follows edges INTO ``start`` (its predecessors) — the dependency cascade
+          ``get_impact`` walks AGAINST the stored arrows (the core's edge-storage convention
+          is dependent→source, so a belief's dependents are reached by walking ``"in"``).
+
+        The closed ``Literal`` is the validation surface: a backend MAY ``raise ValueError``
+        on anything outside ``{"in", "out"}``. BOTH directions MUST agree on BOTH backends
+        (the Phase 7 conformance suite exercises each).
         """
         ...
 

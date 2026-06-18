@@ -39,8 +39,8 @@ A backend MUST implement exactly these five primitives, with these semantics:
 - **`match_nodes(label, where) -> list[dict]`** — return the nodes of `label` whose
   properties **exact-match** every entry in `where` (**AND-combined**). No query language is
   exposed; `where` is a plain property-equality predicate map, never a string.
-- **`traverse(start, edge_types, max_depth) -> (reached, frontier)`** — the **single**
-  graph-walk primitive. Following only edges in `edge_types` from `start`, it returns:
+- **`traverse(start, edge_types, max_depth, direction="out") -> (reached, frontier)`** — the
+  **single** graph-walk primitive. Following only edges in `edge_types` from `start`, it returns:
   - `reached`: the **de-duplicated, cycle-safe** set of reachable nodes (a visited-set
     walk — the backend MUST terminate on cyclic graphs, never loop);
   - `frontier`: the set of node ids left **unexpanded** when `max_depth` is reached.
@@ -49,6 +49,16 @@ A backend MUST implement exactly these five primitives, with these semantics:
   `max_depth` bounds the walk and reports the boundary in `frontier`, so a bounded cascade
   never silently under-reports. `get_impact` and `get_scope_at` compose from this single
   primitive (Phases 3+) — there is no separate per-query method.
+
+  `direction` (D-05) selects which edges to follow from `start`:
+  - `"out"` (the **default**) follows edges **FROM** `start` (its successors) — the OUTGOING
+    walk `get_scope_at` composes. The default is `"out"` so every existing positional caller
+    and `get_scope_at` keep their behaviour unchanged (a cross-phase contract).
+  - `"in"` follows edges **INTO** `start` (its predecessors) — the dependency cascade
+    `get_impact` walks AGAINST the stored arrows (edge storage is dependent→source).
+
+  BOTH directions on BOTH backends **MUST agree** (the Phase 7 conformance suite exercises
+  each). `reached` ordering remains non-contractual in either direction (see §5).
 - **`unit_of_work() -> AbstractContextManager[None]`** — an **atomic** (all-or-nothing)
   write-transaction context manager. The core groups a multi-write operation (e.g. a
   `revise`: append a new `BeliefState` and re-point the `CURRENT_STATE` pointer) inside one
