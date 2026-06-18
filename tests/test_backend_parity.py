@@ -201,6 +201,93 @@ def test_max_depth_zero_no_out_edge_empty_frontier_parity(backend: BackendPort) 
     )
 
 
+# --------------------------------------------------------------------------------------------
+# D-05 reverse-direction (direction="in") parity: walk edges INTO start (predecessors). The
+# builders lay edges START->successor, so on the chain A->B->C->D the dependents-of-D query is
+# traverse("D", ..., direction="in"). These guard the get_impact cascade (Plan 03), which walks
+# AGAINST the stored arrows. Every call passes `direction` as a KEYWORD argument; no existing
+# positional call above is touched (those guard the "out" default regression).
+# --------------------------------------------------------------------------------------------
+
+
+def test_chain_reverse_full_closure_parity(backend: BackendPort) -> None:
+    """Chain A->B->C->D, direction='in', unbounded: traverse('D') reaches {A,B,C} (predecessors)."""
+    _build_chain(backend)
+    reached, frontier = backend.traverse("D", frozenset({_DEPENDS_ON}), None, direction="in")
+    assert _reached_ids(reached) == ["A", "B", "C"], (
+        f"reverse closure from D must reach its predecessors A,B,C; got {_reached_ids(reached)}"
+    )
+    assert _frontier_ids(frontier) == [], "unbounded reverse traverse has an empty frontier"
+
+
+def test_chain_reverse_from_source_is_empty_parity(backend: BackendPort) -> None:
+    """
+    Chain A->B->C->D, direction='in': traverse('A') reaches {} (A has no in-edges) — Pitfall 2.
+
+    The asymmetric probe: a successor/predecessor swap (walking OUT under the 'in' label) would
+    make this reach {B,C,D} instead of {}, so this is the test that catches a direction bug.
+    """
+    _build_chain(backend)
+    reached, frontier = backend.traverse("A", frozenset({_DEPENDS_ON}), None, direction="in")
+    assert _reached_ids(reached) == [], (
+        f"A is the source with no in-edge; reverse reaches nothing; got {_reached_ids(reached)}"
+    )
+    assert _frontier_ids(frontier) == [], "no in-edges means an empty frontier too"
+
+
+def test_reverse_max_depth_zero_frontier_parity(backend: BackendPort) -> None:
+    """
+    Chain, direction='in', max_depth=0: reach nothing; D is the frontier (flipped bound==0 probe).
+
+    Exercises the IN-edge bound==0 probe (Pitfall 3): D sits at the bound with an unexpanded
+    in-edge predecessor (C), so D is on the frontier; nothing is reached.
+    """
+    _build_chain(backend)
+    reached, frontier = backend.traverse("D", frozenset({_DEPENDS_ON}), 0, direction="in")
+    assert _reached_ids(reached) == [], (
+        f"max_depth=0 reaches no nodes (layer 0 is start); got {_reached_ids(reached)}"
+    )
+    assert _frontier_ids(frontier) == ["D"], (
+        f"D sits at the bound with an unexpanded predecessor C; got {_frontier_ids(frontier)}"
+    )
+
+
+def test_reverse_max_depth_zero_no_in_edge_empty_frontier_parity(backend: BackendPort) -> None:
+    """
+    Chain, direction='in', max_depth=0 on the source A: empty reached AND empty frontier.
+
+    A has no in-edge, so under direction='in' the flipped bound==0 probe must report A NOT on
+    the frontier — the in-edge mirror of test_max_depth_zero_no_out_edge_empty_frontier_parity.
+    """
+    _build_chain(backend)
+    reached, frontier = backend.traverse("A", frozenset({_DEPENDS_ON}), 0, direction="in")
+    assert _reached_ids(reached) == [], (
+        f"a source node reaches nothing; got {_reached_ids(reached)}"
+    )
+    assert _frontier_ids(frontier) == [], (
+        f"A has no in-edge, so it is NOT on the direction='in' max_depth=0 frontier; got "
+        f"{_frontier_ids(frontier)}"
+    )
+
+
+def test_reverse_over_bound_chain_frontier_parity(backend: BackendPort) -> None:
+    """
+    Chain A->B->C->D, direction='in', max_depth=2 from D: reach {B,C}; B is boundary frontier.
+
+    Depth-bounded reverse case asserting BOTH reached and frontier literals: from D the reverse
+    layers are {C} (depth 1) then {B} (depth 2); B sits at the bound with an unexpanded
+    predecessor A, so B is the frontier and A is NOT reached.
+    """
+    _build_chain(backend)
+    reached, frontier = backend.traverse("D", frozenset({_DEPENDS_ON}), 2, direction="in")
+    assert _reached_ids(reached) == ["B", "C"], (
+        f"over-bound reverse chain reaches within the bound; got {_reached_ids(reached)}"
+    )
+    assert _frontier_ids(frontier) == ["B"], (
+        f"B sits at exactly max_depth with predecessor A unexpanded; got {_frontier_ids(frontier)}"
+    )
+
+
 def test_scope_upsert_parity(backend: BackendPort) -> None:
     """``Scope`` nodes upsert+match on their real PK ``scope_id`` on both backends (CR-01)."""
     _scope(backend, "world", is_world=True)
@@ -259,6 +346,24 @@ def test_both_backends_diamond_byte_identical() -> None:
         results[name] = (_reached_ids(reached), _frontier_ids(frontier))
     assert results["memory"] == results["ladybug"], (
         f"diamond (reached, frontier) must be byte-identical across backends; got {results}"
+    )
+
+
+def test_both_backends_reverse_chain_byte_identical() -> None:
+    """
+    Build BOTH backends and assert byte-identical reverse (direction='in') (reached, frontier).
+
+    Mirrors test_both_backends_diamond_byte_identical for the reverse walk: on the chain
+    A->B->C->D, traverse('D', ..., max_depth=2, direction='in') must be byte-identical across
+    the in-memory oracle and the ladybug adapter (D-05 reverse-direction parity).
+    """
+    results: dict[str, tuple[list[str], list[str]]] = {}
+    for name, be in _both_backends():
+        _build_chain(be)
+        reached, frontier = be.traverse("D", frozenset({_DEPENDS_ON}), 2, direction="in")
+        results[name] = (_reached_ids(reached), _frontier_ids(frontier))
+    assert results["memory"] == results["ladybug"], (
+        f"reverse (reached, frontier) must be byte-identical across backends; got {results}"
     )
 
 
