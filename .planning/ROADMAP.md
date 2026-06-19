@@ -211,7 +211,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Wave 1**
 
 - [x] 07-01-PLAN.md — Extend _SpineMachine with AGM K*2–K*6 + Hansson 5 postulates + register the FORMAL-03 structural set; extract the rows→tails helper (FORMAL-01/02/03, BACK-05)
-- [ ] 07-02-PLAN.md — Register get_scope_at ≡ replay (the Phase-6 fold property) into the FORMAL-03 conformance set (FORMAL-03, BACK-05)
+- [x] 07-02-PLAN.md — Register get_scope_at ≡ replay (the Phase-6 fold property) into the FORMAL-03 conformance set (FORMAL-03, BACK-05)
 - [ ] 07-03-PLAN.md — Recovery strict-xfail counterexample + superseded-chain replacement positives (FORMAL-04, BACK-05)
 
 **Wave 2** *(blocked on 07-01)*
@@ -245,5 +245,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 4. Retrieval & Observation Surface | 2/2 | Complete    | 2026-06-18 |
 | 5. Edge Model & Contraction Cascade | 3/3 | Complete    | 2026-06-18 |
 | 6. Structural Time-Travel | 2/2 | Complete    | 2026-06-19 |
-| 7. AGM/Hansson Backend Conformance Suite & Irony Join | 1/4 | In Progress|  |
+| 7. AGM/Hansson Backend Conformance Suite & Irony Join | 2/4 | In Progress|  |
 | 8. Publishable Polish | 0/TBD | Not started | - |

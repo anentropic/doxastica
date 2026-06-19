@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-06-19T13:35:30.379Z"
+last_updated: "2026-06-19T13:39:32.120Z"
 last_activity: 2026-06-19 -- Phase 07 execution started
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 23
-  completed_plans: 20
+  completed_plans: 21
   percent: 75
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 ## Current Position
 
 Phase: 07 (agm-hansson-conformance-suite) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-06-19 -- Phase 07 execution started
 
@@ -77,6 +77,7 @@ Progress: [██████████] 100% (4/4 plans)
 | Phase 06 P01 | 5min | 2 tasks | 3 files |
 | Phase 06 P02 | 4min | 1 tasks | 1 files |
 | Phase 07 P01 | 6m | 3 tasks | 2 files |
+| Phase 07 P02 | 4 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -124,6 +125,7 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase ?]: 05-02: [Rule 1] InMemoryBackend.add_edge now silently no-ops on a missing endpoint (MATCH-MERGE parity with ladybug) so the oracle honors the documented D-07 behavior
 - [Phase ?]: 06-01: get_scope_at uses cut-then-max (inclusive <= as_of PRE-filter BEFORE the per-belief ordering-max) so the cut REWINDS rather than drops
 - [Phase ?]: 06-01: inline cut in get_scope_at's group-by loop (not an as_of param on _current_tail) — keeps the Phase-3/4 keystone behaviour-preserving
+- [Phase ?]: [Phase 07]: 07-02: get_scope_at ≡ replay registered into FORMAL-03 via reciprocal registry marker in test_scope_at.py (D-08) — registration not re-implementation; fold oracle left SUT-independent (Pitfall 6 anti-tautology)
 
 ### Pending Todos
 
@@ -144,6 +146,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-19T13:35:26.551Z
+Last session: 2026-06-19T13:39:27.255Z
 Stopped at: Completed 05-01-PLAN.md
 Resume file: .planning/phases/05-edge-model-contraction-cascade/05-02-PLAN.md
