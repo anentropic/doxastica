@@ -21,9 +21,9 @@ This is the example-test HALF (the cut-rewind regression guard for the central t
 operational-fold ``RuleBasedStateMachine`` + the ``fold(ops, as_of)`` oracle (D-07) are added to
 THIS file by plan 06-02.
 
-RED-until-06-02-impl is the correct, intended state: ``MemoryCore.get_scope_at`` has no body yet
-(the protocol stub returns ``...``). Do NOT weaken these tests to make them pass — the body lands in
-Task 2 of this plan.
+The body has landed (``src/doxastica/core.py``) and every test in this file passes GREEN: this is
+now the held regression suite — the cut-rewind example guards plus the operational-fold conformance
+member. Do NOT weaken these tests to make them pass; each one fails only for a real reason.
 """
 
 from __future__ import annotations
