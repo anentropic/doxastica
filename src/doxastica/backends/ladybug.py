@@ -74,8 +74,12 @@ if TYPE_CHECKING:
 # namespace is string-interpolated and therefore MUST be validated before any interpolation.
 _NS_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
-# The literal hop bound compiled in for max_depth=None ("full closure"). No real belief graph
-# approaches a million deep, so the unbounded frontier is empty in practice (A1, RESEARCH).
+# The literal hop bound compiled in for max_depth=None ("full closure"). This is a hard TRUNCATION
+# limit, NOT a true infinity: ladybug var-length patterns need a concrete upper bound, so "full
+# closure" compiles to `*1.._DEPTH_CEILING`. No real belief graph approaches a million hops deep, so
+# in practice the walk closes before the limit (A1, RESEARCH). If a walk ever DOES reach this depth,
+# `traverse` raises rather than passing off a truncated set as a complete closure (WR-03, DATA-04 —
+# never silently under-report).
 _DEPTH_CEILING = 1_000_000
 
 # Ladybug's default var-length upper-hop cap, used ONLY as the fallback when the live cap cannot be
@@ -340,8 +344,11 @@ class LadybugBackend:
 
         ``ACYCLIC`` var-length traversal returns the de-duplicated, cycle-safe reachable set
         (excluding ``start`` itself, matching the in-memory oracle). ``max_depth=None`` compiles
-        to the literal :data:`_DEPTH_CEILING` with ``var_length_extend_max_depth`` raised to lift
-        the default 30-hop cap (Pitfall 1) — so the unbounded frontier is empty in practice. The
+        to the literal :data:`_DEPTH_CEILING` (a hard truncation limit, NOT a true infinity) with
+        ``var_length_extend_max_depth`` raised to lift the default 30-hop cap (Pitfall 1) — so the
+        unbounded frontier is empty in practice. A full-closure walk that actually reaches the
+        ceiling RAISES rather than silently reporting a truncated set as complete (WR-03, DATA-04).
+        The
         depth bound is a validated ``int`` interpolated into ``*1..N`` (``$param`` is rejected
         there — Pitfall 2); ``$start`` is a ``$param`` bind. The ``(reached, frontier)`` shape is
         computed in one query via ``min(length(p))`` + an ``EXISTS{}`` subquery: a node is on the
@@ -412,6 +419,10 @@ class LadybugBackend:
         # FLIP 2 (main var-length pattern) + FLIP 3 (EXISTS frontier subquery): both arrows flip
         # with `direction` via the (lhs, rhs) pair. Flipping only some would leave a direction
         # inconsistency (Pitfall 3) — the frontier probe must match the walk direction.
+        # WR-03: keep `d` in the returned rows so a `max_depth=None` (full-closure) walk can be
+        # audited for the truncation ceiling below. For a true full closure NO node reaches
+        # `_DEPTH_CEILING`; if any does, the closure was silently truncated by the literal cap and
+        # we must NOT report it as complete (DATA-04 — never silently under-report).
         cypher = (
             f"MATCH p=(a:{node} {{{pk}: $start}}){lhs}[:{rels}* ACYCLIC 1..{bound}]{rhs}(b:{node}) "
             f"WHERE b.{pk} <> $start "
@@ -436,6 +447,21 @@ class LadybugBackend:
             if lifted:
                 # restore the tenant's ORIGINAL cap (not a literal) so the connection is unchanged
                 self._exec(f"CALL var_length_extend_max_depth={prior_cap}")
+        # WR-03 (DATA-04): `max_depth=None` is "full closure", compiled to the literal
+        # `_DEPTH_CEILING` hop cap. That cap is a hard TRUNCATION limit, not a true infinity — a
+        # graph deeper than it would otherwise be reported as a complete closure when it is not (the
+        # silent under-report DATA-04 exists to prevent). A node whose min depth equals the ceiling
+        # means the walk hit that limit, so refuse to pass off a truncated set as a full closure.
+        # In practice no real belief graph approaches a million hops, so this never fires; when it
+        # would, the caller gets a loud signal instead of a silently short answer. (A FINITE
+        # `max_depth` surfaces truncation through the `at_frontier`/`frontier` channel instead, so
+        # this guard is scoped to the unbounded case only.)
+        if max_depth is None and any(r["d"] >= _DEPTH_CEILING for r in rows):
+            raise RuntimeError(
+                "full-closure traverse hit the internal depth ceiling "
+                f"({_DEPTH_CEILING}); the cascade exceeds the adapter's unbounded-walk limit and "
+                "cannot be reported as a complete closure (pass an explicit max_depth to bound it)"
+            )
         reached = [{"state_id": r["state_id"]} for r in rows]
         frontier: frozenset[UUID | str] = frozenset(r["state_id"] for r in rows if r["at_frontier"])
         return reached, frontier
