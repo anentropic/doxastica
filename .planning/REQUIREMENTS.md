@@ -101,7 +101,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [x] **BACK-04**: The backend port contract is **documented** so a third party can write an
       alternative backend for any labelled property graph meeting the documented constraint
 
-- [ ] **BACK-05**: The AGM/Hansson property suite runs as a **backend conformance suite** —
+- [x] **BACK-05**: The AGM/Hansson property suite runs as a **backend conformance suite** —
       parameterised so every registered backend must pass the same postulate + invariant tests
 
 ### Connection & Tenancy (ladybug backend)
@@ -119,14 +119,14 @@ Foundational, decision-grade choices that must be settled before storage code ex
 
 ### Formal Correctness (the differentiator — the M0 exit gate)
 
-- [ ] **FORMAL-01**: AGM revision postulate suite green via Hypothesis stateful tests over
+- [x] **FORMAL-01**: AGM revision postulate suite green via Hypothesis stateful tests over
       operation sequences: **Success (K*2), Inclusion (K*3), Vacuity (K*4), Consistency (K*5),
       Extensionality (K*6)** — Closure (K*1) dropped by construction (bases)
 
-- [ ] **FORMAL-02**: Hansson belief-base postulate suite green: **Contraction Success,
+- [x] **FORMAL-02**: Hansson belief-base postulate suite green: **Contraction Success,
       Inclusion, Relevance, Core-Retainment, Uniformity**
 
-- [ ] **FORMAL-03**: Structural-invariant suite green: `CURRENT_STATE` uniqueness, chain
+- [x] **FORMAL-03**: Structural-invariant suite green: `CURRENT_STATE` uniqueness, chain
       immutability, `get_scope_at ≡ replay`, world-scope no-contraction
 
 - [ ] **FORMAL-04**: AGM **Recovery deliberately excluded** — a loud, named `xfail` with
@@ -211,12 +211,12 @@ Which phases cover which requirements. Populated during roadmap creation.
 | EDGE-01 | Phase 5 | Complete |
 | EDGE-02 | Phase 5 | Complete |
 | HIST-03 | Phase 6 | Complete |
-| FORMAL-01 | Phase 7 | Pending |
-| FORMAL-02 | Phase 7 | Pending |
-| FORMAL-03 | Phase 7 | Pending |
+| FORMAL-01 | Phase 7 | Complete |
+| FORMAL-02 | Phase 7 | Complete |
+| FORMAL-03 | Phase 7 | Complete |
 | FORMAL-04 | Phase 7 | Pending |
 | FORMAL-05 | Phase 7 | Pending |
-| BACK-05 | Phase 7 | Pending |
+| BACK-05 | Phase 7 | Complete |
 | PKG-02 | Phase 8 | Pending |
 | PKG-03 | Phase 8 | Pending |
 | PKG-04 | Phase 8 | Pending |
