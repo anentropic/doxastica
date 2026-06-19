@@ -78,8 +78,26 @@ with an empty frontier; `depth=1` still surfaces its frontier).
   `$param`-bound Cypher except the sanctioned namespace/edge-type/int interpolation, pydantic as
   the only required runtime dep, basedpyright STRICT at 0 errors, append-only discipline, and the
   locked `direction` default / `ImpactResult` shape.
-- The 3 Info findings (IN-01, IN-02, IN-03) were out of the `critical_warning` scope and were not
-  addressed.
+- The 3 Info findings (IN-01, IN-02, IN-03) were out of the `critical_warning` scope of this pass.
+
+## Follow-up: Info findings (user-directed, 2026-06-19)
+
+After the warning pass, IN-01 and IN-02 were fixed on explicit user request; IN-03 is deferred.
+
+- **IN-01 — FIXED** (`src/doxastica/core.py`): `get_impact`'s re-fetch loop now RAISES
+  `RuntimeError("… reached/store divergence")` when a reached `state_id` re-fetches empty, instead
+  of the silent `if fetched:` skip — an empty re-fetch is an invariant breach (traverse only
+  reaches real nodes), so it fails loud. Pinned by `test_get_impact_reached_store_divergence_raises`
+  (monkeypatched `match_nodes`).
+- **IN-02 — FIXED** (`src/doxastica/backends/memory.py`, `src/doxastica/backends/ladybug.py`): both
+  `traverse` bodies now guard `if direction not in ("in","out"): raise ValueError(...)`, making the
+  port's advertised MAY-raise validation surface real rather than silently falling through to the
+  outgoing walk. Pinned by `test_traverse_rejects_unknown_direction` (both backends).
+- **IN-03 — DEFERRED**: `_in_edges` O(nodes×edges) reverse scan on the in-memory oracle. Perf is
+  out of v1 scope; the in-memory backend is the test oracle, not a production hot path. Logged for
+  a future reverse-index pass.
+
+Suite green at 168 passed (165 + 3 new tests), basedpyright STRICT 0 errors, ruff clean.
 
 ---
 
