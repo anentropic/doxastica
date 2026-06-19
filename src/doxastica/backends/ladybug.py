@@ -78,10 +78,11 @@ _NS_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 # approaches a million deep, so the unbounded frontier is empty in practice (A1, RESEARCH).
 _DEPTH_CEILING = 1_000_000
 
-# Ladybug's default var-length upper-hop cap. `traverse` only raises this (and only restores it)
-# when the requested bound exceeds it, so a shallow walk never mutates the connection's global
-# config — and even a deep walk restores the default afterward, so an INJECTED tenant connection
-# (R19) is never left with a changed ceiling behind the port (WR-05).
+# Ladybug's default var-length upper-hop cap, used ONLY as the fallback when the live cap cannot be
+# read (it always can on 0.17.1). `traverse` raises the cap only when the requested bound exceeds
+# the connection's CURRENT value, and restores that saved value afterward (WR-01) — so a shallow
+# walk never mutates the connection's global config and even a deep walk leaves an INJECTED tenant
+# connection (R19) with the EXACT ceiling it started with, default or not (WR-05).
 _DEFAULT_HOP_CAP = 30
 
 # Label -> PRIMARY KEY column. The SINGLE source of truth for each node table's PK: the
@@ -418,20 +419,23 @@ class LadybugBackend:
             f"RETURN b.{pk} AS state_id, d, "
             f"(d = {bound} AND EXISTS {{ MATCH (b){lhs}[:{rels}]{rhs}() }}) AS at_frontier"
         )
-        # WR-05: `var_length_extend_max_depth` is a connection-GLOBAL config. Only raise it when the
-        # bound actually exceeds the default cap (a shallow walk never touches tenant state), and
-        # restore the default in a `finally` so an INJECTED tenant connection (R19, owns_conn=False)
-        # is never left with a changed ceiling behind the port — a subsequent unrelated query on the
-        # tenant's handle sees the original 30-hop cap.
-        lifted = bound > _DEFAULT_HOP_CAP
+        # WR-05/WR-01: `var_length_extend_max_depth` is a connection-GLOBAL config. Only raise it
+        # when the requested bound exceeds the cap the connection CURRENTLY holds (a shallow walk
+        # never touches tenant state). The prior value is READ before lifting and restored verbatim
+        # in a `finally`, so an INJECTED tenant connection (R19, owns_conn=False) that deliberately
+        # set its own non-default cap (say 100) is left EXACTLY as it was — not reset to the literal
+        # default 30 (WR-01). The cap is a per-connection int; reading it is the cheap, correct way
+        # to make the port's side effect truly invisible behind the seam.
+        prior_cap = self._read_var_length_cap()
+        lifted = bound > prior_cap
         if lifted:
-            self._exec(f"CALL var_length_extend_max_depth={bound}")  # lift the 30-hop cap
+            self._exec(f"CALL var_length_extend_max_depth={bound}")  # lift the cap for this walk
         try:
             rows = self._rows(self._exec(cypher, {"start": str(start)}))
         finally:
             if lifted:
-                # restore the default cap so an injected tenant connection is unchanged (WR-05)
-                self._exec(f"CALL var_length_extend_max_depth={_DEFAULT_HOP_CAP}")
+                # restore the tenant's ORIGINAL cap (not a literal) so the connection is unchanged
+                self._exec(f"CALL var_length_extend_max_depth={prior_cap}")
         reached = [{"state_id": r["state_id"]} for r in rows]
         frontier: frozenset[UUID | str] = frozenset(r["state_id"] for r in rows if r["at_frontier"])
         return reached, frontier
@@ -453,6 +457,26 @@ class LadybugBackend:
             raise
         else:
             self._exec("COMMIT")
+
+    def _read_var_length_cap(self) -> int:
+        """
+        Read the connection's CURRENT ``var_length_extend_max_depth`` cap (WR-01).
+
+        ``traverse`` lifts this connection-global setting only when a deep walk needs it, then must
+        restore whatever the connection held BEFORE — not a hardcoded default — so an injected
+        tenant (R19) that set its own non-default cap is left untouched behind the port. Ladybug
+        exposes the live value via ``CALL current_setting('var_length_extend_max_depth') RETURN *``,
+        which yields a single row ``{'var_length_extend_max_depth': '<n>'}`` with the value as a
+        STRING; we coerce to ``int``. If the setting is ever absent or unreadable (it always exists
+        on ladybug 0.17.1, default ``30``), fall back to :data:`_DEFAULT_HOP_CAP` so the restore
+        still targets a sane value rather than raising mid-traverse.
+        """
+        rows = self._rows(
+            self._exec("CALL current_setting('var_length_extend_max_depth') RETURN *")
+        )
+        if rows and "var_length_extend_max_depth" in rows[0]:
+            return int(rows[0]["var_length_extend_max_depth"])
+        return _DEFAULT_HOP_CAP
 
     def _rows(self, result: lb.QueryResult) -> list[dict[str, Any]]:
         """Extract a ``QueryResult`` as raw ``list[dict]`` (the canonical port return, D-04)."""
