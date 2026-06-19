@@ -649,6 +649,13 @@ class MemoryCore:
         # Normalize the cut bound ONCE to the _order_key str form (D-04: never str-vs-UUID).
         as_of = str(as_of_event_id)
         # 1. ONE scope-wide round-trip; absent scope → [] (D-08: pure read, no auto-create)
+        #    WR-01 snapshot invariant: this is a SINGLE `match_nodes` ⇒ one auto-committed snapshot,
+        #    so no `unit_of_work` is needed (cf. `get_impact`'s WR-02 wrap, which is required only
+        #    because it makes MORE THAN ONE backend call). If a second backend call is ever added
+        #    here (e.g. a scope-existence probe, or splitting the scan), wrap BOTH in
+        #    `self._backend.unit_of_work()` per WR-02 — otherwise a concurrent append on the ladybug
+        #    single-writer model can land between the two auto-committed reads and break the
+        #    single-snapshot guarantee with no compile-time signal.
         rows = self._backend.match_nodes("BeliefState", {"scope_id": scope_id})
         # 2. INCLUSIVE cut as a PRE-filter, then per-group ordering-MAX over the surviving rows.
         #    The cut runs BEFORE the max (cut-then-max = REWIND, D-02/D-03) — NOT a post-filter on
