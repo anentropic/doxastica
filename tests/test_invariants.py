@@ -43,7 +43,7 @@ import uuid
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from hypothesis import settings
+from hypothesis import given, settings
 from hypothesis import strategies as st
 from hypothesis.stateful import (
     Bundle,
@@ -54,7 +54,12 @@ from hypothesis.stateful import (
     rule,
 )
 
-from doxastica import WORLD_SCOPE_ID, MemoryCore, WorldScopeContractionError
+from doxastica import (
+    WORLD_SCOPE_ID,
+    BeliefFilter,
+    MemoryCore,
+    WorldScopeContractionError,
+)
 
 if TYPE_CHECKING:
     from doxastica.ports import BackendPort
@@ -221,6 +226,36 @@ class _SpineMachine(RuleBasedStateMachine):
         """Return the (scope, belief) pairs the oracle currently derives an active current for."""
         return sorted(k for k in self.entries if self._shadow_current(*k)[0])
 
+    def _shadow_base(self, scope_id: str) -> dict[str, Any]:
+        """
+        The oracle's belief base for ``scope_id``: ``{belief_id: value}`` of active currents.
+
+        This IS the AGM belief base ``K`` for ``scope_id``, computed INDEPENDENTLY from
+        ``self.entries`` via the oracle's own ``(source_event_id, seq)`` winner selection — it never
+        reads ``query_scope`` / ``_current`` (Pitfall 2, the anti-tautology rule). Every AGM
+        postulate ``@invariant`` compares the SUT's observed base against this oracle-computed base.
+        """
+        base: dict[str, Any] = {}
+        for s, b in self.entries:
+            if s != scope_id:
+                continue
+            has_current, value = self._shadow_current(s, b)
+            if has_current:
+                base[b] = value
+        return base
+
+    def _observed_base(self, scope_id: str) -> dict[str, Any]:
+        """
+        The SUT's observed belief base for ``scope_id`` via ``query_scope`` (the AGM ``K``).
+
+        ``query_scope(scope, BeliefFilter())`` IS the observed belief base. Returned as
+        ``{belief_id: decoded value}`` for direct comparison against ``_shadow_base`` (the oracle).
+        This is the SINGLE SUT read; the expected side is always the independent oracle.
+        """
+        return {
+            s.belief_id: s.value for s in self.core.query_scope(scope_id, BeliefFilter())
+        }
+
     @precondition(lambda self: bool(self._asserted_keys()))
     @rule(
         data=st.data(),
@@ -314,6 +349,79 @@ class _SpineMachine(RuleBasedStateMachine):
             f"store has {total} states but {self._state_count} appends were performed"
         )
 
+    # --- AGM revision postulates (FORMAL-01) — @invariants over the op sequence ---------------
+    #
+    # The shadow oracle's active-current set per scope (`_shadow_base`) IS the AGM belief base K.
+    # Each postulate compares the SUT's observed base (`query_scope` = `_observed_base`) against the
+    # oracle — NEVER the SUT against a second SUT read (Pitfall 2, anti-tautology, D-06). The
+    # doxastica phrasings (RESEARCH Pattern 3): `revise` ≡ `expand` (no consistency engine), so
+    # K*3/K*4 collapse to expansion identities; K*1 Closure is DROPPED by construction (belief
+    # bases are not deductively closed). BACK-05 is satisfied transversally — the Memory*/Ladybug*
+    # `.TestCase` subclasses run every @invariant on both backends with no per-backend assertion.
+
+    @invariant()
+    def agm_k2_success(self) -> None:
+        """
+        K*2 Success (``p ∈ K*p``): every belief the oracle currently asserts is present in the base.
+
+        After a sequence of ``revise``/``expand`` writes, every ``(scope, belief)`` the oracle
+        derives an active current for MUST be present in ``query_scope(scope)`` decoding to exactly
+        that value — the latest ``revise(scope, p, v)`` succeeds in making ``p`` present at ``v``.
+        Expected comes ONLY from ``_shadow_base`` (the oracle); the SUT is read once via
+        ``_observed_base``.
+        """
+        for scope_id in _SCOPE_POOL:
+            expected = self._shadow_base(scope_id)  # oracle, independent
+            observed = self._observed_base(scope_id)  # SUT, single read
+            for belief_id, value in expected.items():
+                assert belief_id in observed, (
+                    f"K*2 Success: ({scope_id}, {belief_id}) is asserted in the oracle but "
+                    f"absent from the observed base"
+                )
+                assert observed[belief_id] == value, (
+                    f"K*2 Success: ({scope_id}, {belief_id}) must be present at {value!r}, "
+                    f"got {observed[belief_id]!r}"
+                )
+
+    @invariant()
+    def agm_k3_inclusion(self) -> None:
+        """
+        K*3 Inclusion (``K*p ⊆ K+p``): the observed base never holds a belief the oracle does not.
+
+        Since ``revise ≡ expand`` (no value-semantic consistency engine, D-04), revision adds
+        exactly the new tail and removes nothing except the superseded prior tail of the SAME
+        ``belief_id`` — so the observed base keys equal the oracle (expand-)base keys: the observed
+        base introduces NO belief the oracle's independent expansion model does not also derive.
+        Phrased as ``keys(observed) ⊆ keys(oracle)`` (the ⊇ direction is K*2 Success above; together
+        they pin equality). Expected from the oracle only.
+        """
+        for scope_id in _SCOPE_POOL:
+            expected_keys = set(self._shadow_base(scope_id))  # oracle, independent
+            observed_keys = set(self._observed_base(scope_id))  # SUT, single read
+            assert observed_keys <= expected_keys, (
+                f"K*3 Inclusion: observed base for {scope_id} holds beliefs the oracle does not "
+                f"derive: {observed_keys - expected_keys}"
+            )
+
+    @invariant()
+    def agm_k5_consistency(self) -> None:
+        """
+        K*5 Consistency: the observed base is SINGLE-VALUED — no ``belief_id`` appears twice.
+
+        For a belief base, "consistency" is the structural property that ``query_scope`` yields
+        exactly one current tail per ``(scope, belief)`` — no ``belief_id`` resolves to two states.
+        This is checked directly against the SUT projection (a duplicate would be a structural
+        defect, not an oracle disagreement); it complements the keystone single-valued-derived-
+        current theorem already asserted at the ``_current`` level.
+        """
+        for scope_id in _SCOPE_POOL:
+            states = self.core.query_scope(scope_id, BeliefFilter())
+            belief_ids = [s.belief_id for s in states]
+            assert len(belief_ids) == len(set(belief_ids)), (
+                f"K*5 Consistency: query_scope({scope_id}) is not single-valued — a belief_id "
+                f"appears more than once: {belief_ids}"
+            )
+
     def teardown(self) -> None:
         """
         Release the per-example backend (ladybug owns a native in-memory DB handle).
@@ -353,3 +461,94 @@ LadybugSpineMachine.TestCase.settings = _SETTINGS  # pyright: ignore[reportUnkno
 
 MemorySpineTest = MemorySpineMachine.TestCase  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
 LadybugSpineTest = LadybugSpineMachine.TestCase  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+
+
+# === Single-operation AGM postulates (D-06a) — standalone @given tests over both backends ======
+#
+# Vacuity (K*4) and Extensionality (K*6) are single-operation properties; a full op SEQUENCE is
+# overkill (CLAUDE.md testing note / D-06a), so they are plain `@given` property tests rather than
+# rules on the spine machine. They CANNOT consume the function-scoped `conftest.py` `backend`
+# fixture: Hypothesis does not reset a function-scoped fixture between generated inputs (the
+# `function_scoped_fixture` health check), and reusing one backend across examples would bleed
+# state between them. Instead each test is parametrized over the backend KIND and builds a FRESH
+# throwaway backend per Hypothesis example via `_build_backend` — mirroring `_make_backend` /
+# `conftest.py` (ladybug SKIPS, not fails, when the driver is absent). Running both kinds satisfies
+# BACK-05 transversally exactly as the dual `.TestCase` idiom does for the stateful invariants.
+
+
+def _build_backend(backend_kind: str) -> BackendPort:
+    """Build a fresh throwaway backend for ``backend_kind`` (mirrors ``_make_backend``)."""
+    if backend_kind == "ladybug":
+        lb = pytest.importorskip("ladybug")  # SKIP, not fail, when the driver is absent
+        from doxastica.backends.ladybug import LadybugBackend
+
+        db = lb.Database(max_db_size=2**30)  # 1 GiB cap — one DB per Hypothesis example (Pitfall 4)
+        return LadybugBackend(lb.Connection(db), namespace="dx", owns_conn=True)
+    from doxastica.backends.memory import InMemoryBackend
+
+    return InMemoryBackend()
+
+
+def _base_of(core: MemoryCore, scope_id: str) -> dict[str, Any]:
+    """The observed belief base ``{belief_id: value}`` of ``scope_id`` (one query_scope read)."""
+    return {s.belief_id: s.value for s in core.query_scope(scope_id, BeliefFilter())}
+
+
+@pytest.mark.parametrize("backend_kind", ["memory", "ladybug"])
+@given(value=_values)
+@settings(max_examples=50, deadline=None)
+def test_vacuity_k4(backend_kind: str, value: Any) -> None:
+    """
+    K*4 Vacuity: revising a FRESH ``belief_id`` equals expanding it (no negation/consistency).
+
+    With no consistency machinery (``revise ≡ expand``, D-04), revising a ``belief_id`` NOT
+    currently asserted equals expanding it: the post-base is the prior base ∪ ``{(p, v)}``. The
+    EXPECTED base is computed in plain Python from the known prior writes (the independent oracle),
+    never by a second ``query_scope`` projection used as the source of truth. A FRESH backend per
+    example proves the identity on both backends (BACK-05).
+    """
+    be = _build_backend(backend_kind)
+    try:
+        core = MemoryCore(be)
+        e = uuid.uuid7
+        # prior base, established by writes the test fully controls — the independent expectation
+        core.revise("alice", "b1", 1, e())
+        core.revise("alice", "b2", 2, e())
+        prior_expected = {"b1": 1, "b2": 2}
+        assert _base_of(core, "alice") == prior_expected
+        # revise a FRESH belief_id (b3 is not asserted) — Vacuity says this equals expansion
+        core.revise("alice", "b3", value, e())
+        assert _base_of(core, "alice") == {**prior_expected, "b3": value}
+    finally:
+        close = getattr(be, "close", None)
+        if callable(close):
+            close()
+
+
+@pytest.mark.parametrize("backend_kind", ["memory", "ladybug"])
+@given(value=_values)
+@settings(max_examples=50, deadline=None)
+def test_extensionality_k6(backend_kind: str, value: Any) -> None:
+    """
+    K*6 Extensionality: ``revise(s, p, v)`` and ``expand(s, p, v)`` yield byte-identical bases.
+
+    The core treats ``belief_id`` and ``value`` opaquely; "logically equivalent inputs" =
+    identical ``(belief_id, value)`` writes. Extensionality is asserted by comparing the
+    ``query_scope`` projection produced by ``revise`` against the one produced by ``expand`` on a
+    SEPARATE scope — the two derived bases must be byte-identical (modulo the differing scope_id).
+    Both projections are SUT reads of DISTINCT operations, not a tautological re-read of one op. A
+    FRESH backend per example covers both backends (BACK-05).
+    """
+    be = _build_backend(backend_kind)
+    try:
+        core = MemoryCore(be)
+        src = uuid.uuid7()  # identical inputs (same belief_id, value, source_event_id) into both
+        core.revise("alice", "b1", value, src)
+        core.expand("bob", "b1", value, src)
+        revised = _base_of(core, "alice")
+        expanded = _base_of(core, "bob")
+        assert revised == expanded == {"b1": value}
+    finally:
+        close = getattr(be, "close", None)
+        if callable(close):
+            close()
