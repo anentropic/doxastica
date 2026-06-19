@@ -263,7 +263,7 @@ class _SpineMachine(RuleBasedStateMachine):
     )
     def contract(self, data: st.DataObject, source_event_id: uuid.UUID) -> None:
         """
-        Contract an EXISTING current (OPS-03, D-05): append a retracted state copying its value.
+        Contract an EXISTING current (OPS-03, D-05); assert the Hansson base-contraction postulates.
 
         Gated by ``@precondition`` to (scope, belief) pairs that currently DERIVE an active current
         (so the acting branch, not the vacuous no-op, is exercised). The retracted copy carries the
@@ -271,12 +271,108 @@ class _SpineMachine(RuleBasedStateMachine):
         uses — so whether it actually clears the current is decided by the ordering contract, not
         assumed (a contraction recorded against an earlier ``source_event_id`` does not win,
         Pitfall 6).
+
+        FORMAL-02 (Hansson, D-07 superseded-chain phrasing): capture the oracle's belief base for
+        the affected scope BEFORE and AFTER the contraction (computed independently from
+        ``self.entries`` — never a second SUT read), confirm the SUT's observed base agrees with the
+        oracle on BOTH sides, then assert the four Hansson base-contraction postulates over the
+        oracle-derived bases — Success, Inclusion, Relevance, Core-Retainment. There is NO
+        value-semantic derivation engine (D-07), so Relevance and Core-Retainment collapse to the
+        ONE surgical claim — contraction retracts EXACTLY the named belief and nothing else — but
+        are asserted as TWO distinctly named methods for proof completeness (RESEARCH A2).
         """
         key = data.draw(st.sampled_from(self._asserted_keys()))
         scope_id, belief_id = key
         _has, prior_value = self._shadow_current(scope_id, belief_id)
+
+        # Oracle bases BEFORE the contract (independent of the SUT, D-06/Pitfall 2).
+        base_before = self._shadow_base(scope_id)
+        assert self._observed_base(scope_id) == base_before  # SUT agrees with the oracle BEFORE
+
         self.core.contract(scope_id, belief_id, source_event_id)
         self._record(scope_id, belief_id, prior_value, source_event_id, "retracted")
+
+        # Oracle bases AFTER the contract (independent).
+        base_after = self._shadow_base(scope_id)
+        assert self._observed_base(scope_id) == base_after  # SUT agrees with the oracle AFTER
+
+        self._assert_hansson_success_inclusion(scope_id, belief_id, base_before, base_after)
+        self._assert_hansson_relevance(belief_id, base_before, base_after)
+        self._assert_hansson_core_retainment(belief_id, base_before, base_after)
+
+    def _assert_hansson_success_inclusion(
+        self,
+        scope_id: str,
+        belief_id: str,
+        base_before: dict[str, Any],
+        base_after: dict[str, Any],
+    ) -> None:
+        """
+        Hansson Contraction Success + Inclusion over the oracle-derived bases (FORMAL-02, D-07).
+
+        Success: when the contraction WINS the ordering (the retracted tail is the ordering-max,
+        which the oracle decides), ``belief_id`` is ABSENT from the post-contraction base. When the
+        contraction does NOT win (a colliding earlier ``source_event_id``, Pitfall 6), it is a
+        vacuous no-op and the base is unchanged — the oracle correctly predicts both, so Success is
+        asserted exactly when the oracle drops the belief.
+        Inclusion (``A÷p ⊆ A``): every ``belief_id`` present after the contract was present
+        before — contraction introduces NO new asserted belief.
+        """
+        # Inclusion: keys(after) ⊆ keys(before)
+        assert set(base_after) <= set(base_before), (
+            f"Hansson Inclusion: contract({scope_id}, {belief_id}) introduced a belief absent "
+            f"before: {set(base_after) - set(base_before)}"
+        )
+        # Success: the belief is dropped exactly when the oracle's ordering-max tail is retracted
+        has_current, _value = self._shadow_current(scope_id, belief_id)
+        if not has_current:
+            assert belief_id not in base_after, (
+                f"Hansson Success: contract({scope_id}, {belief_id}) won the ordering but the "
+                f"belief is still present in the post-contraction base"
+            )
+
+    def _assert_hansson_relevance(
+        self,
+        belief_id: str,
+        base_before: dict[str, Any],
+        base_after: dict[str, Any],
+    ) -> None:
+        """
+        Hansson Relevance, superseded-chain phrasing (FORMAL-02, D-07): symmetric difference ⊆ {p}.
+
+        With no value-semantic derivation engine (D-07), the ONLY belief a ``contract(p)`` may
+        remove is ``p`` itself — nothing irrelevant is lost. Asserted as: the symmetric difference
+        of the bases across the contraction is a subset of ``{belief_id}`` (it is exactly
+        ``{belief_id}`` when the contraction wins, and empty when it is a vacuous no-op). Does NOT
+        fabricate a derivation relation the core lacks (Anti-Pattern).
+        """
+        symdiff = set(base_before) ^ set(base_after)
+        assert symdiff <= {belief_id}, (
+            f"Hansson Relevance: contraction changed the membership of beliefs other than "
+            f"{belief_id!r}: {symdiff - {belief_id}}"
+        )
+
+    def _assert_hansson_core_retainment(
+        self,
+        belief_id: str,
+        base_before: dict[str, Any],
+        base_after: dict[str, Any],
+    ) -> None:
+        """
+        Hansson Core-Retainment, superseded-chain phrasing (FORMAL-02, D-07): every other tail held.
+
+        The engine-free re-statement (sibling to Relevance): for EVERY ``belief_id ≠ p`` the current
+        tail is byte-identical before and after ``contract(p)`` — no collateral retraction or value
+        change. A distinct named method from Relevance for proof completeness (RESEARCH A2), though
+        both collapse to the same surgical-contraction claim under D-07.
+        """
+        for other, value in base_before.items():
+            if other == belief_id:
+                continue
+            assert other in base_after and base_after[other] == value, (
+                f"Hansson Core-Retainment: contract({belief_id}) collaterally changed belief "
+                f"{other!r}: was {value!r}, now {base_after.get(other)!r}"
+            )
 
     @rule(belief_id=beliefs, source_event_id=_event_ids)
     def world_contract_raises(self, belief_id: str, source_event_id: uuid.UUID) -> None:
@@ -552,3 +648,62 @@ def test_extensionality_k6(backend_kind: str, value: Any) -> None:
         close = getattr(be, "close", None)
         if callable(close):
             close()
+
+
+@pytest.mark.parametrize("backend_kind", ["memory", "ladybug"])
+@given(value=_values)
+@settings(max_examples=50, deadline=None)
+def test_uniformity(backend_kind: str, value: Any) -> None:
+    """
+    Hansson Uniformity (D-06a / D-05): re-contracting the same key is idempotent at the base level.
+
+    With opaque values and no derivation engine (D-07), two ``contract`` calls on the SAME
+    ``(scope, belief_id)`` produce identical bases: the first retracts ``p`` (dropping it from the
+    base); the second is a vacuous no-op (its ``_current`` probe finds the already-retracted tail
+    and returns ``None`` — D-05), so the base after the second contract equals the base after the
+    first. The EXPECTED base is computed in plain Python (the independent oracle); both backends
+    prove the idempotence (BACK-05).
+    """
+    be = _build_backend(backend_kind)
+    try:
+        core = MemoryCore(be)
+        e = uuid.uuid7
+        core.revise("alice", "p", value, e())
+        core.revise("alice", "q", "kept", e())
+        core.contract("alice", "p", e())
+        base_after_first = _base_of(core, "alice")
+        assert base_after_first == {"q": "kept"}  # p dropped, q surgically retained
+        core.contract("alice", "p", e())  # second contract on the SAME key — vacuous no-op (D-05)
+        assert _base_of(core, "alice") == base_after_first  # idempotent at the base level
+    finally:
+        close = getattr(be, "close", None)
+        if callable(close):
+            close()
+
+
+# === FORMAL-03 named structural-invariant conformance set (D-08) ================================
+#
+# The full FORMAL-03 structural-invariant set is REGISTERED here (the `test_invariants.py` half).
+# All three members are ALREADY implemented on `_SpineMachine` (D-08 routes them into the named set
+# rather than re-implementing); they ride BOTH backends via the Memory*/Ladybug* `.TestCase`
+# subclasses (BACK-05). The `get_scope_at ≡ replay` member of FORMAL-03 lives in
+# `tests/test_scope_at.py::scope_at_equals_fold_for_every_cut` (the Phase-6 operational-fold
+# property, already a registered dual-backend conformance invariant — D-08, not re-implemented).
+#
+#   FORMAL-03 conformance set (this file):
+#     1. current_is_total_single_valued_and_chain_tail  — the CURRENT_STATE-uniqueness THEOREM:
+#        there is NO stored pointer edge (Phase-3 D-01); single-valued derived-current holds as the
+#        unique ordering-max under a unique state_id tiebreak (`_SpineMachine`, @invariant).
+#     2. chain_is_immutable                             — append-only: total BeliefState count
+#        equals the appends performed exactly; no op deletes/mutates/duplicates (`_SpineMachine`).
+#     3. world_contract_raises                          — world-scope no-contraction: contract() on
+#        WORLD_SCOPE_ID is a structural error raised before any write (`_SpineMachine`, @rule).
+#   FORMAL-03 conformance set (sibling file):
+#     4. scope_at_equals_fold_for_every_cut             — get_scope_at ≡ replay over every cut
+#        (tests/test_scope_at.py, the lifted Phase-6 fold property — D-08).
+_FORMAL_03_CONFORMANCE_SET: tuple[str, ...] = (
+    "current_is_total_single_valued_and_chain_tail",
+    "chain_is_immutable",
+    "world_contract_raises",
+    "scope_at_equals_fold_for_every_cut",  # tests/test_scope_at.py (D-08)
+)
