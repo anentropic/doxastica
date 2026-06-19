@@ -487,6 +487,27 @@ class _ScopeAtMachine(RuleBasedStateMachine):
             close()
 
 
+# === FORMAL-03 named structural-invariant conformance set — `get_scope_at ≡ replay` (D-08) ======
+#
+# This is the `tests/test_scope_at.py` half of the FORMAL-03 conformance set (the sibling/canonical
+# half is registered in `tests/test_invariants.py::_FORMAL_03_CONFORMANCE_SET`). D-08 requires the
+# `get_scope_at ≡ replay` member to be NAMED into the conformance set — NOT re-implemented. The
+# Phase-6 operational-fold property `_ScopeAtMachine.scope_at_equals_fold_for_every_cut` (above) IS
+# that member: it asserts `get_scope_at(scope, cut) == fold(scope, cut)` at every cut, where `fold`
+# is the INDEPENDENT pure-Python replay oracle (its own `(source_event_id_str, append_seq)` winner
+# selection — it never calls `get_scope_at` / `_current_tail` / `_current` or any production
+# reconstruction helper, so the equivalence is a real cross-check, not a tautology; Pitfall 6).
+# It rides BOTH backends via the `MemoryScopeAtFoldMachine` / `LadybugScopeAtFoldMachine`
+# two-subclass `.TestCase` idiom below (BACK-05; ladybug SKIPS, not fails, when the driver is
+# absent). Registration only — the `fold`/cut/`_make_backend`/`teardown` logic is unchanged.
+#
+#   FORMAL-03 conformance member (this file):
+#     4. scope_at_equals_fold_for_every_cut  — get_scope_at ≡ replay over every cut (D-08); the
+#        lifted Phase-6 fold property, dual-backend via the two .TestCase subclasses below.
+#   (members 1–3 — CURRENT_STATE-uniqueness theorem, chain immutability, world-scope
+#    no-contraction — live in tests/test_invariants.py::_FORMAL_03_CONFORMANCE_SET.)
+_FORMAL_03_CONFORMANCE_MEMBER: str = "scope_at_equals_fold_for_every_cut"
+
 # Bounded settings so the sub-suite stays fast under shrinking/replay (the test_invariants budget).
 _SETTINGS = settings(max_examples=50, stateful_step_count=20, deadline=None)
 
