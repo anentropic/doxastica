@@ -135,6 +135,11 @@ class InMemoryBackend:
         ``start`` (predecessors, via :meth:`_in_edges`) — the cascade ``get_impact`` needs.
         The layer/frontier/seen BFS logic is otherwise direction-agnostic.
         """
+        # IN-02: make the port's MAY-raise validation surface real — an out-of-set direction
+        # (the Literal is only statically enforced) would otherwise silently fall through to the
+        # outgoing walk; a typo'd internal caller must get a signal, not a wrong-direction result.
+        if direction not in ("in", "out"):
+            raise ValueError(f"direction must be 'in' or 'out'; got {direction!r}")
         start_key = str(start)
         reached: dict[str, dict[str, Any]] = {}
         frontier: set[str] = set()

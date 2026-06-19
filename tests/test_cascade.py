@@ -231,6 +231,31 @@ def test_get_impact_dependents_only_parity() -> None:
     )
 
 
+def test_get_impact_reached_store_divergence_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    IN-01: a reached node that fails re-fetch is a store divergence — get_impact RAISES, not skips.
+
+    ``traverse`` only reaches REAL nodes via REAL edges, so an empty ``match_nodes`` re-fetch of a
+    reached ``state_id`` is an invariant breach (the very parity bug the hydration guard exists to
+    catch). Forcing the re-fetch to come back empty must surface loudly rather than silently
+    dropping the node. Backend-agnostic core logic, so the in-memory backend suffices.
+    """
+    from doxastica.backends.memory import InMemoryBackend
+
+    backend = InMemoryBackend()
+    core = MemoryCore(backend)
+    a = core.revise("s", "ba", 1, uuid.uuid7())
+    b = core.revise("s", "bb", 2, uuid.uuid7())
+    core.add_edge(b.state_id, a.state_id, EdgeType.DEPENDS_ON)  # B->A; A's dependent is B
+
+    def _empty(label: str, where: dict[str, Any]) -> list[dict[str, Any]]:
+        return []  # simulate a reached state_id with no stored node
+
+    monkeypatch.setattr(backend, "match_nodes", _empty)
+    with pytest.raises(RuntimeError, match="reached/store divergence"):
+        core.get_impact(a.state_id)
+
+
 def test_get_impact_derived_from_included_parity(backend: BackendPort) -> None:
     """A positive DERIVED_FROM case: get_impact crosses DERIVED_FROM edges too (D-03 REQUIRED)."""
     core = MemoryCore(backend)

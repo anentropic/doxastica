@@ -366,6 +366,11 @@ class LadybugBackend:
         ``bound`` stays the runtime-guarded interpolated int. The ``var_length_extend_max_depth``
         cap-raise/restore is direction-AGNOSTIC and wraps BOTH directions identically (Pitfall 4).
         """
+        # IN-02: make the port's MAY-raise validation surface real — an out-of-set direction (the
+        # Literal is only statically enforced) must not silently fall through to the outgoing walk
+        # below; it would also be an unvalidated value steering the arrow interpolation.
+        if direction not in ("in", "out"):
+            raise ValueError(f"direction must be 'in' or 'out'; got {direction!r}")
         # D-05: derive the reverse/forward arrow pair ONCE from the closed Literal. For "in" the
         # pattern becomes (a)<-[:rels]-(b); for "out" it stays (a)-[:rels]->(b). This is the ONLY
         # direction-dependent interpolation; everything else below is direction-agnostic.

@@ -288,6 +288,25 @@ def test_reverse_over_bound_chain_frontier_parity(backend: BackendPort) -> None:
     )
 
 
+def test_traverse_rejects_unknown_direction(backend: BackendPort) -> None:
+    """
+    IN-02: an out-of-set ``direction`` raises ``ValueError`` on BOTH backends.
+
+    The ``Literal["in","out"]`` is only statically enforced; a runtime caller that bypasses the
+    type (or a typo'd internal call) must get a signal, not a silent fall-through to the outgoing
+    walk. Pins the port's MAY-raise validation surface (ports.py / backend-contract.md) as real on
+    both reference backends.
+    """
+    _build_chain(backend)
+    with pytest.raises(ValueError, match="direction must be 'in' or 'out'"):
+        backend.traverse(
+            "D",
+            frozenset({_DEPENDS_ON}),
+            None,
+            direction="sideways",  # pyright: ignore[reportArgumentType]  # deliberately invalid
+        )
+
+
 def test_scope_upsert_parity(backend: BackendPort) -> None:
     """``Scope`` nodes upsert+match on their real PK ``scope_id`` on both backends (CR-01)."""
     _scope(backend, "world", is_world=True)

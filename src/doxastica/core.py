@@ -508,8 +508,15 @@ class MemoryCore:
                 fetched = self._backend.match_nodes(
                     "BeliefState", {"state_id": str(row["state_id"])}
                 )
-                if fetched:  # defensive: a reached node should always re-fetch; skip if it does not
-                    props.append(fetched[0])
+                # IN-01: traverse only reaches REAL nodes via REAL edges, so an empty re-fetch is
+                # a reached/store divergence (the parity invariant the hydration guard exists to
+                # protect) — fail loud rather than silently dropping it and hiding the breach.
+                if not fetched:
+                    raise RuntimeError(
+                        f"reached state_id {row['state_id']!r} has no stored BeliefState node "
+                        "(reached/store divergence)"
+                    )
+                props.append(fetched[0])
         props.sort(key=_order_key)  # deterministic order (reuse the ONE ordering contract)
         # the port frontier carries opaque state_id handles (str on both backends); coerce each to
         # UUID for the typed ImpactResult.frontier (frozenset[UUID]) — uuid.UUID(str(...)) is the
