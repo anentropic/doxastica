@@ -7,9 +7,24 @@ authors = [
     { name = "Anentropic", email = "ego@anentropic.com" }
 ]
 requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["belief-revision", "agm", "kumiho", "graph", "epistemic", "memory"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "pydantic>=2.11,<3",
 ]
+
+[project.urls]
+Homepage = "https://github.com/anentropic/doxastica"
+Documentation = "https://anentropic.github.io/doxastica/"
+Repository = "https://github.com/anentropic/doxastica"
 
 [project.optional-dependencies]
 # D-03 (Option B): pydantic is the sole REQUIRED runtime dep; ladybug is the
