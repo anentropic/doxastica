@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
+status: verifying
 stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-06-19T15:14:24.739Z"
+last_updated: "2026-06-19T15:31:50.384Z"
 last_activity: 2026-06-19 -- Phase 08 execution started
 progress:
   total_phases: 8
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 26
-  completed_plans: 25
-  percent: 88
+  completed_plans: 26
+  percent: 100
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 
 Phase: 08 (publishable-polish) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-19 -- Phase 08 execution started
 
 Progress: [██████████] 100% (4/4 plans)
@@ -83,6 +83,7 @@ Progress: [██████████] 100% (4/4 plans)
 | Phase 07 P04 | 5 | 1 tasks | 1 files |
 | Phase 08 P01 | 2min | 2 tasks | 3 files |
 | Phase 08 P02 | 3min | 2 tasks | 2 files |
+| Phase 08 P03 | 15m | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -137,6 +138,8 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase ?]: [Phase 08]: 08-01: PyPI metadata added additively to pyproject [project] (PEP 639 license = MIT -> License-Expression, classifiers, keywords, [project.urls]); dependencies/optional-dependencies/requires-python untouched (D-03 split + 3.14 floor LOCKED)
 - [Phase ?]: [Phase 08]: 08-01: REQUIREMENTS PKG-02 + ROADMAP Phase-8 SC1 prose reconciled to the decided bar (pydantic sole required, ladybug the [ladybug] extra, CI 3.14-only) with D-03 / CONTEXT #2 citations; stale exactly-ladybug+pydantic / 3.11-floor strings removed
 - [Phase 08]: 08-02: README leads with PKG-03 Kumiho framing (reference implementation of Kumiho, multi-scope extension, no recovery) + D-03 install split; docs/src/index.md Quick Start is a runnable zero-dep MemoryCore.in_memory->revise->query_scope example using uuid7 (verified by running it)
+- [Phase ?]: Used git mv (relocation, not duplication) to publish the backend contract inside docs_dir
+- [Phase ?]: Pinned CI git-cliff to .cliff.toml explicitly (default search path is cliff.toml, not the dot-file)
 
 ### Pending Todos
 
@@ -157,6 +160,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-19T15:14:24.734Z
+Last session: 2026-06-19T15:31:36.201Z
 Stopped at: Completed 08-02-PLAN.md
 Resume file: .planning/phases/07-agm-hansson-conformance-suite/07-04-PLAN.md
