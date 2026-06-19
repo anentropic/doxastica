@@ -252,4 +252,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Edge Model & Contraction Cascade | 3/3 | Complete    | 2026-06-18 |
 | 6. Structural Time-Travel | 2/2 | Complete    | 2026-06-19 |
 | 7. AGM/Hansson Backend Conformance Suite & Irony Join | 4/4 | Complete    | 2026-06-19 |
-| 8. Publishable Polish | 3/3 | Complete   | 2026-06-19 |
+| 8. Publishable Polish | 3/3 | Complete    | 2026-06-19 |
