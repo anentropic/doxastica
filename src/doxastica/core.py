@@ -112,6 +112,40 @@ def _is_active_tail(tail: dict[str, Any]) -> bool:
     return tail["status"] != Status.retracted.value
 
 
+def _current_tails(
+    rows: list[dict[str, Any]],
+    allowed: frozenset[Status],
+) -> dict[str, dict[str, Any]]:
+    """
+    Group already-scoped ``rows`` by ``belief_id`` → per-belief ordering-MAX → status filter.
+
+    The pure, driver-blind heart of the derived-current pipeline (D-01a): the ONE
+    group-by-``belief_id`` + per-group ``_order_key`` ordering-MAX (over ALL statuses) + status
+    filter, single-sourced so ``query_scope`` and the Wave-2 diverging-beliefs join cannot drift
+    on the ``_order_key`` contract. ``rows`` is the already scope-filtered ``match_nodes`` scan;
+    ``allowed`` is the resolved status set. Returns ``{belief_id: tail}`` — the per-belief current
+    tail surviving the status filter, keyed by ``belief_id``.
+
+    CRITICAL (Pitfall 2): the status filter runs AFTER the per-belief max, NEVER before —
+    pre-filtering to ``active`` would leak a stale active value below a retracted ordering-max tail.
+    The max is taken status-AGNOSTICALLY first; only the surviving winner is then status-filtered.
+
+    Driver-blind: composes ONLY stdlib + the module-level ``_order_key`` / ``Status`` (no
+    ``ladybug`` import, no Cypher), so ``tests/test_import_purity.py`` stays green (T-07-01).
+    """
+    by_belief: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        current = by_belief.get(row["belief_id"])
+        if current is None or _order_key(row) > _order_key(current):
+            by_belief[row["belief_id"]] = row  # the status-agnostic current tail
+    # status filter AFTER the max (Pitfall 2) — Status(...) rebuilds the enum (like hydrate)
+    return {
+        belief_id: tail
+        for belief_id, tail in by_belief.items()
+        if Status(tail["status"]) in allowed
+    }
+
+
 class MemoryCore:
     """
     Backend-agnostic AGM engine composing a :class:`doxastica.ports.BackendPort` (D-01).
@@ -599,15 +633,10 @@ class MemoryCore:
             )
         # 2. ONE scope-wide round-trip; absent scope → [] (D-08: pure read, no auto-create)
         rows = self._backend.match_nodes("BeliefState", {"scope_id": scope_id})
-        # 3. group by belief_id, keep the per-group ordering-MAX over ALL statuses (reuse the key)
-        by_belief: dict[str, dict[str, Any]] = {}
-        for row in rows:
-            current = by_belief.get(row["belief_id"])
-            if current is None or _order_key(row) > _order_key(current):
-                by_belief[row["belief_id"]] = row  # the status-agnostic current tail
-        tails = list(by_belief.values())
-        # 4. status filter AFTER the max (Pitfall 2) — Status(...) rebuilds the enum (like hydrate)
-        tails = [t for t in tails if Status(t["status"]) in allowed]
+        # 3+4. group by belief_id → per-belief ordering-MAX over ALL statuses → status filter AFTER
+        #      the max (Pitfall 2), single-sourced in the pure `_current_tails` helper (D-01a) so
+        #      this read surface and the Wave-2 diverging-beliefs join share the ONE `_order_key`.
+        tails = list(_current_tails(rows, allowed).values())
         # 5. belief_ids narrowing
         if belief_filter.belief_ids is not None:
             tails = [t for t in tails if t["belief_id"] in belief_filter.belief_ids]
