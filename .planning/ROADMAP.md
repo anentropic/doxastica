@@ -233,7 +233,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 1** *(all three parallel — disjoint file ownership; depends on Phase 7 complete)*
 
-- [ ] 08-01-PLAN.md — PyPI-ready pyproject metadata (license/classifiers/keywords/urls) + verify D-03 dep split & 3.14-only CI + correct stale PKG-02/SC1 prose (PKG-02, PKG-04)
+- [x] 08-01-PLAN.md — PyPI-ready pyproject metadata (license/classifiers/keywords/urls) + verify D-03 dep split & 3.14-only CI + correct stale PKG-02/SC1 prose (PKG-02, PKG-04)
 - [ ] 08-02-PLAN.md — README PKG-03 Kumiho framing (multi-scope extension, no recovery) + runnable docs/src/index.md Quick Start; verify MIT LICENSE (PKG-03)
 - [ ] 08-03-PLAN.md — Relocate backend contract into docs_dir + nav; git-cliff `--config .cliff.toml` in docs.yml & release.yml; fresh-wheel py.typed gate; delete orphan changelog stub (PKG-04)
 
@@ -252,4 +252,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Edge Model & Contraction Cascade | 3/3 | Complete    | 2026-06-18 |
 | 6. Structural Time-Travel | 2/2 | Complete    | 2026-06-19 |
 | 7. AGM/Hansson Backend Conformance Suite & Irony Join | 4/4 | Complete    | 2026-06-19 |
-| 8. Publishable Polish | 0/3 | Not started | - |
+| 8. Publishable Polish | 1/3 | In Progress|  |

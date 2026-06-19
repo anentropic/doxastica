@@ -143,7 +143,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [x] **PKG-01**: Scaffolded from `cookiecutter-python-uv-library` (uv, basedpyright strict,
       ruff, pytest + coverage, pre-commit, git-cliff); import name `doxastica`
 
-- [ ] **PKG-02**: `pydantic` v2 is the **sole required runtime dependency** and `ladybug`
+- [x] **PKG-02**: `pydantic` v2 is the **sole required runtime dependency** and `ladybug`
       is the optional `[ladybug]` reference-backend extra (per **Phase-2 D-03**, NOT "exactly
       ladybug + pydantic"); the in-memory backend adds no dependency; zero NVM imports;
       `hypothesis` added to the dev group; CI matrix is Python **3.14-only** (per **CONTEXT #2**
@@ -152,7 +152,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [ ] **PKG-03**: **MIT** license; README leads with "standalone reference implementation of
       Kumiho (arXiv 2603.17244), multi-scope extension, no recovery"
 
-- [ ] **PKG-04**: mkdocs-material docs site (including the published backend port "how to write
+- [x] **PKG-04**: mkdocs-material docs site (including the published backend port "how to write
       a backend" contract — the consumer-facing form of BACK-04), GitHub Actions CI + release
       pipeline, PyPI-ready packaging, CHANGELOG via git-cliff
 
@@ -220,9 +220,9 @@ Which phases cover which requirements. Populated during roadmap creation.
 | FORMAL-04 | Phase 7 | Complete |
 | FORMAL-05 | Phase 7 | Complete |
 | BACK-05 | Phase 7 | Complete |
-| PKG-02 | Phase 8 | Pending |
+| PKG-02 | Phase 8 | Complete |
 | PKG-03 | Phase 8 | Pending |
-| PKG-04 | Phase 8 | Pending |
+| PKG-04 | Phase 8 | Complete |
 
 **Coverage:**
 
