@@ -1,5 +1,5 @@
 """
-The Wave-0 example-test scaffold for HIST-03 — ``MemoryCore.get_scope_at`` (Phase 6).
+The conformance suite for HIST-03 — ``MemoryCore.get_scope_at`` (Phase 6).
 
 ``get_scope_at(scope, as_of_event_id)`` reconstructs the active belief base of a scope AS OF an
 event, purely structurally from the immutable ``source_event_id``-ordered ``BeliefState`` nodes.
@@ -17,9 +17,9 @@ Two load-bearing conventions, inherited verbatim from ``tests/test_query_scope.p
 2. **Construct ``MemoryCore(backend)`` from the INJECTED fixture port** — NOT the zero-dependency
    in-memory factory classmethod — so the ladybug backend is exercised at all.
 
-This is the example-test HALF (the cut-rewind regression guard for the central trap). The
-operational-fold ``RuleBasedStateMachine`` + the ``fold(ops, as_of)`` oracle (D-07) are added to
-THIS file by plan 06-02.
+This file holds two halves. The example-test half is the cut-rewind regression guard for the
+central trap. The operational-fold half — the ``RuleBasedStateMachine`` + the ``fold(ops, as_of)``
+oracle (D-07) — lives here too, below.
 
 The body has landed (``src/doxastica/core.py``) and every test in this file passes GREEN: this is
 now the held regression suite — the cut-rewind example guards plus the operational-fold conformance
@@ -244,7 +244,7 @@ def test_scope_at_deterministic_order(backend: BackendPort) -> None:
 
 
 # ============================================================================================
-# HALF B — the operational-fold property (D-07, the SPEC). The correctness deliverable.
+# The operational-fold property (D-07, the SPEC). The correctness deliverable.
 # ============================================================================================
 #
 # A pure-Python operational-fold oracle (`fold`) replays the recorded revise/expand/contract op
