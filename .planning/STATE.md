@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 07-03-PLAN.md
-last_updated: "2026-06-19T15:11:01.669Z"
+stopped_at: Completed 08-02-PLAN.md
+last_updated: "2026-06-19T15:14:24.739Z"
 last_activity: 2026-06-19 -- Phase 08 execution started
 progress:
   total_phases: 8
   completed_phases: 7
   total_plans: 26
-  completed_plans: 24
+  completed_plans: 25
   percent: 88
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 ## Current Position
 
 Phase: 08 (publishable-polish) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-06-19 -- Phase 08 execution started
 
@@ -82,6 +82,7 @@ Progress: [██████████] 100% (4/4 plans)
 | Phase 07 P03 | 9min | 2 tasks | 1 files |
 | Phase 07 P04 | 5 | 1 tasks | 1 files |
 | Phase 08 P01 | 2min | 2 tasks | 3 files |
+| Phase 08 P02 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -135,6 +136,7 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase 07]: 07-03: superseded-chain positives (D-05) assert active->retracted->active + current==v' + retained-retracted + base-not-restored on both backends; kept distinct from temporal recoverability (no get_scope_at)
 - [Phase ?]: [Phase 08]: 08-01: PyPI metadata added additively to pyproject [project] (PEP 639 license = MIT -> License-Expression, classifiers, keywords, [project.urls]); dependencies/optional-dependencies/requires-python untouched (D-03 split + 3.14 floor LOCKED)
 - [Phase ?]: [Phase 08]: 08-01: REQUIREMENTS PKG-02 + ROADMAP Phase-8 SC1 prose reconciled to the decided bar (pydantic sole required, ladybug the [ladybug] extra, CI 3.14-only) with D-03 / CONTEXT #2 citations; stale exactly-ladybug+pydantic / 3.11-floor strings removed
+- [Phase 08]: 08-02: README leads with PKG-03 Kumiho framing (reference implementation of Kumiho, multi-scope extension, no recovery) + D-03 install split; docs/src/index.md Quick Start is a runnable zero-dep MemoryCore.in_memory->revise->query_scope example using uuid7 (verified by running it)
 
 ### Pending Todos
 
@@ -155,6 +157,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-19T15:10:42.443Z
-Stopped at: Completed 07-03-PLAN.md
+Last session: 2026-06-19T15:14:24.734Z
+Stopped at: Completed 08-02-PLAN.md
 Resume file: .planning/phases/07-agm-hansson-conformance-suite/07-04-PLAN.md

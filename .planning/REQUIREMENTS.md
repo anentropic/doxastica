@@ -149,7 +149,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
       `hypothesis` added to the dev group; CI matrix is Python **3.14-only** (per **CONTEXT #2**
       3.14-floor lock, NOT a 3.11 floor + 3.14)
 
-- [ ] **PKG-03**: **MIT** license; README leads with "standalone reference implementation of
+- [x] **PKG-03**: **MIT** license; README leads with "standalone reference implementation of
       Kumiho (arXiv 2603.17244), multi-scope extension, no recovery"
 
 - [x] **PKG-04**: mkdocs-material docs site (including the published backend port "how to write
@@ -221,7 +221,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | FORMAL-05 | Phase 7 | Complete |
 | BACK-05 | Phase 7 | Complete |
 | PKG-02 | Phase 8 | Complete |
-| PKG-03 | Phase 8 | Pending |
+| PKG-03 | Phase 8 | Complete |
 | PKG-04 | Phase 8 | Complete |
 
 **Coverage:**
