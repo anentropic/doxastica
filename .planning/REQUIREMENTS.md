@@ -129,7 +129,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [x] **FORMAL-03**: Structural-invariant suite green: `CURRENT_STATE` uniqueness, chain
       immutability, `get_scope_at ≡ replay`, world-scope no-contraction
 
-- [ ] **FORMAL-04**: AGM **Recovery deliberately excluded** — a loud, named `xfail` with
+- [x] **FORMAL-04**: AGM **Recovery deliberately excluded** — a loud, named `xfail` with
       rationale, plus positive superseded-chain replacement tests (no Recovery assertion)
 
 - [ ] **FORMAL-05**: The **irony join** demonstrated on synthetic data — actor-scope vs.
@@ -214,7 +214,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | FORMAL-01 | Phase 7 | Complete |
 | FORMAL-02 | Phase 7 | Complete |
 | FORMAL-03 | Phase 7 | Complete |
-| FORMAL-04 | Phase 7 | Pending |
+| FORMAL-04 | Phase 7 | Complete |
 | FORMAL-05 | Phase 7 | Pending |
 | BACK-05 | Phase 7 | Complete |
 | PKG-02 | Phase 8 | Pending |

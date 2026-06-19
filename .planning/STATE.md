@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-06-19T13:39:32.120Z"
-last_activity: 2026-06-19 -- Phase 07 execution started
+stopped_at: Completed 07-03-PLAN.md
+last_updated: "2026-06-19T00:00:00.000Z"
+last_activity: 2026-06-19 -- Completed 07-03 (Recovery strict-xfail + superseded-chain positives)
 progress:
   total_phases: 8
   completed_phases: 6
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 ## Current Position
 
 Phase: 07 (agm-hansson-conformance-suite) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
-Last activity: 2026-06-19 -- Phase 07 execution started
+Last activity: 2026-06-19 -- Completed 07-03 (Recovery strict-xfail + superseded-chain positives)
 
 Progress: [██████████] 100% (4/4 plans)
 
@@ -78,6 +78,7 @@ Progress: [██████████] 100% (4/4 plans)
 | Phase 06 P02 | 4min | 1 tasks | 1 files |
 | Phase 07 P01 | 6m | 3 tasks | 2 files |
 | Phase 07 P02 | 4 | 1 tasks | 1 files |
+| Phase 07 P03 | 9min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -126,6 +127,9 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase ?]: 06-01: get_scope_at uses cut-then-max (inclusive <= as_of PRE-filter BEFORE the per-belief ordering-max) so the cut REWINDS rather than drops
 - [Phase ?]: 06-01: inline cut in get_scope_at's group-by loop (not an as_of param on _current_tail) — keeps the Phase-3/4 keystone behaviour-preserving
 - [Phase ?]: [Phase 07]: 07-02: get_scope_at ≡ replay registered into FORMAL-03 via reciprocal registry marker in test_scope_at.py (D-08) — registration not re-implementation; fold oracle left SUT-independent (Pitfall 6 anti-tautology)
+- [Phase 07]: 07-03: AGM Recovery encoded as @pytest.mark.xfail(strict=True) on the mark itself (no global xfail_strict) — reports xfailed against correct code; drift toward closed belief sets XPASSes -> suite red (FORMAL-04, D-04)
+- [Phase 07]: 07-03: ratified Recovery counterexample base = single belief p re-asserted at a NEW value (revise->contract->revise); the naive {p,q} base XPASSes erroneously (independent q survives) — Open Q1 resolved
+- [Phase 07]: 07-03: superseded-chain positives (D-05) assert active->retracted->active + current==v' + retained-retracted + base-not-restored on both backends; kept distinct from temporal recoverability (no get_scope_at)
 
 ### Pending Todos
 
@@ -134,7 +138,7 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 2]: Biggest project risk is the LadybugDB de-risking spike — verify `IF NOT EXISTS` DDL, multi-statement transactions, `$param` binds, and `$depth` patterns against the actually-installed `ladybug` (PyPI, NOT `ladybugdb`) before any belief logic stands on them. Phase 2 now also ships BOTH backends (ladybug reference + in-memory) behind the port; the in-memory backend doubles as the Phase 7 conformance-suite oracle.
-- [Phase 7]: AGM Recovery must remain a named `xfail` (false for belief bases); never assert it against correct code. The property suite is now a backend conformance suite — in-memory oracle and ladybug must pass the identical parameterised tests.
+- [Phase 7]: AGM Recovery must remain a named `xfail` (false for belief bases); never assert it against correct code. The property suite is now a backend conformance suite — in-memory oracle and ladybug must pass the identical parameterised tests. **(07-03: RESOLVED — Recovery is now a strict xfail in tests/test_recovery_xfail.py reporting xfailed against correct code with a drift guard; superseded-chain positives pass on both backends.)**
 
 ## Deferred Items
 
@@ -146,6 +150,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-19T13:39:27.255Z
-Stopped at: Completed 05-01-PLAN.md
-Resume file: .planning/phases/05-edge-model-contraction-cascade/05-02-PLAN.md
+Last session: 2026-06-19T00:00:00.000Z
+Stopped at: Completed 07-03-PLAN.md
+Resume file: .planning/phases/07-agm-hansson-conformance-suite/07-04-PLAN.md
