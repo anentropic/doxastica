@@ -143,8 +143,11 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [x] **PKG-01**: Scaffolded from `cookiecutter-python-uv-library` (uv, basedpyright strict,
       ruff, pytest + coverage, pre-commit, git-cliff); import name `doxastica`
 
-- [ ] **PKG-02**: Runtime deps **`ladybug` + `pydantic` v2 only**, zero NVM imports;
-      `hypothesis` added to the dev group; CI matrix Python 3.11 (floor) and 3.14
+- [ ] **PKG-02**: `pydantic` v2 is the **sole required runtime dependency** and `ladybug`
+      is the optional `[ladybug]` reference-backend extra (per **Phase-2 D-03**, NOT "exactly
+      ladybug + pydantic"); the in-memory backend adds no dependency; zero NVM imports;
+      `hypothesis` added to the dev group; CI matrix is Python **3.14-only** (per **CONTEXT #2**
+      3.14-floor lock, NOT a 3.11 floor + 3.14)
 
 - [ ] **PKG-03**: **MIT** license; README leads with "standalone reference implementation of
       Kumiho (arXiv 2603.17244), multi-scope extension, no recovery"

@@ -225,7 +225,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Requirements**: PKG-02, PKG-03, PKG-04
 **Success Criteria** (what must be TRUE):
 
-  1. Runtime dependencies are exactly `ladybug` + `pydantic` v2 with zero NVM imports (the in-memory backend adds no dependency), `hypothesis` is in the dev group, and CI runs the green conformance suite on a Python 3.11 (floor) and 3.14 matrix
+  1. `pydantic` v2 is the sole required runtime dependency and `ladybug` is the optional `[ladybug]` reference-backend extra (per Phase-2 D-03), the in-memory backend adds no dependency, zero NVM imports, `hypothesis` is in the dev group, and CI runs the green conformance suite on a Python 3.14-only matrix (per CONTEXT #2 3.14-floor lock)
   2. An MIT license file exists and the README leads with "standalone reference implementation of Kumiho (arXiv 2603.17244), multi-scope extension, no recovery"
   3. A mkdocs-material docs site builds and **publishes the "how to write a backend" port contract** (the consumer-facing form of the BACK-04 spec drafted in Phase 1, via PKG-04 docs), a GitHub Actions CI + release pipeline is configured, packaging is PyPI-ready, and a CHANGELOG is generated via git-cliff
 
