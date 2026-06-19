@@ -85,7 +85,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
       with the flag, retracted) belief states — the observation surface
 
 - [x] **HIST-02**: `get_revision_chain(belief_id)` returns the full immutable version chain
-- [ ] **HIST-03**: `get_scope_at(scope, as_of_event_id)` reconstructs the active base as of an
+- [x] **HIST-03**: `get_scope_at(scope, as_of_event_id)` reconstructs the active base as of an
       event, purely structurally from immutable event-id-ordered states (time-travel)
 
 ### Backends & Ports (Ports & Adapters)
@@ -210,7 +210,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | HIST-01 | Phase 4 | Complete |
 | EDGE-01 | Phase 5 | Complete |
 | EDGE-02 | Phase 5 | Complete |
-| HIST-03 | Phase 6 | Pending |
+| HIST-03 | Phase 6 | Complete |
 | FORMAL-01 | Phase 7 | Pending |
 | FORMAL-02 | Phase 7 | Pending |
 | FORMAL-03 | Phase 7 | Pending |

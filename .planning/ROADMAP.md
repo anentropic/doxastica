@@ -187,7 +187,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 1**
 
-- [ ] 06-01-PLAN.md — Wave-0 failing example tests (cut-rewind / inclusive / SC1 / retracted-as-of / multi-belief / empty-world / order) + `MemoryCore.get_scope_at` body: temporal cut-then-max reconstruction over `match_nodes` (HIST-03, D-02..D-06)
+- [x] 06-01-PLAN.md — Wave-0 failing example tests (cut-rewind / inclusive / SC1 / retracted-as-of / multi-belief / empty-world / order) + `MemoryCore.get_scope_at` body: temporal cut-then-max reconstruction over `match_nodes` (HIST-03, D-02..D-06)
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -234,6 +234,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 3. Append-Only Revision Spine | 4/4 | Complete    | 2026-06-16 |
 | 4. Retrieval & Observation Surface | 2/2 | Complete    | 2026-06-18 |
 | 5. Edge Model & Contraction Cascade | 3/3 | Complete    | 2026-06-18 |
-| 6. Structural Time-Travel | 0/TBD | Not started | - |
+| 6. Structural Time-Travel | 1/2 | In Progress|  |
 | 7. AGM/Hansson Backend Conformance Suite & Irony Join | 0/TBD | Not started | - |
 | 8. Publishable Polish | 0/TBD | Not started | - |

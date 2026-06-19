@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-06-19T07:12:56.990Z"
-last_activity: 2026-06-19 -- Phase 06 planning complete
+last_updated: "2026-06-19T07:22:00.491Z"
+last_activity: 2026-06-19 -- Phase 06 execution started
 progress:
   total_phases: 8
   completed_phases: 5
-  total_plans: 17
-  completed_plans: 17
+  total_plans: 19
+  completed_plans: 18
   percent: 63
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-13)
 
 **Core value:** A correct, append-only belief-revision core behind a clean `BeliefStore` Protocol whose correctness is *provable* — AGM/Hansson postulate compliance and structural invariants verified mechanically, zero narrative semantics leaking in.
-**Current focus:** Phase 05 — edge-model-contraction-cascade
+**Current focus:** Phase 06 — structural-time-travel
 
 ## Current Position
 
-Phase: 6
-Plan: Not started
+Phase: 06 (structural-time-travel) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-06-19 -- Phase 06 planning complete
+Last activity: 2026-06-19 -- Phase 06 execution started
 
 Progress: [██████████] 100% (4/4 plans)
 
@@ -73,6 +73,7 @@ Progress: [██████████] 100% (4/4 plans)
 | Phase 05 P01 | 4min | 4 tasks | 5 files |
 | Phase 05 P02 | 5 | 2 tasks | 3 files |
 | Phase 05 P03 | 9 | 2 tasks | 2 files |
+| Phase 06 P01 | 5min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -118,6 +119,8 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase 05]: 05-01: hydration gap persists for Plan 05-03 — ladybug traverse still returns state_id-only rows, so get_impact must re-fetch props via match_nodes (Option A)
 - [Phase ?]: 05-02: MemoryCore.add_edge is a one-call passthrough to backend.add_edge inside exactly one unit_of_work (D-06); idempotency left to the backend, no endpoint-existence raise (D-07)
 - [Phase ?]: 05-02: [Rule 1] InMemoryBackend.add_edge now silently no-ops on a missing endpoint (MATCH-MERGE parity with ladybug) so the oracle honors the documented D-07 behavior
+- [Phase ?]: 06-01: get_scope_at uses cut-then-max (inclusive <= as_of PRE-filter BEFORE the per-belief ordering-max) so the cut REWINDS rather than drops
+- [Phase ?]: 06-01: inline cut in get_scope_at's group-by loop (not an as_of param on _current_tail) — keeps the Phase-3/4 keystone behaviour-preserving
 
 ### Pending Todos
 
@@ -138,6 +141,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-18T22:31:18.901Z
+Last session: 2026-06-19T07:21:35.761Z
 Stopped at: Completed 05-01-PLAN.md
 Resume file: .planning/phases/05-edge-model-contraction-cascade/05-02-PLAN.md
