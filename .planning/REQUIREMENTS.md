@@ -132,7 +132,7 @@ Foundational, decision-grade choices that must be settled before storage code ex
 - [x] **FORMAL-04**: AGM **Recovery deliberately excluded** — a loud, named `xfail` with
       rationale, plus positive superseded-chain replacement tests (no Recovery assertion)
 
-- [ ] **FORMAL-05**: The **irony join** demonstrated on synthetic data — actor-scope vs.
+- [x] **FORMAL-05**: The **irony join** demonstrated on synthetic data — actor-scope vs.
       world-scope divergence on `belief_id` computed as one query
 
 - [x] **FORMAL-06**: Test harness uses throwaway `:memory:` LadybugDB per example,
@@ -215,7 +215,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | FORMAL-02 | Phase 7 | Complete |
 | FORMAL-03 | Phase 7 | Complete |
 | FORMAL-04 | Phase 7 | Complete |
-| FORMAL-05 | Phase 7 | Pending |
+| FORMAL-05 | Phase 7 | Complete |
 | BACK-05 | Phase 7 | Complete |
 | PKG-02 | Phase 8 | Pending |
 | PKG-03 | Phase 8 | Pending |

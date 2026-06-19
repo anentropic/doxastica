@@ -38,7 +38,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Retrieval & Observation Surface** - `query_scope` with closed typed filter + retracted/superseded matrix; full `get_revision_chain` (completed 2026-06-18)
 - [x] **Phase 5: Edge Model & Contraction Cascade** - `add_edge` and bounded, cycle-safe `get_impact` with a truncation signal (completed 2026-06-18)
 - [x] **Phase 6: Structural Time-Travel** - `get_scope_at` reconstruction under an explicit UUID7 ordering contract (completed 2026-06-19)
-- [ ] **Phase 7: AGM/Hansson Backend Conformance Suite & Irony Join (M0 Exit Gate)** - Assembled, green property suite + structural invariants + recovery xfail + irony join, parameterised over every registered backend (in-memory oracle vs. ladybug)
+- [x] **Phase 7: AGM/Hansson Backend Conformance Suite & Irony Join (M0 Exit Gate)** - Assembled, green property suite + structural invariants + recovery xfail + irony join, parameterised over every registered backend (in-memory oracle vs. ladybug) (completed 2026-06-19)
 - [ ] **Phase 8: Publishable Polish** - Docs site (incl. published backend port contract), CI/release pipeline, PyPI-ready packaging, MIT license, README
 
 ## Phase Details
@@ -216,7 +216,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 2** *(blocked on 07-01)*
 
-- [ ] 07-04-PLAN.md — Irony join: two scopes diverging on belief_id in one round-trip vs. a plain-Python oracle (FORMAL-05, BACK-05)
+- [x] 07-04-PLAN.md — Irony join: two scopes diverging on belief_id in one round-trip vs. a plain-Python oracle (FORMAL-05, BACK-05)
 
 ### Phase 8: Publishable Polish
 
@@ -245,5 +245,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 4. Retrieval & Observation Surface | 2/2 | Complete    | 2026-06-18 |
 | 5. Edge Model & Contraction Cascade | 3/3 | Complete    | 2026-06-18 |
 | 6. Structural Time-Travel | 2/2 | Complete    | 2026-06-19 |
-| 7. AGM/Hansson Backend Conformance Suite & Irony Join | 2/4 | In Progress|  |
+| 7. AGM/Hansson Backend Conformance Suite & Irony Join | 4/4 | Complete   | 2026-06-19 |
 | 8. Publishable Polish | 0/TBD | Not started | - |
