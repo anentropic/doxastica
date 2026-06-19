@@ -37,7 +37,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Append-Only Revision Spine (Keystone)** - Scopes, `Belief`/`BeliefState` split, immutable chains, derived current (D-01: no stored `CURRENT_STATE` pointer), and `revise`/`expand`/`contract` — written against the port, running on both backends; SC3 verified as a Hypothesis consistency check
 - [x] **Phase 4: Retrieval & Observation Surface** - `query_scope` with closed typed filter + retracted/superseded matrix; full `get_revision_chain` (completed 2026-06-18)
 - [x] **Phase 5: Edge Model & Contraction Cascade** - `add_edge` and bounded, cycle-safe `get_impact` with a truncation signal (completed 2026-06-18)
-- [ ] **Phase 6: Structural Time-Travel** - `get_scope_at` reconstruction under an explicit UUID7 ordering contract
+- [x] **Phase 6: Structural Time-Travel** - `get_scope_at` reconstruction under an explicit UUID7 ordering contract (completed 2026-06-19)
 - [ ] **Phase 7: AGM/Hansson Backend Conformance Suite & Irony Join (M0 Exit Gate)** - Assembled, green property suite + structural invariants + recovery xfail + irony join, parameterised over every registered backend (in-memory oracle vs. ladybug)
 - [ ] **Phase 8: Publishable Polish** - Docs site (incl. published backend port contract), CI/release pipeline, PyPI-ready packaging, MIT license, README
 
@@ -191,7 +191,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 06-02-PLAN.md — Operational-fold oracle + Hypothesis `RuleBasedStateMachine` (two `.TestCase` subclasses): `get_scope_at(scope, cut) == fold(ops, cut)` on both backends, colliding/out-of-order ids (SC3), cut stepped across the pool (SC2/SC1) — the D-07 SPEC
+- [x] 06-02-PLAN.md — Operational-fold oracle + Hypothesis `RuleBasedStateMachine` (two `.TestCase` subclasses): `get_scope_at(scope, cut) == fold(ops, cut)` on both backends, colliding/out-of-order ids (SC3), cut stepped across the pool (SC2/SC1) — the D-07 SPEC
 
 ### Phase 7: AGM/Hansson Backend Conformance Suite & Irony Join (M0 Exit Gate)
 
@@ -234,6 +234,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 3. Append-Only Revision Spine | 4/4 | Complete    | 2026-06-16 |
 | 4. Retrieval & Observation Surface | 2/2 | Complete    | 2026-06-18 |
 | 5. Edge Model & Contraction Cascade | 3/3 | Complete    | 2026-06-18 |
-| 6. Structural Time-Travel | 1/2 | In Progress|  |
+| 6. Structural Time-Travel | 2/2 | Complete   | 2026-06-19 |
 | 7. AGM/Hansson Backend Conformance Suite & Irony Join | 0/TBD | Not started | - |
 | 8. Publishable Polish | 0/TBD | Not started | - |
