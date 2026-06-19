@@ -96,6 +96,22 @@ def _order_key(state: dict[str, Any]) -> tuple[str, str]:
     return (str(state["source_event_id"]), str(state["state_id"]))
 
 
+def _is_active_tail(tail: dict[str, Any]) -> bool:
+    """
+    The ONE "retracted tail ⇒ absent" rule — ``True`` iff ``tail`` is not a retracted winner.
+
+    Sibling to ``_order_key``: the ordering contract picks the winner, this predicate decides
+    whether that winner clears the belief. Centralized here so ``_current`` (the "now" collapse)
+    and ``get_scope_at`` (the same collapse over the as-of cut window) cannot drift apart — both
+    implement the identical D-05/D-06 rule that an ordering-max tail with ``status == retracted``
+    means the belief has NO active state and is absent. Comparison form is byte-identical to the
+    prior inline sites (raw ``!= Status.retracted.value`` on the stored token); under the closed
+    ``{active, retracted}`` taxonomy (DATA-06) this is exactly equivalent to ``Status(...) in
+    {active}``.
+    """
+    return tail["status"] != Status.retracted.value
+
+
 class MemoryCore:
     """
     Backend-agnostic AGM engine composing a :class:`doxastica.ports.BackendPort` (D-01).
@@ -227,8 +243,8 @@ class MemoryCore:
         ``contract`` ``prior`` computation depends on.
         """
         tail = self._current_tail(scope_id, belief_id)
-        if tail is None or tail["status"] == Status.retracted.value:
-            return None  # D-05: retracted tail ⇒ no active current
+        if tail is None or not _is_active_tail(tail):
+            return None  # D-05: retracted tail ⇒ no active current (the ONE active-tail predicate)
         return tail
 
     # --- Value encode/decode boundary (DEF-02-01, identical on both backends) -
@@ -668,7 +684,7 @@ class MemoryCore:
             if current is None or _order_key(row) > _order_key(current):
                 by_belief[row["belief_id"]] = row  # cut-window status-agnostic tail (D-05 tiebreak)
         # 3. retracted-as-of collapse (D-06: the _current rule over the cut window, not "now")
-        tails = [t for t in by_belief.values() if t["status"] != Status.retracted.value]
+        tails = [t for t in by_belief.values() if _is_active_tail(t)]
         # 4. deterministic order (D-05: reuse the ONE _order_key) then 5. hydrate
         tails.sort(key=_order_key)
         return [self._hydrate(t) for t in tails]
