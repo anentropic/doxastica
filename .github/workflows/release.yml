@@ -93,6 +93,7 @@ jobs:
       - name: Generate changelog
         uses: orhun/git-cliff-action@v4
         with:
+          config: .cliff.toml
           args: --latest
         env:
           OUTPUT: CHANGELOG.md
