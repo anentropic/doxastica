@@ -8,116 +8,83 @@ files_reviewed_list:
   - tests/test_scope_at.py
 findings:
   critical: 0
-  warning: 1
-  info: 3
-  total: 4
+  warning: 0
+  info: 1
+  total: 1
 status: issues_found
 ---
 
-# Phase 6: Code Review Report
+# Phase 6: Code Review Report (Re-review / Pass 2)
 
 **Reviewed:** 2026-06-19T00:00:00Z
 **Depth:** standard
 **Files Reviewed:** 2
-**Status:** issues_found
+**Status:** issues_found (Info-only)
 
 ## Summary
 
-Phase 06 (HIST-03) adds one production method — `MemoryCore.get_scope_at` in
-`src/doxastica/core.py` — plus an example-test suite and a Hypothesis operational-fold
-property machine in `tests/test_scope_at.py`. I reviewed the new method body and the test
-file adversarially, traced the ordering/cut/retracted-collapse logic, verified the UUID7
-tiebreak assumption empirically, and ran the full sub-suite on BOTH backends.
+Second adversarial pass over Phase 6 (HIST-03), re-assessing the CURRENT state of
+`src/doxastica/core.py` (`MemoryCore.get_scope_at`) and `tests/test_scope_at.py` after the prior
+pass's fixes. The production surface is the temporal sibling of `query_scope`: an inclusive
+`source_event_id <= as_of` cut applied as a PRE-filter inside the group-by loop, then a per-belief
+`_order_key` ordering-max (cut-then-max = rewind), a retracted-as-of collapse, sort, and hydrate.
 
-**Assessment: the implementation is correct.** The central trap of the phase — placing the
-inclusive `<= as_of` cut BEFORE the per-belief ordering-max (cut-then-max = REWIND) rather
-than after it (`query_scope`'s max-then-filter = DROP) — is implemented correctly (lines
-657-662). I specifically verified the load-bearing assumptions that could have hidden a bug:
+**Correctness verdict on the central trap: correct.** The `<= as_of` test runs BEFORE the
+per-belief max (line 665, inside the `for row in rows` loop), so a since-revised belief REWINDS to
+its older as-of value rather than dropping — distinct from `query_scope`'s `event_id_max`
+POST-filter on already-derived tails (max-then-filter = DROP). Confirmed against
+`test_cut_rewinds_to_older_value` and `test_cut_is_inclusive_at_boundary`.
 
-- **UUID7 string-monotonicity (the oracle's `append_seq` ↔ `state_id` tiebreak):** empirically
-  confirmed `str(uuid.uuid7())` is strictly increasing in mint order, so the oracle's monotonic
-  `append_seq` faithfully mirrors the production `state_id` tiebreak. The anti-tautology design
-  (the `fold` oracle never calls `get_scope_at`/`_current`) is intact (lines 367-390).
-- **Inclusive cut + retracted-as-of collapse computed over the cut window** (lines 658, 664):
-  correct — a `contract` op drawn from `_EVENT_POOL` is recorded with the same `(source_event_id,
-  tiebreak)` key the core uses, so whether it wins at a given cut is decided, not assumed (SC3).
-- **`_MAX_CUT` sentinel** (`ffffffff-…`): a real UUID7 (version nibble `7`, variant bits) can
-  never reach all-`f`, so the sentinel is a valid `>=`-everything cut for the SC1 case.
-- **Driver-blindness / append-only / parameterized-Cypher:** no `ladybug` import, no Cypher,
-  no mutation — `get_scope_at` composes only `match_nodes` (pure read, no `_ensure_scope`, no
-  `unit_of_work`, no world-scope guard), exactly as a pure-read temporal query should.
+**Retracted-as-of collapse (line 671)** is equivalent to `_current`'s collapse: both take the
+status-agnostic ordering-max and treat a `retracted` winner as absent, so SC1
+(`get_scope_at(latest) == query_scope(current)`) holds for the retracted case too.
 
-Both backends (`memory` + `ladybug`) genuinely ran (ladybug installed locally) — all 16 cases
-pass. Findings below are quality/robustness only; none block.
+**CLAUDE.md guideline compliance: confirmed.** No `ladybug` import (module-top imports are
+`base64`/`json`/`uuid`/stdlib + first-party only); no Cypher and no `traverse` in `get_scope_at`
+(composes only the `match_nodes` port primitive); append-only / pure read (no `_ensure_scope`, no
+`unit_of_work`, no world-scope guard — pinned by `test_empty_scope_and_world_read`); no
+narrative/LLM concepts; pydantic-only required dep untouched.
 
-## Warnings
+### Prior-pass disposition
 
-### WR-01: `get_scope_at` reads outside a `unit_of_work` while `query_scope`'s sibling `get_impact` wraps its multi-call read in one
+- **WR-01 — RESOLVED.** The single-call snapshot invariant is now documented at core.py:652-658,
+  immediately above the single `match_nodes` call (line 659). It explains why no `unit_of_work`
+  wrap is needed (one auto-committed snapshot) and instructs a future maintainer to wrap BOTH
+  calls per WR-02 if a second backend call is ever added here. Correct and defensible.
+- **IN-01 (prior: raw-string vs enum retracted check) — re-carried below as IN-01**, downgraded in
+  emphasis: the current `t["status"] != Status.retracted.value` (line 671) is correct and matches
+  `_current`'s own idiom (line 230). Still a maintenance-symmetry note, not a defect.
+- **IN-02 (prior: `_active_keys` recomputes `fold` per entry) — NOT re-raised.** It is a
+  test-helper micro-inefficiency (performance is out of v1 scope) and the bounded op sequence keeps
+  it cheap; the helper is correct. Churning it adds risk without correctness value.
+- **IN-03 (prior: redundant expand-via-`get_scope_at` example) — NOT re-raised / resolved.** No
+  such redundant example is present in the current test file; `expand` coverage is supplied by the
+  fold machine (lines 422-425), which is sufficient for correctness.
 
-**File:** `src/doxastica/core.py:651-667`
-**Issue:** `get_scope_at` issues a single `match_nodes` scan with no enclosing `unit_of_work()`.
-For a single round-trip this is harmless — there is no second call to interleave. However, the
-docstring (line 643-647) justifies the bare read as "Composes ONLY `match_nodes` — no
-`traverse`, no edge walk," which is true *today*. The adjacent `get_impact` (line 480-497)
-explicitly documents (WR-02) that wrapping even a pure read in `unit_of_work` is required on the
-ladybug single-writer model whenever MORE THAN ONE backend call must share a snapshot, because a
-concurrent append can land between two auto-committed reads. `get_scope_at` is one call so it is
-correct now, but the asymmetry is a latent trap: if a future change adds a second backend call
-(e.g. a scope-existence probe, or splitting the scan), the single-snapshot guarantee silently
-disappears with no compile-time signal. `query_scope` shares this same single-call exemption, so
-this is a pre-existing pattern — but the new method inherits the risk without the WR-02-style
-note that flags it.
-**Fix:** Either (a) add a one-line comment mirroring `get_impact`'s WR-02 note making the
-single-call snapshot assumption explicit ("one `match_nodes` ⇒ one auto-committed snapshot; if a
-second backend call is ever added here, wrap both in `unit_of_work` per WR-02"), or (b) if a
-phase budget allows, wrap the scan in `self._backend.unit_of_work()` for symmetry with
-`get_impact`. Option (a) is sufficient; the goal is to make the snapshot assumption a documented
-invariant rather than an accident of the current single-call shape.
+No Critical or Warning findings remain. One Info item below.
 
 ## Info
 
-### IN-01: Retracted-status check uses raw string compare while `query_scope` uses enum-membership — divergent if the closed taxonomy ever grows
+### IN-01: Retracted-as-of collapse restates the `_current` rule inline rather than through a shared predicate
 
-**File:** `src/doxastica/core.py:664`
-**Issue:** `get_scope_at` collapses retracted tails with a raw value compare:
-`t["status"] != Status.retracted.value`. The sibling `query_scope` instead rebuilds the enum and
-tests set membership: `Status(t["status"]) in allowed` (line 594). Both are correct under the
-closed `{active, retracted}` taxonomy (DATA-06, confirmed in `models.py:45-46`). But the two
-methods would diverge if a third `Status` member were ever added: `get_scope_at` would silently
-INCLUDE the new status (anything not-retracted passes), whereas `query_scope`'s explicit
-allow-set would EXCLUDE it. The taxonomy is documented closed, so this is not a live bug — only a
-maintenance asymmetry that hides which method to update if DATA-06 is ever revisited.
-**Fix:** For symmetry and future-proofing, express the keep-rule positively against the active
-status — `t["status"] == Status.active.value` — which fails-closed (a hypothetical new status is
-excluded, matching `query_scope`). Alternatively add a comment pinning the raw compare to the
-closed-taxonomy assumption (`# DATA-06: closed {active, retracted}, so != retracted ≡ == active`).
-
-### IN-02: `_active_keys` recomputes the full `fold` once per op-log entry (test helper)
-
-**File:** `tests/test_scope_at.py:427-434`
-**Issue:** `_active_keys` loops over every `(scope, belief)` in `self.entries` and calls
-`self.fold(scope_id, max_cut)` inside the loop, so `fold` is re-run once per entry even though
-its result for a given `scope_id` is identical across that scope's beliefs. This is a test-helper
-inefficiency, not a correctness defect (performance is out of v1 scope, and the bounded op
-sequence keeps it cheap). Noted only because it slightly obscures the intent — the helper reads
-as if `fold` were per-belief when it is per-scope.
-**Fix:** Memoize `fold` per `scope_id` within the call, e.g. compute
-`folded = {sc: self.fold(sc, max_cut) for sc in {s for s, _ in self.entries}}` once, then test
-`belief_id in folded[scope_id]`. Cosmetic; skip if not touching this helper.
-
-### IN-03: Example suite never exercises `expand` through `get_scope_at`
-
-**File:** `tests/test_scope_at.py:87-243`
-**Issue:** The seven example tests drive only `revise` (and `contract`); none call `expand`. The
-operational-fold machine does drive `expand` (line 422-425) and records it as op_kind `"revise"`,
-mirroring the production `expand` ≡ `revise` equivalence (core.py:350-364), so the path IS covered
-by the property machine. The gap is only in the human-readable example layer, where a reader
-cannot see at a glance that `expand` participates in as-of reconstruction identically to `revise`.
-Low value — the mechanical identity is already proven by `_append` delegation and the fold
-machine — but worth a one-line example for documentation parity with `test_query_scope.py`.
-**Fix:** Optionally add a small example asserting `get_scope_at` after an `expand` returns the
-expanded value at the cut, mirroring `test_cut_is_inclusive_at_boundary` but via `expand`. Skip if
-the fold-machine coverage is considered sufficient (it is, for correctness).
+**File:** `src/doxastica/core.py:671` (cf. `_current` at `src/doxastica/core.py:230`,
+`query_scope` at `src/doxastica/core.py:594`)
+**Issue:** `get_scope_at` collapses retracted winners with a raw value compare
+`t["status"] != Status.retracted.value`. This is correct and deliberately consistent with
+`_current`'s own `tail["status"] == Status.retracted.value` collapse, so it is NOT a defect — both
+implement the same "retracted tail clears the belief" rule. The residual observation is
+maintenance symmetry: the ordering contract is centralized in `_order_key` ("the ONE ordering
+contract"), but the logically-paired "retracted tail ⇒ absent" rule is restated inline in three
+sites (`_current`, `query_scope`, `get_scope_at`) with two different idioms (raw `!= .value`
+here and in `_current`; enum-membership `Status(...) in allowed` in `query_scope`). Under the
+closed `{active, retracted}` taxonomy (DATA-06, models.py:45-46) all three agree exactly. A
+hypothetical third `Status` would diverge — the two `!= retracted` sites would INCLUDE it,
+`query_scope`'s allow-set would EXCLUDE it — but adding a third status is a deliberate,
+reviewed change to a closed taxonomy, so this is a future-proofing nicety, not a live risk.
+**Fix:** Optional. Extract a tiny `_is_active_tail(row: dict[str, Any]) -> bool` predicate
+(`row["status"] != Status.retracted.value`) and call it from both `_current` and the
+`get_scope_at` collapse so the active-tail definition has one home alongside `_order_key`.
+Behavior-preserving. Skip if the closed-taxonomy assumption is considered a sufficient guard.
 
 ---
 
