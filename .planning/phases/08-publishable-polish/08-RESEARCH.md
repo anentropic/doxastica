@@ -366,18 +366,17 @@ postulates verified mechanically as a backend conformance suite).
 **Note:** All other findings are `[VERIFIED]` (reproduced against the live tree) or `[CITED]`
 (pymdownx snippets docs). The stale-text corrections and gaps are facts, not assumptions.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Commit `dist/` or gitignore it?**
    - What we know: the committed `dist/` is stale; `release.yml` rebuilds on tag.
-   - What's unclear: whether the user wants `dist/` tracked at all.
-   - Recommendation: gitignore `dist/` (or refresh it); rely on `release.yml` for authoritative builds.
+   - **RESOLVED (2026-06-19, verified):** `dist/` is ALREADY gitignored (`.gitignore:13`) and untracked (`git ls-files dist/` → empty). There is nothing to commit or change. No plan task needed — the stale on-disk wheel is local-only and is never version-controlled; `release.yml` is the authoritative build. 08-03 Task 3 proves wheel correctness via a fresh `/tmp` build, bypassing the stale local copy.
 2. **Delete the orphaned `docs/changelog.md`?**
    - What we know: it's an unused sphinx/myst stub outside `docs_dir`.
-   - Recommendation: delete it to avoid confusion; it has no consumer.
+   - **RESOLVED:** Delete it — implemented as a task in plan 08-03 (it has no consumer; removing it avoids confusion with `docs/src/changelog.md`).
 3. **PyPI publish trigger — confirm OUT of scope.**
    - What we know: `release.yml` has a `publish` job (trusted publishing) gated on a `v*` tag.
-   - Recommendation: leave the pipeline ready; do NOT push a tag (pipeline-ready ≠ published, per locked scope).
+   - **RESOLVED:** OUT of scope (locked decision D-05). The pipeline is left ready; no plan pushes a tag (pipeline-ready ≠ published). 08-03 enforces this as an explicit non-action.
 
 ## Environment Availability
 
