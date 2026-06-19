@@ -492,7 +492,8 @@ class MemoryCore:
         assertions stable).
         """
         # WR-02: one read snapshot covers BOTH the traverse and every re-fetch, so the hydrated
-        # `reached` set is consistent with the `frontier` the traverse derived (no interleaved write).
+        # `reached` set is consistent with the `frontier` the traverse derived (no interleaved
+        # write).
         with self._backend.unit_of_work():
             reached_rows, frontier = self._backend.traverse(
                 str(belief_state_id),  # stringify to match the stored STRING PKs
