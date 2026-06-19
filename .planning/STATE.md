@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 Phase: 08
 Plan: Not started
 Status: Phase complete — ready for verification
-Last activity: 2026-06-19
+Last activity: 2026-06-19 - Completed quick task 260619-put: GitHub Copilot ignore .planning/
 
 Progress: [██████████] 100% (4/4 plans)
 
@@ -150,6 +150,12 @@ None yet.
 
 - [Phase 2]: Biggest project risk is the LadybugDB de-risking spike — verify `IF NOT EXISTS` DDL, multi-statement transactions, `$param` binds, and `$depth` patterns against the actually-installed `ladybug` (PyPI, NOT `ladybugdb`) before any belief logic stands on them. Phase 2 now also ships BOTH backends (ladybug reference + in-memory) behind the port; the in-memory backend doubles as the Phase 7 conformance-suite oracle.
 - [Phase 7]: AGM Recovery must remain a named `xfail` (false for belief bases); never assert it against correct code. The property suite is now a backend conformance suite — in-memory oracle and ladybug must pass the identical parameterised tests. **(07-03: RESOLVED — Recovery is now a strict xfail in tests/test_recovery_xfail.py reporting xfailed against correct code with a drift guard; superseded-chain positives pass on both backends.)**
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260619-put | Add `.github/copilot-instructions.md` telling Copilot code review to ignore `.planning/` | 2026-06-19 | 4c999a7 | [260619-put-add-github-copilot-instructions-md-telli](./quick/260619-put-add-github-copilot-instructions-md-telli/) |
 
 ## Deferred Items
 
