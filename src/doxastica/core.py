@@ -605,3 +605,63 @@ class MemoryCore:
         # 7. deterministic order (D-07: reuse the ONE _order_key) then 8. hydrate
         tails.sort(key=_order_key)
         return [self._hydrate(t) for t in tails]
+
+    # --- Temporal reconstruction (HIST-03) -----------------------------------
+    def get_scope_at(
+        self,
+        scope_id: str,
+        as_of_event_id: UUID,
+    ) -> list[BeliefState]:
+        """
+        Reconstruct the active belief base of ``scope_id`` AS OF ``as_of_event_id`` (HIST-03).
+
+        The temporal sibling of ``query_scope`` with ONE structural change (D-02/D-03): the
+        inclusive ``source_event_id <= as_of`` CUT is applied to the candidate states BEFORE the
+        per-belief ordering-MAX (cut-then-max = REWIND), in place of ``query_scope``'s
+        ``event_id_max`` POST-filter on derived tails (max-then-filter = DROP). So an OLDER value
+        RESURFACES for a since-revised belief — the value current AT the cut — rather than the
+        belief going absent. Conflating this cut with ``query_scope``'s ``event_id_max`` is the
+        central trap of the phase (D-03): the placement of the cut relative to the max is the whole
+        difference.
+
+        Pipeline: ONE scope-wide ``match_nodes`` scan → INCLUSIVE ``<= as_of`` cut as a PRE-filter
+        inside the group-by loop → per-group ``_order_key`` ordering-MAX over the surviving rows
+        (the cut-window current tail, ``state_id``-tiebroken, D-05) → retracted-as-of collapse
+        (D-06: a belief whose as-of tail is ``retracted`` is ABSENT — the ``_current`` rule computed
+        over the cut window, not "now") → ``_order_key`` sort → ``_hydrate``. There is NO
+        ``include_retracted`` flag and NO status-set resolution; the base is always active-as-of.
+
+        The cut is INCLUSIVE (D-04): a state whose ``source_event_id == as_of`` IS included — this
+        is what makes ``get_scope_at(latest) == query_scope(current)`` hold (SC1). Comparison is
+        ``str``-vs-``str`` on ``source_event_id`` (normalized ONCE to the SAME form ``_order_key``
+        uses — never ``str``-vs-``UUID``, Pitfall 2). The ONE ``_order_key`` contract is reused for
+        the cut key form, the per-group max, and the final sort — never a second ordering (D-05).
+
+        A single multi-belief event shares one ``source_event_id``, so the inclusive cut folds ALL
+        of that event's writes into the base, tiebroken by ``state_id``.
+
+        A pure read (D-08): a non-existent or empty scope returns ``[]`` and creates NO ``Scope``
+        node — no ``_ensure_scope``, no ``unit_of_work``, no world-scope guard
+        (``get_scope_at(world, e)`` is a valid read). Composes ONLY ``match_nodes`` — no
+        ``traverse``, no edge walk: the chain order is implicit in the
+        ``(source_event_id, state_id)`` ordering (D-01).
+        """
+        # Normalize the cut bound ONCE to the _order_key str form (D-04: never str-vs-UUID).
+        as_of = str(as_of_event_id)
+        # 1. ONE scope-wide round-trip; absent scope → [] (D-08: pure read, no auto-create)
+        rows = self._backend.match_nodes("BeliefState", {"scope_id": scope_id})
+        # 2. INCLUSIVE cut as a PRE-filter, then per-group ordering-MAX over the surviving rows.
+        #    The cut runs BEFORE the max (cut-then-max = REWIND, D-02/D-03) — NOT a post-filter on
+        #    derived tails (that is query_scope's DROP). This placement is the whole phase.
+        by_belief: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            if row["source_event_id"] > as_of:  # D-04 inclusive cut: keep <= as_of, drop newer
+                continue
+            current = by_belief.get(row["belief_id"])
+            if current is None or _order_key(row) > _order_key(current):
+                by_belief[row["belief_id"]] = row  # cut-window status-agnostic tail (D-05 tiebreak)
+        # 3. retracted-as-of collapse (D-06: the _current rule over the cut window, not "now")
+        tails = [t for t in by_belief.values() if t["status"] != Status.retracted.value]
+        # 4. deterministic order (D-05: reuse the ONE _order_key) then 5. hydrate
+        tails.sort(key=_order_key)
+        return [self._hydrate(t) for t in tails]
