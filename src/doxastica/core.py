@@ -477,28 +477,38 @@ class MemoryCore:
         backends. A re-fetch that returns nothing is skipped defensively (it should not happen for a
         reached node; the core does not raise).
 
-        A pure READ (mirrors ``query_scope``): NO ``unit_of_work``. Driver-blind (D-02): NO Cypher,
-        NO ``ladybug`` import, NO ``direction`` logic — the core passes the literal
-        ``direction="in"`` and both backends own the arrow flip. The hydrated ``reached`` tuple is
-        sorted by the ONE ``_order_key`` contract for deterministic output (``reached`` order is
-        non-contractual per BACK-04 §5, but determinism keeps cross-backend parity assertions
-        stable).
+        ATOMIC READ SCOPE (WR-02): the ``traverse`` + the per-reached-node ``match_nodes`` re-fetch
+        loop run inside ONE ``unit_of_work`` so they share a single serializable snapshot. Without
+        it, the re-fetches are N separate auto-committed reads on the ladybug backend, and the
+        single-writer model permits a concurrent append BETWEEN two of them — yielding a
+        ``reached``/``frontier`` pair that never existed at a single instant. Wrapping a pure READ
+        in ``unit_of_work`` is safe on both backends: ladybug runs a ``BEGIN``/``COMMIT`` with no
+        writes, and the in-memory adapter snapshots on entry and (absent an exception) leaves state
+        untouched on exit. Driver-blind (D-02): NO Cypher, NO ``ladybug`` import, NO ``direction``
+        logic — the core composes only ``unit_of_work`` / ``traverse`` / ``match_nodes`` and passes
+        the literal ``direction="in"`` so both backends own the arrow flip. The hydrated ``reached``
+        tuple is sorted by the ONE ``_order_key`` contract for deterministic output (``reached``
+        order is non-contractual per BACK-04 §5, but determinism keeps cross-backend parity
+        assertions stable).
         """
-        reached_rows, frontier = self._backend.traverse(
-            str(belief_state_id),  # stringify to match the stored STRING PKs
-            _CASCADE_EDGE_TYPES,  # D-03 — SUPERSEDES excluded by construction
-            depth,  # depth=None ⇒ full closure, empty frontier (D-02)
-            direction="in",  # D-04/D-05: walk AGAINST the arrows (X's dependents)
-        )
-        # close the hydration gap (Option A): re-fetch full props per reached state_id, then
-        # _hydrate — both backends agree because match_nodes props are already parity-tested.
-        props: list[dict[str, Any]] = []
-        for row in reached_rows:
-            fetched = self._backend.match_nodes(
-                "BeliefState", {"state_id": str(row["state_id"])}
+        # WR-02: one read snapshot covers BOTH the traverse and every re-fetch, so the hydrated
+        # `reached` set is consistent with the `frontier` the traverse derived (no interleaved write).
+        with self._backend.unit_of_work():
+            reached_rows, frontier = self._backend.traverse(
+                str(belief_state_id),  # stringify to match the stored STRING PKs
+                _CASCADE_EDGE_TYPES,  # D-03 — SUPERSEDES excluded by construction
+                depth,  # depth=None ⇒ full closure, empty frontier (D-02)
+                direction="in",  # D-04/D-05: walk AGAINST the arrows (X's dependents)
             )
-            if fetched:  # defensive: a reached node should always re-fetch; skip if it does not
-                props.append(fetched[0])
+            # close the hydration gap (Option A): re-fetch full props per reached state_id, then
+            # _hydrate — both backends agree because match_nodes props are already parity-tested.
+            props: list[dict[str, Any]] = []
+            for row in reached_rows:
+                fetched = self._backend.match_nodes(
+                    "BeliefState", {"state_id": str(row["state_id"])}
+                )
+                if fetched:  # defensive: a reached node should always re-fetch; skip if it does not
+                    props.append(fetched[0])
         props.sort(key=_order_key)  # deterministic order (reuse the ONE ordering contract)
         # the port frontier carries opaque state_id handles (str on both backends); coerce each to
         # UUID for the typed ImpactResult.frontier (frozenset[UUID]) — uuid.UUID(str(...)) is the
