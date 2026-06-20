@@ -76,11 +76,22 @@ _NS_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 # The literal hop bound compiled in for max_depth=None ("full closure"). This is a hard TRUNCATION
 # limit, NOT a true infinity: ladybug var-length patterns need a concrete upper bound, so "full
-# closure" compiles to `*1.._DEPTH_CEILING`. No real belief graph approaches a million hops deep, so
-# in practice the walk closes before the limit (A1, RESEARCH). If a walk ever DOES reach this depth,
-# `traverse` raises rather than passing off a truncated set as a complete closure (WR-03, DATA-04 —
-# never silently under-report).
-_DEPTH_CEILING = 1_000_000
+# closure" compiles to `*1.._DEPTH_CEILING`. No real belief graph approaches ten thousand hops deep,
+# so in practice the walk closes before the limit (A1, RESEARCH). If a walk ever DOES reach this
+# depth, `traverse` raises rather than passing off a truncated set as a complete closure (WR-03,
+# DATA-04 — never silently under-report).
+#
+# SIZE RATIONALE (ladybug-cycle-traverse-oom): the bound is interpolated into the var-length pattern
+# `*1..N` AND lifted via `var_length_extend_max_depth=N`. Ladybug's recursive-join operator
+# PRE-ALLOCATES buffer-pool memory LINEARLY in N (~18 KB per hop), independent of the actual graph
+# size — so the original 1_000_000 reserved ~18 GB and OOM'd the buffer pool on ANY unbounded walk,
+# even a 3-node cycle ("buffer pool is full and no memory could be freed"). This stayed latent
+# because the [ladybug] extra is not synced in the dev env (those tests skip locally); CI is the
+# first real execution. 10_000 caps the pre-allocation at ~290 MB peak (safe on any default,
+# GB-scale buffer pool) while remaining astronomically beyond any plausible belief-revision chain —
+# so the DATA-04 truncation-raise below is still a never-fires-in-practice safety net, not a limit a
+# real closure approaches. Measured: bound 100->~98 MB, 1k->~124 MB, 10k->~290 MB, 50k+ -> OOM.
+_DEPTH_CEILING = 10_000
 
 # Ladybug's default var-length upper-hop cap, used ONLY as the fallback when the live cap cannot be
 # read (it always can on 0.17.1). `traverse` raises the cap only when the requested bound exceeds
@@ -457,7 +468,7 @@ class LadybugBackend:
         # graph deeper than it would otherwise be reported as a complete closure when it is not (the
         # silent under-report DATA-04 exists to prevent). A node whose min depth equals the ceiling
         # means the walk hit that limit, so refuse to pass off a truncated set as a full closure.
-        # In practice no real belief graph approaches a million hops, so this never fires; when it
+        # In practice no real belief graph approaches the ceiling, so this never fires; when it
         # would, the caller gets a loud signal instead of a silently short answer. (A FINITE
         # `max_depth` surfaces truncation through the `at_frontier`/`frontier` channel instead, so
         # this guard is scoped to the unbounded case only.)
