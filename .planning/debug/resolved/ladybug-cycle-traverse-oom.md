@@ -1,6 +1,6 @@
 ---
 slug: ladybug-cycle-traverse-oom
-status: awaiting_human_verify
+status: resolved
 trigger: "PR #1 CI: ladybug backend cycle-safe traverse OOMs — buffer pool full"
 created: 2026-06-20
 updated: 2026-06-20
@@ -51,18 +51,19 @@ reasoning_checkpoint:
   falsification_test: "If memory scaled with graph size not bound, varying bound on a fixed 3-node graph would NOT change peak RSS. It does (98->124->290MB), falsifying the graph-size explanation."
   fix_rationale: "Lower _DEPTH_CEILING from 1_000_000 to 10_000. Pre-allocation drops from ~18GB to ~290MB (safe on any GB-scale default pool). 10_000-deep is astronomically beyond any real belief-revision chain, so the DATA-04 truncation-raise guard stays a never-fires-in-practice safety net (still a hard ceiling that RAISES if exceeded). Parity preserved: same reachable set, same query, only the literal cap changes. No truncation test asserts the literal value (no million-deep fixture exists)."
   blind_spots: "Exact CI runner pool size unknown (couldn't reproduce OOM locally on macOS default pool, which is large). Mitigated by choosing a ceiling whose ABSOLUTE pre-allocation (~290MB) is small regardless of pool size, with confirmed-correct results."
-- next_action: lower _DEPTH_CEILING to 10_000 in ladybug.py, run full suite with [ladybug] installed.
+- next_action: DONE — fix committed and pushed (PR #1); CI green confirms verification. Session resolved and archived.
 
 ## Resolution
 
 root_cause: "src/doxastica/backends/ladybug.py: _DEPTH_CEILING=1_000_000 is interpolated into the var-length pattern `*1..N` (and var_length_extend_max_depth=N) for max_depth=None. Ladybug's recursive-join operator pre-allocates buffer-pool memory linearly in N (~18KB/hop, ~18GB at 1M), independent of graph size, exhausting the buffer pool -> OOM on any unbounded traverse. Latent because the [ladybug] extra was never synced locally (tests skipped); CI is first real execution."
 fix: "Lowered _DEPTH_CEILING from 1_000_000 to 10_000 in src/doxastica/backends/ladybug.py (the literal cap interpolated into `*1..N` and var_length_extend_max_depth for max_depth=None). Updated the surrounding comment with the measured size rationale and the one docstring 'million hops' reference. Pre-allocation drops from ~18GB to ~290MB peak; DATA-04 truncation-raise guard unchanged (still raises if a closure ever reaches the ceiling)."
-verification: "Full suite WITH [ladybug] installed (uv sync --extra ladybug): 194 passed, 1 xfailed, 0 failed, 0 skipped-that-should-run. Direct measurement under the default (auto, CI-equivalent) buffer pool: bound=1_000_000 -> ~18GB -> OOM (the CI failure); bound=10_000 -> ~254MB OK with correct cycle result (b@1, c@2), failure margin not reached until ~30_000. Cycle + full-closure + bounded-frontier + parity tests all green."
+verification: "DEFINITIVE: CI on PR #1 (gsd/v1.0-milestone) is GREEN — the two previously-failing jobs both pass with [ladybug] actually installed: `quality / Full suite (with [ladybug]) (3.14)` pass (49s), `Report test coverage` pass (45s), `quality / Isolation (ladybug absent) (3.14)` pass (17s). This confirms the root cause and fix in the real CI environment (the OOM was CI-pool-specific and could not be reproduced on the local large default pool). Earlier local measurement under the default (auto, CI-equivalent) buffer pool: bound=1_000_000 -> ~18GB -> OOM (the CI failure); bound=10_000 -> ~254MB OK with correct cycle result (b@1, c@2). Cycle + full-closure + bounded-frontier + parity tests all green."
 files_changed: ["src/doxastica/backends/ladybug.py"]
 
 ## Evidence
 
 - timestamp 2026-06-20: CI `Report test coverage` job: `2 failed, 192 passed, 1 xfailed in 28.46s`; both failures are the ladybug cycle-traverse tests with the buffer-pool OOM. Coverage otherwise 97%.
+- timestamp 2026-06-20: DEFINITIVE VERIFICATION — CI on PR #1 (gsd/v1.0-milestone) GREEN after the fix. Previously-failing jobs now pass with [ladybug] installed: `quality / Full suite (with [ladybug]) (3.14)` pass (49s); `Report test coverage` pass (45s); `quality / Isolation (ladybug absent) (3.14)` pass (17s). Confirms root cause + fix in the real CI environment (OOM was CI-pool-specific, unreproducible on the local large default pool).
 
 ## Eliminated
 
