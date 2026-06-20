@@ -68,9 +68,7 @@ if TYPE_CHECKING:
     # from_connection() factories use function-local imports to keep this module driver-blind.
 
 
-_CASCADE_EDGE_TYPES: frozenset[EdgeType] = frozenset(
-    {EdgeType.DEPENDS_ON, EdgeType.DERIVED_FROM}
-)
+_CASCADE_EDGE_TYPES: frozenset[EdgeType] = frozenset({EdgeType.DEPENDS_ON, EdgeType.DERIVED_FROM})
 """
 The cascade edge set ``get_impact`` traverses (D-03 — the ONE place this set is defined).
 

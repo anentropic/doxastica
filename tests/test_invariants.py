@@ -252,9 +252,7 @@ class _SpineMachine(RuleBasedStateMachine):
         ``{belief_id: decoded value}`` for direct comparison against ``_shadow_base`` (the oracle).
         This is the SINGLE SUT read; the expected side is always the independent oracle.
         """
-        return {
-            s.belief_id: s.value for s in self.core.query_scope(scope_id, BeliefFilter())
-        }
+        return {s.belief_id: s.value for s in self.core.query_scope(scope_id, BeliefFilter())}
 
     @precondition(lambda self: bool(self._asserted_keys()))
     @rule(
