@@ -7,9 +7,11 @@ Follows the SQLAlchemy ``Engine`` pattern MINUS pool, two-tier, and registry (D-
   ``MemoryCore(backend: BackendPort)`` — pure dependency injection. ``MemoryCore`` is
   backend-agnostic and never holds a raw connection directly (maps to ``Engine`` holding a
   ``Dialect``). It NEVER names a backend.
-- Connection / path handling and the named convenience constructors (the ``create_engine``
-  analog) live in :mod:`doxastica.factories`, NOT here — that is the one module outside the
-  backends package that wires a concrete backend. ``MemoryCore`` itself stays pure DI.
+- Construction is pure DI: the caller builds the backend and passes it in. ``InMemoryBackend()``
+  is the zero-dependency default; ``LadybugBackend.open(path)`` /
+  ``LadybugBackend.from_connection(conn)`` build the ladybug reference backend. Connection / path
+  handling lives ON the backend (in ``doxastica.backends``), NEVER here — ``MemoryCore`` stays
+  pure DI and never names or imports a backend.
 - DROPPED from SQLAlchemy: the connection pool (the embedded reference backend is single-writer)
   and the Engine-vs-Connection two-tier (collapsed to one object; no ``core.connect()``). No
   URL/scheme registry and no plugin system (D-01a).
@@ -17,9 +19,9 @@ Follows the SQLAlchemy ``Engine`` pattern MINUS pool, two-tier, and registry (D-
 Driver-blind (D-02): this module imports NO driver and names NO backend. The ``BackendPort``
 import is type-only (under ``TYPE_CHECKING``), used solely for the ``__init__`` annotation; there
 is no module-level OR ``TYPE_CHECKING`` backend import, so importing ``MemoryCore`` never
-chain-loads the optional driver. The convenience constructors that DO name backends live in
-:mod:`doxastica.factories` (function-local driver imports there). ``tests/test_import_purity.py``
-proves this by scanning module-level imports only.
+chain-loads the optional driver. The only module that names + imports a backend driver is
+``doxastica.backends.ladybug`` (a guarded module-level import, outside this blind spine).
+``tests/test_import_purity.py`` proves this by scanning module-level imports only.
 
 Phase 3 lands the append-only revision-spine op bodies here (the keystone): the scope
 helpers, the DERIVED-current selection (D-01 — no stored ``CURRENT_STATE`` pointer), the
@@ -147,11 +149,11 @@ class MemoryCore:
     Backend-agnostic AGM engine composing a :class:`doxastica.ports.BackendPort` (D-01).
 
     The SOLE constructor is ``__init__(backend: BackendPort)`` — pure dependency injection over an
-    already-built port; it never names a backend or takes a raw connection. The named convenience
-    constructors (``in_memory()`` for the zero-dependency default, ``open(path, ...)`` /
-    ``from_connection(conn, ...)`` for the reference backend) live as free functions in
-    :mod:`doxastica.factories` (the ``create_engine`` analog) and are re-exported from the package
-    root, so this class stays driver-blind (D-02).
+    already-built port; it never names a backend or takes a raw connection. The caller builds the
+    backend and injects it: ``MemoryCore(InMemoryBackend())`` for the zero-dependency default, or
+    ``MemoryCore(LadybugBackend.open(path))`` / ``MemoryCore(LadybugBackend.from_connection(conn))``
+    for the ladybug reference backend. Backend construction lives ON the backend classes (in
+    ``doxastica.backends``), so this class stays driver-blind (D-02).
     """
 
     def __init__(self, backend: BackendPort) -> None:

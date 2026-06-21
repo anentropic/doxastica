@@ -5,13 +5,14 @@ This is the SINGLE module that imports the ``ladybug`` driver (D-02). The import
 so that, when the optional driver is absent, importing this module raises a friendly
 :class:`doxastica.errors.BackendDependencyError` (``pip install doxastica[ladybug]``) rather
 than a raw ``ModuleNotFoundError``. Every other module in the package stays driver-blind;
-``MemoryCore`` reaches this adapter only via FUNCTION-LOCAL imports in its factories.
+a consumer reaches this adapter only by importing it explicitly from
+``doxastica.backends.ladybug`` (it is NOT re-exported from the package root).
 
 What this adapter realizes
 --------------------------
 - **Flexible connection ownership (CONN-01 / R19):** ``__init__`` records an ``owns_conn``
   flag. A connection this backend opened itself (via :meth:`LadybugBackend.open`) is owned and
-  closed on :meth:`close`; an INJECTED connection (``doxastica.factories.from_connection``) is a
+  closed on :meth:`close`; an INJECTED connection (:meth:`LadybugBackend.from_connection`) is a
   tenant's handle and is NEVER closed.
 - **Namespaced, idempotent schema bootstrap (CONN-02 / CONN-03 / D-04):** the backend is the
   sole writer of its ``{ns}_*`` closed subgraph. Bootstrap runs ``CREATE NODE/REL TABLE IF
@@ -176,14 +177,28 @@ class LadybugBackend:
         Open a self-managing backend over ``path`` (or ``":memory:"`` / ``""`` for in-memory).
 
         Constructs its own ``lb.Database`` + ``lb.Connection`` and takes ownership
-        (``owns_conn=True``) — :meth:`close` will close the connection. This is what
-        ``doxastica.factories.open`` wires to. A ``:memory:`` / ``""`` path yields a fresh
-        in-memory DB.
+        (``owns_conn=True``) — :meth:`close` will close the connection. The sibling
+        :meth:`from_connection` wraps a tenant-supplied connection instead. A ``:memory:`` /
+        ``""`` path yields a fresh in-memory DB.
         """
         db_path = None if path in (":memory:", "") else path
         db = lb.Database(db_path) if db_path is not None else lb.Database()
         conn = lb.Connection(db)
         return cls(conn, namespace=namespace, owns_conn=True)
+
+    @classmethod
+    def from_connection(cls, conn: lb.Connection, *, namespace: str = "dx") -> LadybugBackend:
+        """
+        Wrap an INJECTED tenant connection the backend must NEVER close (CONN-01 / R19).
+
+        The sibling of :meth:`open`: where ``open`` creates and OWNS its connection
+        (``owns_conn=True``, closed on :meth:`close`), this wraps a caller-supplied
+        ``lb.Connection`` with ``owns_conn=False`` — the core is a tenant and must not close
+        someone else's handle (R19). Schema bootstrap still runs idempotently (``CREATE ... IF
+        NOT EXISTS``) against the injected (possibly fresh OR shared) DB, so wiring the backend
+        onto a leased connection is a safe no-op when the namespaced subgraph already exists.
+        """
+        return cls(conn, namespace=namespace, owns_conn=False)
 
     def close(self) -> None:
         """Close the connection ONLY if owned (R19: never close an injected handle)."""

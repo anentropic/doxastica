@@ -7,7 +7,6 @@ from doxastica.errors import (
     DoxasticaError,
     WorldScopeContractionError,
 )
-from doxastica.factories import from_connection, in_memory, open
 from doxastica.models import (
     WORLD_SCOPE_ID,
     Belief,
@@ -35,7 +34,4 @@ __all__ = [
     "Status",
     "WORLD_SCOPE_ID",
     "WorldScopeContractionError",
-    "from_connection",
-    "in_memory",
-    "open",
 ]
