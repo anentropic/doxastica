@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 Phase: 08
 Plan: Not started
 Status: Phase complete — ready for verification
-Last activity: 2026-06-19 - Completed quick task 260619-put: GitHub Copilot ignore .planning/
+Last activity: 2026-06-21 - Completed quick task 260621-m02: MemoryCore pure DI (factories.py)
 
 Progress: [██████████] 100% (4/4 plans)
 
@@ -156,6 +156,7 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260619-put | Add `.github/copilot-instructions.md` telling Copilot code review to ignore `.planning/` | 2026-06-19 | 4c999a7 | [260619-put-add-github-copilot-instructions-md-telli](./quick/260619-put-add-github-copilot-instructions-md-telli/) |
+| 260621-m02 | Refactor MemoryCore to pure DI — move factory classmethods to `factories.py` so `core.py` has zero backend refs | 2026-06-21 | 0133558 | [260621-m02-refactor-memorycore-to-pure-di-move-fact](./quick/260621-m02-refactor-memorycore-to-pure-di-move-fact/) |
 
 ## Deferred Items
 
