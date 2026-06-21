@@ -2,27 +2,31 @@
 D-02 / DATA-01 / BACK-01 guard — the backend-blind spine must never import ``ladybug``.
 
 A module-level ``ladybug`` import inside the public ``BeliefStore`` seam (``protocol.py``),
-the internal ``BackendPort`` seam (``ports.py``), the engine (``core.py``), or the in-memory
-oracle (``backends/memory.py``) would leak the backend dialect/topology across a contract
-boundary, or chain-load the optional driver into the always-importable spine. All four modules
-carry the identical "never import ``ladybug``" contract (D-02), so the static guard is
-parameterized over them.
+the internal ``BackendPort`` seam (``ports.py``), the engine (``core.py``), the convenience
+constructors (``factories.py``), or the in-memory oracle (``backends/memory.py``) would leak the
+backend dialect/topology across a contract boundary, or chain-load the optional driver into the
+always-importable spine. All five modules carry the identical "never import ``ladybug`` at module
+level" contract (D-02), so the static guard is parameterized over them. ``factories.py`` is a
+special case: it is the ONE spine module that DOES name the backends, but its ladybug imports are
+function-local — so it still passes the module-level scan.
 
 This guard inspects **MODULE-LEVEL imports only** — top-level statements plus imports inside a
 module-scoped ``if TYPE_CHECKING:`` block — and deliberately IGNORES imports nested inside
-function/method bodies. ``MemoryCore.open`` / ``MemoryCore.from_connection`` place
-``from doxastica.backends import ladybug`` INSIDE their method bodies (D-02 — sanctioned
-function-local imports that keep ``core.py`` driver-blind); the contract PERMITS those, so the
-scan must not flag them. (An earlier version of this file used ``ast.walk``, which recurses into
-function bodies and would have mis-flagged the sanctioned function-local imports — that claim is
-no longer true and has been corrected.)
+function/method bodies. ``factories.open`` / ``factories.from_connection`` place
+``from doxastica.backends import ladybug`` INSIDE their function bodies (D-02 — sanctioned
+function-local imports that keep ``factories.py`` driver-blind; ``core.py`` no longer references
+the driver at all); the contract PERMITS those, so the scan must not flag them. (An earlier
+version of this file used ``ast.walk``, which recurses into function bodies and would have
+mis-flagged the sanctioned function-local imports — that claim is no longer true and has been
+corrected.)
 
 Two independent proofs of D-02 isolation live here:
 
 1. The static module-level AST scan (catches a top-level OR ``TYPE_CHECKING``-block ``ladybug``
    import — the real violations — while permitting the function-local ones).
 2. A subprocess that installs a ``sys.meta_path`` finder raising ``ModuleNotFoundError`` for any
-   ``ladybug`` import, then imports the driver-free spine and runs ``MemoryCore.in_memory()`` —
+   ``ladybug`` import, then imports the driver-free spine and runs the package-root
+   ``in_memory()`` —
    proving the spine imports and runs with ladybug genuinely blocked. This complements CI
    base-install Job 1 (Plan 04) where ladybug is truly uninstalled.
 """
@@ -68,7 +72,7 @@ def _module_level_imports(tree: ast.Module) -> list[str]:
     return imported
 
 
-@pytest.mark.parametrize("module", ["protocol", "ports", "core", "backends/memory"])
+@pytest.mark.parametrize("module", ["protocol", "ports", "core", "factories", "backends/memory"])
 def test_seam_does_not_import_ladybug(module: str) -> None:
     """A backend-blind module must carry no MODULE-LEVEL ``ladybug`` import (D-02 / DATA-01)."""
     source = pathlib.Path(f"src/doxastica/{module}.py").read_text()
@@ -85,7 +89,7 @@ def test_scan_flags_a_module_level_ladybug_import() -> None:
 
     Proves the scan is not vacuously green — a genuine module-level violation (both a plain
     top-level import and a ``TYPE_CHECKING``-block import) is detected, while a function-local
-    import (the sanctioned ``MemoryCore`` pattern) is NOT.
+    import (the sanctioned ``factories`` pattern) is NOT.
     """
     violating = textwrap.dedent(
         """
@@ -107,28 +111,31 @@ def test_scan_flags_a_module_level_ladybug_import() -> None:
 
 def test_function_local_ladybug_import_is_not_flagged() -> None:
     """
-    The sanctioned function-local ladybug imports in ``core.py`` are NOT module-level offenders.
+    The sanctioned function-local ladybug imports in ``factories.py`` are NOT offenders.
 
-    ``MemoryCore.open`` / ``from_connection`` import ``ladybug`` inside their bodies (D-02). The
-    module-level scan must leave them alone — this asserts the real ``core.py`` source passes.
+    ``factories.open`` / ``factories.from_connection`` import ``ladybug`` inside their bodies
+    (D-02) — ``core.py`` no longer references ladybug at all, so this guarantee now lives in
+    ``factories.py``. The module-level scan must leave the function-local imports alone — this
+    asserts the real ``factories.py`` source passes.
     """
-    source = pathlib.Path("src/doxastica/core.py").read_text()
-    assert "ladybug" in source, "core.py should reference ladybug (function-local)"
+    source = pathlib.Path("src/doxastica/factories.py").read_text()
+    assert "ladybug" in source, "factories.py should reference ladybug (function-local)"
     imported = _module_level_imports(ast.parse(source))
     offenders = [name for name in imported if name.split(".")[0] == "ladybug"]
     assert offenders == [], (
-        f"core.py function-local ladybug imports must not be module-level; got {offenders}"
+        f"factories.py function-local ladybug imports must not be module-level; got {offenders}"
     )
 
 
 def test_driver_free_spine_imports_with_ladybug_blocked() -> None:
     """
-    The driver-free spine imports and ``MemoryCore.in_memory()`` runs with ladybug BLOCKED (D-02).
+    The driver-free spine imports and ``in_memory()`` runs with ladybug BLOCKED (D-02).
 
     Runs a subprocess that installs a ``sys.meta_path`` finder raising ``ModuleNotFoundError`` for
     any ``ladybug`` import, then imports ``doxastica`` / ``doxastica.core`` /
-    ``doxastica.backends.memory``, constructs ``MemoryCore.in_memory()``, and exits 0 — the
-    independent runtime proof alongside CI base-install Job 1 (Plan 04).
+    ``doxastica.factories`` / ``doxastica.backends.memory`` (``factories`` is now part of the
+    always-importable driver-free spine), constructs the package-root ``in_memory()`` factory,
+    and exits 0 — the independent runtime proof alongside CI base-install Job 1 (Plan 04).
     """
     code = textwrap.dedent(
         """
@@ -152,10 +159,11 @@ def test_driver_free_spine_imports_with_ladybug_blocked() -> None:
 
         import doxastica  # noqa: F401
         import doxastica.core  # noqa: F401
+        import doxastica.factories  # noqa: F401
         import doxastica.backends.memory  # noqa: F401
-        from doxastica import MemoryCore
+        from doxastica import in_memory
 
-        core = MemoryCore.in_memory()
+        core = in_memory()
         assert core is not None
         """
     )

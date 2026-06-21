@@ -160,18 +160,19 @@ def test_backend_dependency_error_dual_catch() -> None:
 
 
 def test_memory_core_in_memory_works_driver_free() -> None:
-    """``MemoryCore.in_memory()`` returns a working core with zero extra dependency (D-01/D-05)."""
+    """``in_memory()`` returns a working core with zero extra dependency (D-01/D-05)."""
+    from doxastica import in_memory
     from doxastica.core import MemoryCore
 
-    core = MemoryCore.in_memory()
+    core = in_memory()
     assert isinstance(core, MemoryCore)
 
 
 def test_memory_core_unit_of_work_composes_backend() -> None:
     """``MemoryCore.unit_of_work()`` composes the in-memory backend's atomic scope (D-01)."""
-    from doxastica.core import MemoryCore
+    from doxastica import in_memory
 
-    core = MemoryCore.in_memory()
+    core = in_memory()
     backend = core._backend  # pyright: ignore[reportPrivateUsage]  # noqa: SLF001
     assert isinstance(backend, InMemoryBackend)
     with core.unit_of_work():
