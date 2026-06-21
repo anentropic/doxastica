@@ -7,7 +7,7 @@ composes two existing idioms rather than re-scaffolding them:
 - the parametrized ``backend`` fixture (``tests/conftest.py``) and the ``_both_backends`` /
   ``_reached_ids`` normalization idiom (``tests/test_backend_parity.py``), so every case runs
   on BOTH the in-memory oracle and the ladybug reference backend;
-- ``in_memory()`` (``doxastica.factories``) for zero-dependency construction.
+- ``MemoryCore(InMemoryBackend())`` (pure DI) for zero-dependency construction.
 
 Scope (this plan, 05-02): ``add_edge`` ONLY. ``get_impact`` lands in plan 05-03 and will EXTEND
 this file. The AGM Relevance/Core-Retainment POSTULATE tests are Phase 7 — NOT here; these tests
@@ -36,7 +36,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from doxastica import MemoryCore, in_memory
+from doxastica import InMemoryBackend, MemoryCore
 from doxastica.models import BeliefState, EdgeType, ImpactResult
 
 if TYPE_CHECKING:
@@ -356,7 +356,7 @@ def test_get_impact_depth_zero_parity() -> None:
 @given(depth=st.one_of(st.none(), st.integers(min_value=0, max_value=10)))
 def test_get_impact_terminates_on_cycle(depth: int | None) -> None:
     """Mutual dependency (A<-B and B<-A) ⇒ get_impact terminates and de-dupes (cycle-safe)."""
-    core = in_memory()
+    core = MemoryCore(InMemoryBackend())
     a = core.revise("s", "a", 1, uuid.uuid7())
     b = core.revise("s", "b", 2, uuid.uuid7())
     core.add_edge(b.state_id, a.state_id, EdgeType.DEPENDS_ON)  # A <- B
@@ -370,7 +370,7 @@ def test_get_impact_terminates_on_cycle(depth: int | None) -> None:
 @given(depth=st.integers(min_value=0, max_value=6))
 def test_get_impact_exact_reachable_within_depth(depth: int) -> None:
     """On a linear dependency chain, reached is EXACTLY the dependents within ``depth`` hops."""
-    core = in_memory()
+    core = MemoryCore(InMemoryBackend())
     states = _chain_of_dependents(core, 6)  # s0 <- s1 <- s2 <- s3 <- s4 <- s5
     impact = core.get_impact(states[0].state_id, depth)
     # within `depth` hops of s0 (walking INTO s0): s1..s[depth] (capped at the chain length).

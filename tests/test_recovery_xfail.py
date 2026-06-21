@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from doxastica import BeliefFilter, MemoryCore, in_memory
+from doxastica import BeliefFilter, InMemoryBackend, MemoryCore
 
 if TYPE_CHECKING:
     from doxastica.ports import BackendPort
@@ -72,7 +72,7 @@ def test_recovery_does_not_hold_for_belief_bases() -> None:
     not history replay — as-of/time-travel scope reconstruction is a SEPARATE held property
     and is NOT exercised here.
     """
-    core = in_memory()  # the memory backend is the AGM oracle (zero-dep)
+    core = MemoryCore(InMemoryBackend())  # the memory backend is the AGM oracle (zero-dep)
 
     def e() -> uuid.UUID:
         return uuid.uuid7()
