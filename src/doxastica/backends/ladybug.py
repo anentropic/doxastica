@@ -11,7 +11,7 @@ What this adapter realizes
 --------------------------
 - **Flexible connection ownership (CONN-01 / R19):** ``__init__`` records an ``owns_conn``
   flag. A connection this backend opened itself (via :meth:`LadybugBackend.open`) is owned and
-  closed on :meth:`close`; an INJECTED connection (``MemoryCore.from_connection``) is a
+  closed on :meth:`close`; an INJECTED connection (``doxastica.factories.from_connection``) is a
   tenant's handle and is NEVER closed.
 - **Namespaced, idempotent schema bootstrap (CONN-02 / CONN-03 / D-04):** the backend is the
   sole writer of its ``{ns}_*`` closed subgraph. Bootstrap runs ``CREATE NODE/REL TABLE IF
@@ -177,7 +177,8 @@ class LadybugBackend:
 
         Constructs its own ``lb.Database`` + ``lb.Connection`` and takes ownership
         (``owns_conn=True``) — :meth:`close` will close the connection. This is what
-        ``MemoryCore.open`` wires to. A ``:memory:`` / ``""`` path yields a fresh in-memory DB.
+        ``doxastica.factories.open`` wires to. A ``:memory:`` / ``""`` path yields a fresh
+        in-memory DB.
         """
         db_path = None if path in (":memory:", "") else path
         db = lb.Database(db_path) if db_path is not None else lb.Database()
