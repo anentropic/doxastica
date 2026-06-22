@@ -158,6 +158,7 @@ None yet.
 | 260619-put | Add `.github/copilot-instructions.md` telling Copilot code review to ignore `.planning/` | 2026-06-19 | 4c999a7 | [260619-put-add-github-copilot-instructions-md-telli](./quick/260619-put-add-github-copilot-instructions-md-telli/) |
 | 260621-m02 | Refactor MemoryCore to pure DI — move factory classmethods to `factories.py` so `core.py` has zero backend refs | 2026-06-21 | 0133558 | [260621-m02-refactor-memorycore-to-pure-di-move-fact](./quick/260621-m02-refactor-memorycore-to-pure-di-move-fact/) |
 | 260621-mjb | Remove the `factories` layer entirely — pure-DI construction; `LadybugBackend.from_connection` classmethod added | 2026-06-21 | ee969c8 | [260621-mjb-remove-doxastica-factories-layer-pure-di](./quick/260621-mjb-remove-doxastica-factories-layer-pure-di/) |
+| 260622-h2l | Fix stale "`MemoryCore`'s factories" docstring in `backends/__init__.py` (layer removed in be64fe8); update to pure-DI construction story | 2026-06-22 | 680b280 | [260622-h2l-fix-stale-factories-docstring](./quick/260622-h2l-fix-stale-factories-docstring/) |
 
 ## Deferred Items
 
