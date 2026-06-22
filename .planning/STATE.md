@@ -159,6 +159,7 @@ None yet.
 | 260621-m02 | Refactor MemoryCore to pure DI — move factory classmethods to `factories.py` so `core.py` has zero backend refs | 2026-06-21 | 0133558 | [260621-m02-refactor-memorycore-to-pure-di-move-fact](./quick/260621-m02-refactor-memorycore-to-pure-di-move-fact/) |
 | 260621-mjb | Remove the `factories` layer entirely — pure-DI construction; `LadybugBackend.from_connection` classmethod added | 2026-06-21 | ee969c8 | [260621-mjb-remove-doxastica-factories-layer-pure-di](./quick/260621-mjb-remove-doxastica-factories-layer-pure-di/) |
 | 260622-h2l | Fix stale "`MemoryCore`'s factories" docstring in `backends/__init__.py` (layer removed in be64fe8); update to pure-DI construction story | 2026-06-22 | 680b280 | [260622-h2l-fix-stale-factories-docstring](./quick/260622-h2l-fix-stale-factories-docstring/) |
+| 260622-hiy | PR #1 review fixes: broken `MemoryCore.in_memory()` Quick Start → `MemoryCore(InMemoryBackend())`; drop stored `CURRENT_STATE` from backend-contract; test `-> None` consistency; assert port surface is exactly five primitives | 2026-06-22 | 3fac85b | [260622-hiy-pr1-review-fixes](./quick/260622-hiy-pr1-review-fixes/) |
 
 ## Deferred Items
 
