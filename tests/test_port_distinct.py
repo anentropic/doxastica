@@ -12,6 +12,8 @@ Two assertions encode the BACK-01 decision mechanically:
    removed.
 """
 
+from typing import get_protocol_members
+
 from doxastica.ports import BackendPort
 from doxastica.protocol import BeliefStore
 
@@ -31,6 +33,16 @@ def test_backend_port_exposes_no_query_string_method() -> None:
 
 
 def test_backend_port_exposes_the_five_primitives() -> None:
-    """The port surface is exactly the five decided LPG primitives."""
-    for primitive in ("upsert_node", "add_edge", "match_nodes", "traverse", "unit_of_work"):
-        assert hasattr(BackendPort, primitive), f"missing primitive: {primitive}"
+    """
+    The port surface is EXACTLY the five decided LPG primitives — no more, no less.
+
+    Asserts the full declared protocol surface via ``typing.get_protocol_members`` (the set
+    of member names a structural implementer must satisfy), so a sixth primitive sneaking
+    onto the seam — the dialect-coupling / query-string regression BACK-01 designed out —
+    fails here, not just a missing one.
+    """
+    five = {"upsert_node", "add_edge", "match_nodes", "traverse", "unit_of_work"}
+    members = get_protocol_members(BackendPort)
+    assert members == five, (
+        f"BackendPort surface must be exactly the five primitives; got {sorted(members)}"
+    )

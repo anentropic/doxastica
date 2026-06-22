@@ -32,17 +32,17 @@ def _make_belief_state() -> BeliefState:
     )
 
 
-def test_belief_state_is_frozen():
+def test_belief_state_is_frozen() -> None:
     state = _make_belief_state()
     with pytest.raises(ValidationError):
         state.belief_id = "mutated"  # type: ignore[misc]
 
 
-def test_status_membership_is_exactly_active_and_retracted():
+def test_status_membership_is_exactly_active_and_retracted() -> None:
     assert set(Status) == {Status.active, Status.retracted}
 
 
-def test_edge_type_membership_is_exactly_the_three_generic_types():
+def test_edge_type_membership_is_exactly_the_three_generic_types() -> None:
     assert set(EdgeType) == {
         EdgeType.SUPERSEDES,
         EdgeType.DEPENDS_ON,
@@ -50,13 +50,13 @@ def test_edge_type_membership_is_exactly_the_three_generic_types():
     }
 
 
-def test_edge_type_excludes_structural_edges():
+def test_edge_type_excludes_structural_edges() -> None:
     members = {member.value for member in EdgeType}
     assert "HAS_REVISION" not in members
     assert "CURRENT_STATE" not in members
 
 
-def test_belief_state_field_set_is_the_closed_six():
+def test_belief_state_field_set_is_the_closed_six() -> None:
     assert set(BeliefState.model_fields) == {
         "state_id",
         "belief_id",
@@ -67,7 +67,7 @@ def test_belief_state_field_set_is_the_closed_six():
     }
 
 
-def test_belief_filter_field_set_is_the_closed_four():
+def test_belief_filter_field_set_is_the_closed_four() -> None:
     assert set(BeliefFilter.model_fields) == {
         "belief_ids",
         "status",
@@ -76,7 +76,7 @@ def test_belief_filter_field_set_is_the_closed_four():
     }
 
 
-def test_belief_filter_constructs_with_all_none_defaults():
+def test_belief_filter_constructs_with_all_none_defaults() -> None:
     f = BeliefFilter()
     assert f.belief_ids is None
     assert f.status is None
@@ -84,7 +84,7 @@ def test_belief_filter_constructs_with_all_none_defaults():
     assert f.event_id_max is None
 
 
-def test_impact_result_constructs_and_exposes_three_fields():
+def test_impact_result_constructs_and_exposes_three_fields() -> None:
     result = ImpactResult(reached=(), frontier=frozenset(), truncated=False)
     assert result.reached == ()
     assert result.frontier == frozenset()
@@ -92,21 +92,21 @@ def test_impact_result_constructs_and_exposes_three_fields():
     assert set(ImpactResult.model_fields) == {"reached", "frontier", "truncated"}
 
 
-def test_impact_result_reached_is_an_immutable_tuple():
+def test_impact_result_reached_is_an_immutable_tuple() -> None:
     # WR-03: reached must be a tuple so the frozen guarantee is complete —
     # a mutable list would allow result.reached.append(...) past frozen=True.
     result = ImpactResult(reached=(), frontier=frozenset(), truncated=False)
     assert isinstance(result.reached, tuple)
 
 
-def test_belief_filter_rejects_unknown_field():
+def test_belief_filter_rejects_unknown_field() -> None:
     # WR-01: extra="forbid" makes the "triple-structure leak unrepresentable"
     # claim mechanical — an unknown kwarg must raise, not be silently discarded.
     with pytest.raises(ValidationError):
         BeliefFilter(bogus=1)  # type: ignore[call-arg]
 
 
-def test_belief_state_rejects_unknown_field():
+def test_belief_state_rejects_unknown_field() -> None:
     with pytest.raises(ValidationError):
         BeliefState(
             state_id=uuid7(),

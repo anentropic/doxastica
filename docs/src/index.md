@@ -23,10 +23,11 @@ exactly the current tail, never a duplicate (append-only supersession).
 ```python
 from uuid import uuid7
 
-from doxastica import BeliefFilter, MemoryCore
+from doxastica import BeliefFilter, InMemoryBackend, MemoryCore
 
-# Zero-dependency in-memory core (no ladybug install needed).
-core = MemoryCore.in_memory()
+# Zero-dependency in-memory core (no ladybug install needed) — pure DI: build the
+# backend and inject it.
+core = MemoryCore(InMemoryBackend())
 
 scope_id = "agent-1"
 belief_id = "sky-colour"

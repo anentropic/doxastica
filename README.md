@@ -38,7 +38,7 @@ adds the LadybugDB-backed reference backend behind the same `BeliefStore` protoc
 ## Quick Start
 
 See the [Quick Start in the documentation](https://anentropic.github.io/doxastica/) for a
-runnable first program using `MemoryCore.in_memory()`.
+runnable first program using `MemoryCore(InMemoryBackend())`.
 
 ## License
 

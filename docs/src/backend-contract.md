@@ -61,8 +61,11 @@ A backend MUST implement exactly these five primitives, with these semantics:
   each). `reached` ordering remains non-contractual in either direction (see §5).
 - **`unit_of_work() -> AbstractContextManager[None]`** — an **atomic** (all-or-nothing)
   write-transaction context manager. The core groups a multi-write operation (e.g. a
-  `revise`: append a new `BeliefState` and re-point the `CURRENT_STATE` pointer) inside one
-  `unit_of_work`; either all writes commit or none do.
+  `revise`: append a new `BeliefState`, lay its `HAS_REVISION` hub edge, and lay the
+  `SUPERSEDES` edge to the prior state) inside one `unit_of_work`; either all writes commit
+  or none do. There is **no** stored `CURRENT_STATE` pointer for the backend to re-point —
+  current state is *derived* by the core from the append-only states (D-01), so the backend
+  only ever appends.
 
 ## 3. Uniqueness
 
