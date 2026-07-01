@@ -110,6 +110,6 @@ nav:
     - The Superseded Chain: explanation/superseded-chain-no-recovery.md
     - Derived Current State and UUID7 Ordering: explanation/derived-current-uuid7-ordering.md
     - The Two Seams: explanation/beliefstore-vs-backendport.md
-  - Backend Contract: backend-contract.md
+    - Backend Port Contract: explanation/backend-contract.md
   - API Reference: reference/
   - Changelog: changelog.md
