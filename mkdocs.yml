@@ -1,5 +1,5 @@
 site_name: doxastica
-site_description: Graph-native AGM belief-revision core (Kumiho M0)
+site_description: Graph-native AGM belief-revision core built on the Kumiho architecture
 site_url: https://anentropic.github.io/doxastica/
 repo_url: https://github.com/anentropic/doxastica
 repo_name: anentropic/doxastica
@@ -25,6 +25,7 @@ theme:
         name: Switch to light mode
   features:
     - navigation.instant
+    - navigation.tabs
     - navigation.sections
     - navigation.top
     - navigation.tracking
@@ -89,6 +90,26 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Tutorials:
+    - tutorials/index.md
+    - Your First Belief Store: tutorials/first-belief-store.md
+  - How-To Guides:
+    - how-to/index.md
+    - Use the LadybugDB Backend: how-to/ladybug-backend.md
+    - Lease a Shared Connection: how-to/lease-shared-connection.md
+    - Retract a Belief with contract: how-to/contract-a-belief.md
+    - Query with BeliefFilter: how-to/query-with-belief-filter.md
+    - Inspect Revision History: how-to/inspect-revision-history.md
+    - Reconstruct a Scope at a Point in Time: how-to/reconstruct-scope-at.md
+    - Trace a Dependency Cascade: how-to/trace-dependency-cascade.md
+  - Explanation:
+    - explanation/index.md
+    - What Is AGM Belief Revision?: explanation/agm-belief-revision.md
+    - The Kumiho Architecture: explanation/kumiho-architecture.md
+    - Scopes and the World Scope: explanation/scopes-and-world-scope.md
+    - The Superseded Chain: explanation/superseded-chain-no-recovery.md
+    - Derived Current State and UUID7 Ordering: explanation/derived-current-uuid7-ordering.md
+    - The Two Seams: explanation/beliefstore-vs-backendport.md
   - Backend Contract: backend-contract.md
   - API Reference: reference/
   - Changelog: changelog.md
