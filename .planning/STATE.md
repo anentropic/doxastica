@@ -160,6 +160,7 @@ None yet.
 | 260621-mjb | Remove the `factories` layer entirely — pure-DI construction; `LadybugBackend.from_connection` classmethod added | 2026-06-21 | ee969c8 | [260621-mjb-remove-doxastica-factories-layer-pure-di](./quick/260621-mjb-remove-doxastica-factories-layer-pure-di/) |
 | 260622-h2l | Fix stale "`MemoryCore`'s factories" docstring in `backends/__init__.py` (layer removed in be64fe8); update to pure-DI construction story | 2026-06-22 | 680b280 | [260622-h2l-fix-stale-factories-docstring](./quick/260622-h2l-fix-stale-factories-docstring/) |
 | 260622-hiy | PR #1 review fixes: broken `MemoryCore.in_memory()` Quick Start → `MemoryCore(InMemoryBackend())`; drop stored `CURRENT_STATE` from backend-contract; test `-> None` consistency; assert port surface is exactly five primitives | 2026-06-22 | 3fac85b | [260622-hiy-pr1-review-fixes](./quick/260622-hiy-pr1-review-fixes/) |
+| 260702-tab | Switch mkdocs docs to top tabs navigation — add `navigation.tabs` to theme features (kept `navigation.sections` for per-tab section grouping) | 2026-07-02 | be5a828 | — (gsd-fast) |
 
 ## Deferred Items
 
