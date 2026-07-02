@@ -25,9 +25,13 @@ deferred, the formal core and its property-test suite must be right.
 - **Tech stack**: Python (uv) — **`pydantic` v2 is the only REQUIRED runtime dep**; **`ladybug`
   (the LadybugDB PyPI package, a Kùzu fork, import `ladybug as lb`) is the reference-backend
   extra (`doxastica[ladybug]`)** behind the Phase-1 `BackendPort` seam; future backends are
-  extras too. Zero NVM imports. Why: the repo boundary keeps the implementation faithful to the
-  paper's domain-agnostic model, and LadybugDB's single-writer/multi-reader embedded model
-  enforces write serialization for free when the reference backend is in use.
+  extras too. Keep the runtime footprint lean — prefer the stdlib for trivial needs — but a
+  well-chosen dependency is a judgment call, not something to avoid on principle: there is no
+  ban on adding one where it genuinely earns its place. Why lean: a small, easy-to-adopt
+  reference implementation, and LadybugDB's single-writer/multi-reader embedded model enforces
+  write serialization for free when the reference backend is in use. (The core stays
+  domain-agnostic — no consumer-application concepts inside it — but that is the separate
+  **Boundary** constraint below, not a dependency rule.)
   > **Phase 2 D-03 decision-grade reversal (recorded, not silent — sibling to the Phase 1 §2
   > 3.14-floor decision):** the original "runtime deps **exactly `ladybug` + `pydantic`**"
   > constraint is REVERSED. `pydantic` is the sole required dep; `ladybug` moved to
@@ -130,14 +134,14 @@ deferred, the formal core and its property-test suite must be right.
 | Recommended | Alternative | When/why the alternative — and why NOT here |
 |-------------|-------------|----------------------------------------------|
 | `ladybug` (pinned) | Kùzu / Neo4j / SQLite+graph | Storage is *pinned by design* (no abstraction layer is an explicit non-goal). Ladybug is the chosen substrate; Kùzu is its API twin and only a doc reference. Neo4j (server, not embedded) would break the single-writer-for-free property and the "tenant in a shared embedded DB" model. |
-| pydantic v2 | dataclasses / attrs / msgspec | Constraint says pydantic. v2 gives frozen models + validation at the seam. dataclasses lack validation; msgspec would be a third runtime dep (forbidden). |
+| pydantic v2 | dataclasses / attrs / msgspec | pydantic v2 gives frozen models + validation at the seam. dataclasses lack validation; msgspec would add another required runtime dep for no gain here, since pydantic already covers the need — not worth it, rather than forbidden. |
 | Hypothesis `RuleBasedStateMachine` | hand-written sequence tests / `pytest-randomly` | AGM postulates over *operation sequences* are the textbook stateful-property case; shrinking minimal failing sequences is exactly what makes the formal claim credible. Hand-rolled sequences don't shrink. |
 | in-memory `:memory:` DB per test | shared fixture DB / Dockerized server | Embedded + in-memory means zero infra, perfect isolation, fast Hypothesis replay. A server DB would be slower and break reproducibility under shrinking. |
 | caller supplies `source_event_id` (opaque) | core mints `source_event_id` | NVM owns event-id meaning, so the caller supplies it and the core treats it as an opaque, non-unique handle. (Distinct from `state_id`, which the core *does* mint as a native stdlib UUID7 PK on the locked 3.14 floor.) |
 | mkdocs-material | sphinx-shibuya | Both offered by the template; mkdocs-material + mkdocstrings is already wired and lower-friction for an API-reference docs site. Either satisfies the publishable-docs requirement. |
 ## What NOT to Use
 - **`ladybugdb` as a package/import name** — does not exist on PyPI (404). The dependency string and all imports must be `ladybug`. This is the single most likely scaffolding bug; flag it loudly in the roadmap. (PROJECT.md's "`ladybugdb`" is the project/brand, not the installable.)
-- **Any third runtime dependency** (orjson, msgspec, networkx, a UUID lib at runtime, an ORM/graph-OGM, a storage-abstraction layer). After the Phase 2 D-03 reversal the constraint is: **`pydantic` is the only required runtime dep; `ladybug` is the reference-backend extra**; additional backends may ONLY be added as further extras (never new required deps). The "no storage-abstraction layer over the DB" non-goal still holds — `BackendPort` is a narrow port, not a repository abstraction. Ladybug-backend graph traversal (`get_impact`, `get_scope_at`) is **Cypher**, not networkx.
+- **A required runtime dependency added reflexively.** The stack is deliberately lean — `pydantic` is the only required runtime dep, `ladybug` is the reference-backend extra, and additional backends should be further extras rather than new required deps. This keeps the footprint small and adoption easy; it is NOT a blanket ban — a well-chosen dependency that earns its place is fine, just weigh it. The specific things that remain genuine non-goals for their own reasons: a **storage-abstraction / repository layer over the DB** (`BackendPort` is a narrow port, not a repository abstraction), and pulling in **networkx** for traversal (`get_impact` / `get_scope_at` are Cypher on the reference backend and an in-memory BFS otherwise — by design, no graph library needed).
 - **Async core API** — `lb.AsyncConnection` exists but M0 is the deterministic sync side. Don't build the core around async.
 - **String-interpolated Cypher** — docs "strongly discourage" it (injection risk). Always `parameters={...}` with `$name`.
 - **A custom graph-storage abstraction / repository pattern over Ladybug** — explicitly a non-goal; the DI seam is NVM↔core (the Protocol + injected `Connection`), not core↔DB.
