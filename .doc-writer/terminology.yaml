@@ -1,0 +1,63 @@
+version: 1
+
+source_terms:
+  - canonical: "MemoryCore"
+    variants: []
+    source: "class MemoryCore in src/doxastica/core.py"
+  - canonical: "InMemoryBackend"
+    variants: []
+    source: "class InMemoryBackend in src/doxastica/backends/memory.py"
+  - canonical: "LadybugBackend"
+    variants: []
+    source: "class LadybugBackend in src/doxastica/backends/ladybug.py"
+  - canonical: "BeliefStore"
+    variants: []
+    source: "class BeliefStore(Protocol) in src/doxastica/protocol.py"
+  - canonical: "BackendPort"
+    variants: []
+    source: "class BackendPort(Protocol) in src/doxastica/ports.py"
+  - canonical: "BeliefState"
+    variants: []
+    source: "class BeliefState in src/doxastica/models.py"
+  - canonical: "BeliefFilter"
+    variants: []
+    source: "class BeliefFilter in src/doxastica/models.py"
+  - canonical: "ImpactResult"
+    variants: []
+    source: "class ImpactResult in src/doxastica/models.py"
+  - canonical: "EdgeType"
+    variants: []
+    source: "class EdgeType(StrEnum) in src/doxastica/models.py"
+  - canonical: "WORLD_SCOPE_ID"
+    variants: []
+    source: "WORLD_SCOPE_ID constant in src/doxastica/models.py"
+  - canonical: "WorldScopeContractionError"
+    variants: []
+    source: "class WorldScopeContractionError in src/doxastica/errors.py"
+  - canonical: "BackendDependencyError"
+    variants: []
+    source: "class BackendDependencyError in src/doxastica/errors.py"
+
+proper_nouns:
+  # Product brand (used in prose). The PyPI package / Python import name is the
+  # lowercase code form `ladybug`, kept as-is inside inline code and code blocks.
+  - canonical: "LadybugDB"
+    variants: ["Ladybug"]
+  - canonical: "Kùzu"
+    variants: ["Kuzu"]
+  - canonical: "Kumiho"
+    variants: []
+  - canonical: "UUID7"
+    variants: ["UUID-7"]
+
+project_terms:
+  # Grammatically appropriate variation kept (NOT normalized):
+  #   - "world scope" (noun) vs "world-scope" (compound modifier)
+  #   - "belief id" / "event id" / "scope id" / "state id" (prose forms of the
+  #     `belief_id` / `source_event_id` / `scope_id` / `state_id` fields)
+  #   - prose "in-memory backend" vs the code symbol `InMemoryBackend`
+  []
+
+overrides: {}
+</content>
+</invoke>
