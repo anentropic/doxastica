@@ -2,6 +2,10 @@
 
 Graph-native AGM belief-revision core built on the [Kumiho](explanation/kumiho-architecture.md) architecture.
 
+Its multi-scope extension makes it a natural substrate for **agent-team memory**: give each
+agent its own belief scope, keep the team's shared truth in a world scope, and ask which
+agents a change to that shared truth makes stale. See [Build a Shared-World Memory for an Agent Team](tutorials/agent-team-memory.md).
+
 ## Installation
 
 ```bash

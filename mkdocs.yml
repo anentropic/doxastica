@@ -93,6 +93,7 @@ nav:
   - Tutorials:
     - tutorials/index.md
     - Your First Belief Store: tutorials/first-belief-store.md
+    - Build a Shared-World Memory for an Agent Team: tutorials/agent-team-memory.md
   - How-To Guides:
     - how-to/index.md
     - Use the LadybugDB Backend: how-to/ladybug-backend.md
