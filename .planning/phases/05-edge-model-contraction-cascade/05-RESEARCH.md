@@ -636,5 +636,3 @@ the ladybug param and the in-memory backend still exercises the full mechanism (
 
 **Research date:** 2026-06-18
 **Valid until:** 2026-07-18 (stable — embedded library, pinned deps, no fast-moving surface)
-</content>
-</invoke>

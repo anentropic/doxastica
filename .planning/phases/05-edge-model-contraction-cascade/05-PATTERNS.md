@@ -361,5 +361,3 @@ supplies the exact test bodies under "Code Examples".
 `docs/backend-contract.md`.
 **Files scanned:** 11.
 **Pattern extraction date:** 2026-06-18.
-</content>
-</invoke>

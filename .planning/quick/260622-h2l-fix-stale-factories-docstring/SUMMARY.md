@@ -23,4 +23,3 @@ never imports `.ladybug`) is unchanged.
 
 ## Files changed
 - `src/doxastica/backends/__init__.py` (docstring only)
-</content>

@@ -33,4 +33,3 @@ consistency only).
 - Full suite: 193 passed, 1 xfailed.
 - Quick Start snippet executed end-to-end (`MemoryCore(InMemoryBackend())` →
   `revise` → `query_scope` → `{'sky-colour': 'blue'}`).
-</content>

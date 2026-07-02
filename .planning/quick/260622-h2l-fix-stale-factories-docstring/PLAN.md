@@ -28,4 +28,3 @@ here) is unchanged.
 
 - `ruff check` clean.
 - `import doxastica.backends` succeeds, `__all__ == ['InMemoryBackend']` unchanged.
-</content>

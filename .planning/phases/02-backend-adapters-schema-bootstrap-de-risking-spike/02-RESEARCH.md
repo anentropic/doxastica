@@ -575,5 +575,3 @@ conn.execute("CALL current_setting('var_length_extend_max_depth') RETURN *")  # 
 
 **Research date:** 2026-06-15
 **Valid until:** ~2026-07-15 (stable; re-verify only if `ladybug` minor version bumps — the 30-cap default and var-length grammar are the things most likely to shift).
-</content>
-</invoke>
