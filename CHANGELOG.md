@@ -114,4 +114,3 @@ All notable changes to this project will be documented in this file.
 
 - Wrap WR-02 comment to satisfy ruff E501
 - Apply ruff format and fix .gitignore trailing whitespace
-
