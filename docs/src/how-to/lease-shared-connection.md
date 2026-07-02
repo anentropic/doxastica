@@ -66,10 +66,10 @@ conn.close()  # the owner closes it, when the owner is done
 The namespace is interpolated into table-creation statements, so it is validated as a bare identifier before use. It must match `^[A-Za-z_][A-Za-z0-9_]*$`: a letter or underscore followed by letters, digits, or underscores. An invalid namespace raises `ValueError`.
 
 ```python
-LadybugBackend.from_connection(conn, namespace="beliefs")     # ok
-LadybugBackend.from_connection(conn, namespace="host_core")   # ok
+LadybugBackend.from_connection(conn, namespace="beliefs")  # ok
+LadybugBackend.from_connection(conn, namespace="host_core")  # ok
 LadybugBackend.from_connection(conn, namespace="my-beliefs")  # ValueError: hyphen not allowed
-LadybugBackend.from_connection(conn, namespace="1beliefs")    # ValueError: cannot start with a digit
+LadybugBackend.from_connection(conn, namespace="1beliefs")  # ValueError: cannot start with a digit
 ```
 
 Belief data itself never goes through interpolation; only the namespace identifier does, and only after validation. If you omit `namespace`, it defaults to `"dx"`.

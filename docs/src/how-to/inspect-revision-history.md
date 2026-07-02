@@ -103,7 +103,8 @@ history = core.get_revision_chain("satellite-status")
 
 # Current value of that belief in a scope:
 current = next(
-    b for b in core.query_scope(scope, BeliefFilter(), include_retracted=True)
+    b
+    for b in core.query_scope(scope, BeliefFilter(), include_retracted=True)
     if b.belief_id == "satellite-status"
 )
 print(current.value, current.status.value)

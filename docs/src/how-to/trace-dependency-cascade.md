@@ -74,9 +74,9 @@ Both `thermal-model` (directly derived from power) and `ops-schedule` (transitiv
 
 ```python
 result = core.get_impact(power.state_id)
-print(len(result.reached))   # 2
-print(result.frontier)       # frozenset() — nothing left unexpanded
-print(result.truncated)      # False — the walk ran to completion
+print(len(result.reached))  # 2
+print(result.frontier)  # frozenset() — nothing left unexpanded
+print(result.truncated)  # False — the walk ran to completion
 ```
 
 A full-closure walk (the default) always finishes with an empty `frontier` and `truncated=False`. The `frontier`/`truncated` fields exist so that a *bounded* walk can never silently under-report; it always tells you it stopped early and what it left behind.
@@ -89,8 +89,8 @@ Pass `depth` to limit how many hops the walk follows. This is useful for large g
 # Only direct dependents of power-budget (one hop).
 shallow = core.get_impact(power.state_id, depth=1)
 print(sorted(b.belief_id for b in shallow.reached))  # ['thermal-model']
-print(shallow.truncated)                             # True — more lies beyond
-print(len(shallow.frontier))                         # 1 — the unexpanded boundary
+print(shallow.truncated)  # True — more lies beyond
+print(len(shallow.frontier))  # 1 — the unexpanded boundary
 ```
 
 At `depth=1` only `thermal-model` is reached; `ops-schedule` sits beyond the bound. `truncated=True` and a non-empty `frontier` tell you the cascade continues past what was returned. Increase `depth` (or pass `depth=None`, the default, for full closure) to see more.

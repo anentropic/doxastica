@@ -60,7 +60,7 @@ reconstructed = core.get_scope_at(scope, as_of_event_id=latest_event)
 current = core.query_scope(scope, BeliefFilter())
 
 print({b.belief_id: b.value for b in reconstructed})  # {'satellite-status': 'nominal'}
-print({b.belief_id: b.value for b in current})        # {'satellite-status': 'nominal'}
+print({b.belief_id: b.value for b in current})  # {'satellite-status': 'nominal'}
 ```
 
 A belief that was retracted at or before the cut is absent from the reconstruction, exactly as it would be in the current base: the cut applies the same active-tail rule, just over the window up to `as_of`.
@@ -94,6 +94,7 @@ print(core.get_scope_at(scope, as_of_event_id=cut))
 
 # query_scope event_id_max DROPS the belief (its current tail is newer than the cut):
 from doxastica import BeliefFilter
+
 print(core.query_scope(scope, BeliefFilter(event_id_max=cut)))
 # []
 ```
