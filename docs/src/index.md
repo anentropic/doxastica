@@ -1,6 +1,6 @@
 # doxastica
 
-Graph-native AGM belief-revision core (Kumiho M0)
+Graph-native AGM belief-revision core built on the [Kumiho](explanation/kumiho-architecture.md) architecture.
 
 ## Installation
 
@@ -17,7 +17,7 @@ uv add doxastica
 ## Quick Start
 
 Build the zero-dependency in-memory core, revise a belief, and read the current base back.
-Revising the same belief again supersedes the prior value — `query_scope` always returns
+Revising the same belief again supersedes the prior value. `query_scope` always returns
 exactly the current tail, never a duplicate (append-only supersession).
 
 ```python
