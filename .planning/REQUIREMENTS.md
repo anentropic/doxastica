@@ -119,11 +119,11 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STANCE-01 | — | Pending |
-| STANCE-02 | — | Pending |
-| STANCE-03 | — | Pending |
-| STANCE-04 | — | Pending |
-| STANCE-05 | — | Pending |
-| STANCE-06 | — | Pending |
-| STANCE-07 | — | Pending |
-| DOCS-01 | — | Pending |
+| STANCE-01 | Phase 9 | Pending |
+| STANCE-02 | Phase 9 | Pending |
+| STANCE-03 | Phase 9 | Pending |
+| STANCE-04 | Phase 9 | Pending |
+| STANCE-05 | Phase 9 | Pending |
+| STANCE-06 | Phase 9 | Pending |
+| STANCE-07 | Phase 10 | Pending |
+| DOCS-01 | Phase 10 | Pending |

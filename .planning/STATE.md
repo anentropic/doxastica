@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v0.2.0
 milestone_name: Stance
-status: planning
+status: roadmapped
 last_updated: "2026-07-04T13:28:13.397Z"
 last_activity: 2026-07-04
 progress:
-  total_phases: 0
+  total_phases: 2
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-13)
 
 **Core value:** A correct, append-only belief-revision core behind a clean `BeliefStore` Protocol whose correctness is *provable* — AGM/Hansson postulate compliance and structural invariants verified mechanically, zero narrative semantics leaking in.
-**Current focus:** Phase 08 — publishable-polish
+**Current focus:** v0.2.0 Stance (R21) — Phase 9 (Stance value layer, write & persistence) next
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 9 — Stance Value Layer, Write & Persistence (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-07-04 — Milestone v0.2.0 started
+Status: Roadmapped — awaiting phase planning
+Last activity: 2026-07-04 — v0.2.0 roadmap created (Phases 9–10)
 
 ## Performance Metrics
 
@@ -181,4 +181,4 @@ Resume file: .planning/phases/07-agm-hansson-conformance-suite/07-04-PLAN.md
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Plan Phase 9 with /gsd-plan-phase 9
