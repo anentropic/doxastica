@@ -1,0 +1,90 @@
+name: Quality
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  isolation:
+    # D-03 Job 1: base-isolation environment. The ladybug EXTRA is deliberately NOT
+    # synced (ladybug genuinely absent) to prove the D-02 driver-blind isolation — the
+    # in-memory spine + import-purity scan must pass with the reference backend uninstalled.
+    name: Isolation (ladybug absent)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        python-version: ["3.14"]
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          python-version: ${{ matrix.python-version }}
+
+      - name: Sync dependencies (dev tools only, NO ladybug extra)
+        run: uv sync --locked --no-default-groups --group dev
+
+      - name: Assert ladybug is absent
+        run: |
+          uv run python -c "import importlib.util, sys; \
+            spec = importlib.util.find_spec('ladybug'); \
+            sys.exit('ladybug must be ABSENT in the isolation job' if spec else 0)"
+
+      - name: Full suite, driver-free path (ladybug uninstalled)
+        # Run the WHOLE suite with ladybug absent and rely on `pytest.importorskip` to skip the
+        # ladybug-dependent tests/params (WR-04). An explicit two-file allowlist would silently
+        # exclude any new driver-free test from the D-02 isolation guarantee; running everything
+        # keeps new driver-free tests inside the guarantee automatically. The asymmetry is
+        # deliberate: this job MUST NOT install `--extra ladybug` (the `full` job does that).
+        run: uv run pytest
+
+      - name: Cache pruning
+        if: always()
+        run: uv cache prune --ci
+
+  full:
+    # D-03 Job 2: full environment with the ladybug reference backend installed.
+    # Runs the prek quality gates + the complete suite parametrized over both backends.
+    name: Full suite (with [ladybug])
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        python-version: ["3.14"]
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          python-version: ${{ matrix.python-version }}
+
+      - name: Sync dependencies (dev + ladybug extra)
+        run: uv sync --locked --dev --extra ladybug
+
+      - name: Install prek
+        run: uv tool install prek
+
+      - name: Run quality gates
+        run: prek run --all-files
+
+      - name: Tests
+        run: uv run pytest
+
+      - name: Cache pruning
+        if: always()
+        run: uv cache prune --ci

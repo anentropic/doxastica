@@ -1,0 +1,116 @@
+site_name: doxastica
+site_description: Graph-native AGM belief-revision core built on the Kumiho architecture
+site_url: https://anentropic.github.io/doxastica/
+repo_url: https://github.com/anentropic/doxastica
+repo_name: anentropic/doxastica
+edit_uri: edit/main/docs/src/
+docs_dir: docs/src
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - toc.follow
+    - content.code.copy
+    - content.code.annotate
+    - search.suggest
+    - search.highlight
+
+plugins:
+  - search
+  - gen-files:
+      scripts:
+        - docs/scripts/gen_ref_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - section-index
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            docstring_section_style: table
+            show_source: true
+            show_root_heading: true
+            show_root_toc_entry: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            filters:
+              - "!^_"
+            merge_init_into_class: true
+            show_signature_annotations: true
+            separate_signature: true
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Tutorials:
+    - tutorials/index.md
+    - Your First Belief Store: tutorials/first-belief-store.md
+    - "The Detective's Notebook: Revising a Theory": tutorials/cluedo-detective.md
+  - How-To Guides:
+    - how-to/index.md
+    - Use the LadybugDB Backend: how-to/ladybug-backend.md
+    - Lease a Shared Connection: how-to/lease-shared-connection.md
+    - Retract a Belief with contract: how-to/contract-a-belief.md
+    - Query with BeliefFilter: how-to/query-with-belief-filter.md
+    - Inspect Revision History: how-to/inspect-revision-history.md
+    - Reconstruct a Scope at a Point in Time: how-to/reconstruct-scope-at.md
+    - Trace a Dependency Cascade: how-to/trace-dependency-cascade.md
+  - Explanation:
+    - explanation/index.md
+    - What Is AGM Belief Revision?: explanation/agm-belief-revision.md
+    - The Kumiho Architecture: explanation/kumiho-architecture.md
+    - Scopes and the World Scope: explanation/scopes-and-world-scope.md
+    - The Superseded Chain: explanation/superseded-chain-no-recovery.md
+    - Derived Current State and UUID7 Ordering: explanation/derived-current-uuid7-ordering.md
+    - The Two Seams: explanation/beliefstore-vs-backendport.md
+    - Backend Port Contract: explanation/backend-contract.md
+  - API Reference: reference/
+  - Changelog: changelog.md

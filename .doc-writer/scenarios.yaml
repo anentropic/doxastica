@@ -1,0 +1,53 @@
+version: 1
+user_personas:
+  - name: "Python developers integrating doxastica into a larger system (e.g. NVM)"
+    skill_level: "advanced"
+    generated_at: "2026-06-23"
+    doc_pages:
+      - "README.md"
+      - "docs/src/index.md"
+      - "docs/src/backend-contract.md"
+      - "docs/src/changelog.md"
+      - "docs/src/tutorials/index.md"
+      - "docs/src/tutorials/first-belief-store.md"
+      - "docs/src/how-to/index.md"
+      - "docs/src/how-to/ladybug-backend.md"
+      - "docs/src/how-to/lease-shared-connection.md"
+      - "docs/src/how-to/contract-a-belief.md"
+      - "docs/src/how-to/query-with-belief-filter.md"
+      - "docs/src/how-to/inspect-revision-history.md"
+      - "docs/src/how-to/reconstruct-scope-at.md"
+      - "docs/src/how-to/trace-dependency-cascade.md"
+      - "docs/src/explanation/index.md"
+      - "docs/src/explanation/agm-belief-revision.md"
+      - "docs/src/explanation/kumiho-architecture.md"
+      - "docs/src/explanation/scopes-and-world-scope.md"
+      - "docs/src/explanation/superseded-chain-no-recovery.md"
+      - "docs/src/explanation/derived-current-uuid7-ordering.md"
+      - "docs/src/explanation/beliefstore-vs-backendport.md"
+    scenarios:
+      - id: S1
+        goal: "Construct a MemoryCore with an injected in-memory backend, type my integration code against the BeliefStore protocol, and confirm there is no factory I am supposed to use instead."
+        starting_point: "README.md"
+        persona_relevance: "DI-based construction against a Protocol seam is the very first thing an integrator must get right; getting the construction idiom wrong (e.g. reaching for a non-existent factory) blocks everything else."
+        done_when: "I can build MemoryCore(InMemoryBackend()), know that MemoryCore satisfies BeliefStore, and understand there is no MemoryCore.in_memory() factory."
+      - id: S2
+        goal: "Swap the in-memory backend for the durable LadybugDB backend, and lease a connection my host application (NVM) already owns under a namespace without the core ever closing my handle."
+        starting_point: "README.md"
+        persona_relevance: "Production integration into NVM means running on durable storage as a tenant in a shared embedded DB; connection ownership and namespace isolation are correctness-critical for this persona."
+        done_when: "I can install the [ladybug] extra, build LadybugBackend.from_connection(conn, namespace=...), confirm close() is a no-op for a leased handle, and know the namespace validation rules."
+      - id: S3
+        goal: "Record dependency edges between beliefs and trace every belief affected by a change, reading the ImpactResult and bounding the walk by depth."
+        starting_point: "README.md"
+        persona_relevance: "Tracing how a belief change ripples through dependents is one of the two hard questions this persona builds the epistemic layer to answer; the cascade must be bounded and cycle-safe."
+        done_when: "I can lay DEPENDS_ON/DERIVED_FROM edges with add_edge, call get_impact, and correctly read reached/frontier/truncated including the depth-bounded case."
+      - id: S4
+        goal: "Understand the AGM semantics doxastica implements well enough to know what revise/expand/contract actually mean, why current state is derived rather than stored, and what the no-recovery model gives up versus textbook AGM."
+        starting_point: "README.md"
+        persona_relevance: "This persona is a Python/graph expert but new to belief-revision theory (per never_assume); they must trust the correctness claims and grasp the epistemic contract before wiring it into NVM."
+        done_when: "I can find clear explanations of the three operations, the derived-current contract, and the superseded-chain/no-recovery model, written for someone fluent in Python but new to AGM."
+      - id: S5
+        goal: "Query the current belief base precisely (by belief id, status, and event-id range) and reconstruct a scope's state as of a past point in time, understanding how 'dropping' differs from 'rewinding'."
+        starting_point: "README.md"
+        persona_relevance: "Reading the derived current base with a closed filter, and structural time-travel, are core daily-use read paths for an auditable knowledge layer."
+        done_when: "I can use BeliefFilter's four fields and include_retracted, and use get_scope_at, and understand the difference between a dropped vs rewound belief."
