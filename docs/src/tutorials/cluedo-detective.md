@@ -125,7 +125,9 @@ reads as "conclusion was derived from basis."
 
 ```python
 # Assume Plum is holding the Rope. This is a guess we may have to abandon.
-assume = core.revise("theory", "assume-plum-has-rope", "Plum holds the Rope", source_event_id=uuid7())
+assume = core.revise(
+    "theory", "assume-plum-has-rope", "Plum holds the Rope", source_event_id=uuid7()
+)
 
 # On the strength of that assumption, we now believe the weapon is the Wrench.
 weapon_state = core.revise("theory", "weapon", "Wrench", source_event_id=uuid7())
@@ -199,7 +201,9 @@ Nothing was deleted by the contraction; a `retracted` state was appended. Pass
 `include_retracted=True` to `query_scope` to see the retracted tail directly:
 
 ```python
-tail = core.query_scope("theory", BeliefFilter(belief_ids={"assume-plum-has-rope"}), include_retracted=True)
+tail = core.query_scope(
+    "theory", BeliefFilter(belief_ids={"assume-plum-has-rope"}), include_retracted=True
+)
 print([(b.belief_id, b.status.value) for b in tail])
 ```
 
@@ -239,7 +243,9 @@ past event. Rewind to the accusation moment you captured in Step 3 with
 [`get_scope_at`](../reference/doxastica/core.md#doxastica.core.MemoryCore.get_scope_at):
 
 ```python
-at_accusation = {b.belief_id: b.value for b in core.get_scope_at("theory", as_of_event_id=accusation_event)}
+at_accusation = {
+    b.belief_id: b.value for b in core.get_scope_at("theory", as_of_event_id=accusation_event)
+}
 print(at_accusation["culprit"])
 ```
 
@@ -322,7 +328,9 @@ core.revise("theory", "weapon", "Candlestick", source_event_id=accusation_event)
 core.revise("theory", "room", "Kitchen", source_event_id=accusation_event)
 
 # A defeasible inference, recorded with provenance: the weapon rests on the assumption.
-assume = core.revise("theory", "assume-plum-has-rope", "Plum holds the Rope", source_event_id=uuid7())
+assume = core.revise(
+    "theory", "assume-plum-has-rope", "Plum holds the Rope", source_event_id=uuid7()
+)
 weapon_state = core.revise("theory", "weapon", "Wrench", source_event_id=uuid7())
 core.add_edge(weapon_state.state_id, assume.state_id, EdgeType.DERIVED_FROM)
 
@@ -343,7 +351,9 @@ except WorldScopeContractionError:
     pass
 
 # The audit trail: the theory rewinds to who you were about to accuse.
-at_accusation = {b.belief_id: b.value for b in core.get_scope_at("theory", as_of_event_id=accusation_event)}
+at_accusation = {
+    b.belief_id: b.value for b in core.get_scope_at("theory", as_of_event_id=accusation_event)
+}
 assert at_accusation["culprit"] == "Mustard"
 
 print("All checks passed.")
