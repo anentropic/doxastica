@@ -2,9 +2,10 @@
 
 Graph-native AGM belief-revision core built on the [Kumiho](explanation/kumiho-architecture.md) architecture.
 
-Its multi-scope extension makes it a natural substrate for **agent-team memory**: give each
-agent its own belief scope, keep the team's shared truth in a world scope, and ask which
-agents a change to that shared truth makes stale. See [Build a Shared-World Memory for an Agent Team](tutorials/agent-team-memory.md).
+It is built for knowledge that is **held, then contradicted, then revised**: keep certain
+facts in a privileged world scope where they can never be retracted, hold a provisional theory
+in its own scope, supersede a belief the moment evidence refutes it, and trace which
+conclusions a retraction leaves stale. See [The Detective's Notebook: Revising a Theory Under Contradiction](tutorials/cluedo-detective.md).
 
 ## Installation
 

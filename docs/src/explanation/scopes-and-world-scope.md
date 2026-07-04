@@ -29,7 +29,7 @@ One scope id is reserved: [`WORLD_SCOPE_ID`](../reference/doxastica/models.md#do
 
 The id is deliberately dunder-wrapped (`__world__`) rather than a bare word like `"world"`, so it cannot accidentally collide with a scope a consumer genuinely wants to name "world." When you create a scope whose id equals `WORLD_SCOPE_ID`, doxastica derives `is_world=True` on the returned `Scope`; every other id yields an ordinary scope.
 
-For a worked application of shared world facts across many private scopes, see [Build a Shared-World Memory for an Agent Team](../tutorials/agent-team-memory.md).
+For a worked application of certain world facts alongside a provisional theory in its own scope, see [The Detective's Notebook: Revising a Theory Under Contradiction](../tutorials/cluedo-detective.md).
 
 ```mermaid
 flowchart TD
@@ -69,7 +69,7 @@ You rarely need to call it directly: the write operations create scopes on deman
 
 ## Further reading
 
-- [Build a Shared-World Memory for an Agent Team](../tutorials/agent-team-memory.md): a worked multi-scope use case built on the world scope.
+- [The Detective's Notebook: Revising a Theory Under Contradiction](../tutorials/cluedo-detective.md): a worked use case pairing the un-retractable world scope with a provisional theory scope.
 - [The Kumiho Architecture](kumiho-architecture.md): multi-scope as one of two departures from the paper.
 - [How to Retract a Belief with contract](../how-to/contract-a-belief.md): handling the world-scope guard in practice.
 - [What Is AGM Belief Revision?](agm-belief-revision.md): what contraction means epistemically.

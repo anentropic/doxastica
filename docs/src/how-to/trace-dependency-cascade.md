@@ -124,6 +124,6 @@ The full walk reaching both dependents with no truncation, and the bounded walk 
 
 ## Related guides
 
-- [Build a Shared-World Memory for an Agent Team](../tutorials/agent-team-memory.md): a motivating multi-scope use of `get_impact`, finding which agents a shared-truth change makes stale.
+- [The Detective's Notebook: Revising a Theory Under Contradiction](../tutorials/cluedo-detective.md): a motivating use of `get_impact`, finding the conclusion left stale when the inference it rested on is retracted.
 - [How to Inspect Revision History with get_revision_chain](inspect-revision-history.md)
 - [The Superseded Chain: Append-Only, No Recovery](../explanation/superseded-chain-no-recovery.md)
