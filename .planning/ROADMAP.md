@@ -89,5 +89,5 @@ Full phase goals, success criteria, and plan breakdowns are archived in
 | 6. Structural Time-Travel | v0.1.0 | 2/2 | Complete | 2026-06-19 |
 | 7. AGM/Hansson Backend Conformance Suite & Irony Join | v0.1.0 | 4/4 | Complete | 2026-06-19 |
 | 8. Publishable Polish | v0.1.0 | 3/3 | Complete | 2026-06-19 |
-| 9. Stance Value Layer, Write & Persistence | v0.2.0 | 2/2 | Complete   | 2026-07-04 |
+| 9. Stance Value Layer, Write & Persistence | v0.2.0 | 2/2 | Complete    | 2026-07-04 |
 | 10. Stance Formal Proof & Docs | v0.2.0 | 0/? | Not started | - |
