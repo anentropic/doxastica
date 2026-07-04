@@ -1,0 +1,70 @@
+"""
+The Phase-9 headline proof: ``stance`` survives write → persist → read byte-stable (SC4/SC5).
+
+Plan 09-01 landed all the production plumbing (the required ``BeliefState.stance`` field, the
+write-spine threading through ``revise``/``expand``/``contract``, and the name-token DDL) and
+proved nothing regressed — but it did NOT assert stance is actually *preserved* (the pre-stance
+suite predates the field). This suite supplies that proof, across the ``memory`` + ``ladybug``
+parity fixture, so byte-stability is proven at the core boundary on both substrates.
+
+Two load-bearing conventions, both inherited from ``tests/test_revision_spine.py`` /
+``tests/test_backend_parity.py``:
+
+1. **Parametrized over the ``backend`` fixture** (``conftest.py`` ``params=["memory", "ladybug"]``):
+   every test takes ``backend: BackendPort`` and runs once per backend, so each guarantee is proven
+   on BOTH the in-memory oracle and the ladybug reference adapter (D-05). The ladybug param is
+   SKIPPED — never failed — when the optional driver is absent (``importorskip`` in the fixture).
+2. **Drive assertions through ``MemoryCore(backend)``, NOT the bare port** — the serialize/hydrate
+   discipline lives in ``core.py`` (``_append`` writes ``stance.name``; ``_hydrate`` reconstructs via
+   the ``Stance[...]`` NAME-lookup), so byte-stability must be proven at the core boundary.
+
+Every assertion is member-identity (``is``): a value-vs-name hydrate regression (09 Pitfall 1 —
+``Stance(props["stance"])`` instead of ``Stance[props["stance"]]``) would raise on read rather than
+silently pass, so ``is`` makes the guarantee loud. No Hypothesis / oracle machinery here — the
+K*6-Extensionality oracle widening is STANCE-07 (Phase 10), explicitly out of scope.
+"""
+
+from __future__ import annotations
+
+import uuid
+from typing import TYPE_CHECKING
+
+from doxastica import MemoryCore
+from doxastica.models import BeliefFilter, Stance
+
+if TYPE_CHECKING:
+    from doxastica.ports import BackendPort
+
+
+def _event_id() -> uuid.UUID:
+    """Mint a fresh caller-side ``source_event_id`` (UUID7, time-ordered, RFC 9562 section 5.7)."""
+    return uuid.uuid7()
+
+
+# --------------------------------------------------------------------------------------------
+# STANCE-03 — a non-default stance round-trips byte-stable through query_scope on both backends.
+# --------------------------------------------------------------------------------------------
+
+
+def test_stance_round_trips_byte_stable(backend: BackendPort) -> None:
+    """STANCE-03: a non-default stance survives revise → query_scope unchanged on both backends."""
+    core = MemoryCore(backend)
+    core.revise("alice", "b1", "v", _event_id(), stance=Stance.suspected)
+    [state] = core.query_scope("alice", BeliefFilter())
+    assert state.stance is Stance.suspected, (
+        "the queried stance must be the SUSPECTED member (name-hydrated, not value-hydrated)"
+    )
+    assert state.stance.name == "suspected", "the stored wire token is the member NAME (D-02)"
+
+
+# --------------------------------------------------------------------------------------------
+# STANCE-03 — omitting stance defaults to certain (existing callers unaffected).
+# --------------------------------------------------------------------------------------------
+
+
+def test_stance_defaults_to_certain(backend: BackendPort) -> None:
+    """STANCE-03: omitting the stance arg on revise yields ``certain`` on both backends."""
+    core = MemoryCore(backend)
+    core.revise("alice", "b1", "v", _event_id())
+    [state] = core.query_scope("alice", BeliefFilter())
+    assert state.stance is Stance.certain, "the omitted default must round-trip as CERTAIN"
