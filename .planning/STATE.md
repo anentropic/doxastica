@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.2.0
 milestone_name: — Stance
-status: executing
+status: verifying
 stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-07-04T20:14:03.297Z"
+last_updated: "2026-07-04T20:20:45.637Z"
 last_activity: 2026-07-04 -- Phase 09 execution started
 progress:
   total_phases: 2
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 50
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 
 Phase: 09 (stance-value-layer-write-persistence) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-04 -- Phase 09 execution started
 
 ## Performance Metrics
@@ -84,6 +84,7 @@ Last activity: 2026-07-04 -- Phase 09 execution started
 | Phase 08 P02 | 3min | 2 tasks | 2 files |
 | Phase 08 P03 | 15m | 3 tasks | 5 files |
 | Phase 09 P01 | 8min | 2 tasks | 6 files |
+| Phase 09 P02 | 8min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -142,6 +143,7 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase ?]: Pinned CI git-cliff to .cliff.toml explicitly (default search path is cliff.toml, not the dot-file)
 - [Phase 09]: 09-01: Stance is a plain Enum + total_ordering with an isinstance-guarded __lt__ (not IntEnum/StrEnum); +/*/cross-type < raise TypeError by base-class choice. Serialize .name / hydrate Stance[token] name-lookup (never value-lookup on the wire token).
 - [Phase 09]: 09-01: stance is a REQUIRED 7th BeliefState field (no model default, D-01); the certain default lives on revise/expand. protocol.py imports Stance at RUNTIME because the =Stance.certain default is evaluated at class-definition time (TYPE_CHECKING-only would NameError).
+- [Phase ?]: STANCE persistence proofs driven through MemoryCore(backend) with member-identity assertions; a value-vs-name hydrate regression raises on read (T-09-02)
 
 ### Pending Todos
 
@@ -179,7 +181,7 @@ Items acknowledged at v0.1.0 milestone close (5 open artifacts; none are functio
 
 ## Session Continuity
 
-Last session: 2026-07-04T20:13:27.739Z
+Last session: 2026-07-04T20:20:38.651Z
 Stopped at: Completed 08-02-PLAN.md
 Resume file: .planning/phases/07-agm-hansson-conformance-suite/07-04-PLAN.md
 

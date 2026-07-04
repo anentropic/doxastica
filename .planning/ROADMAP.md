@@ -36,7 +36,7 @@ Full phase goals, success criteria, and plan breakdowns are archived in
 
 ### v0.2.0 — Stance (R21) (Phases 9–10)
 
-- [ ] **Phase 9: Stance Value Layer, Write & Persistence** - Land the canonical `Stance` ordinal enum, add it to the frozen `BeliefState`, thread it through the write surface and time-travel, and round-trip it byte-stable on both backends — comparison-only, no arithmetic path.
+- [x] **Phase 9: Stance Value Layer, Write & Persistence** - Land the canonical `Stance` ordinal enum, add it to the frozen `BeliefState`, thread it through the write surface and time-travel, and round-trip it byte-stable on both backends — comparison-only, no arithmetic path. (completed 2026-07-04)
 - [ ] **Phase 10: Stance Formal Proof & Docs** - Widen the dual-backend property/conformance suite so it carries stance non-vacuously (K*6 Extensionality now compares stance), and showcase stance in the Cluedo tutorial + refreshed docs.
 
 ## Phase Details
@@ -60,7 +60,7 @@ Full phase goals, success criteria, and plan breakdowns are archived in
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 09-02-PLAN.md — Stance persistence & time-travel proof (dual-backend byte-stable round-trip, contract-verbatim, get_scope_at)
+- [x] 09-02-PLAN.md — Stance persistence & time-travel proof (dual-backend byte-stable round-trip, contract-verbatim, get_scope_at)
 
 ### Phase 10: Stance Formal Proof & Docs
 
@@ -89,5 +89,5 @@ Full phase goals, success criteria, and plan breakdowns are archived in
 | 6. Structural Time-Travel | v0.1.0 | 2/2 | Complete | 2026-06-19 |
 | 7. AGM/Hansson Backend Conformance Suite & Irony Join | v0.1.0 | 4/4 | Complete | 2026-06-19 |
 | 8. Publishable Polish | v0.1.0 | 3/3 | Complete | 2026-06-19 |
-| 9. Stance Value Layer, Write & Persistence | v0.2.0 | 1/2 | In Progress|  |
+| 9. Stance Value Layer, Write & Persistence | v0.2.0 | 2/2 | Complete   | 2026-07-04 |
 | 10. Stance Formal Proof & Docs | v0.2.0 | 0/? | Not started | - |

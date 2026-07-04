@@ -48,7 +48,7 @@ Decision-grade edits to the frozen value layer — reversing them is a rewrite.
 - [x] **STANCE-04**: `contract` preserves the prior stance **verbatim** on the retracted tail
       it appends (mirrors the existing verbatim-value copy; Pitfall-2 sibling).
 
-- [ ] **STANCE-05**: `get_scope_at` reconstructs stance unchanged — time-travel round-trips the
+- [x] **STANCE-05**: `get_scope_at` reconstructs stance unchanged — time-travel round-trips the
       field along with the rest of the state.
 
 ### Comparison Contract
@@ -127,7 +127,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | STANCE-02 | Phase 9 | Complete |
 | STANCE-03 | Phase 9 | Complete |
 | STANCE-04 | Phase 9 | Complete |
-| STANCE-05 | Phase 9 | Pending |
+| STANCE-05 | Phase 9 | Complete |
 | STANCE-06 | Phase 9 | Complete |
 | STANCE-07 | Phase 10 | Pending |
 | DOCS-01 | Phase 10 | Pending |
