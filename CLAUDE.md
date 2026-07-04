@@ -162,7 +162,29 @@ deferred, the formal core and its property-test suite must be right.
 <!-- GSD:conventions-start source:CONVENTIONS.md -->
 ## Conventions
 
-Conventions not yet established. Will populate as patterns emerge during development.
+### Verification: run the full prek pre-commit suite before committing/pushing
+
+Local verification MUST run the **entire** `prek` pre-commit suite, not just the change-specific
+checks (e.g. running `mkdocs build` or a doc script is not enough — it misses `blacken-docs`,
+`trailing-whitespace`, `end-of-file-fixer`, `ruff`, `ruff-format`, `uv-lock`, `basedpyright`).
+CI runs `prek run --all-files`; local verification must match it or failures only surface in CI.
+
+Run it with CI-parity environment (the `basedpyright` hook is `uv run basedpyright`, and without
+the ladybug extra synced it emits false `reportUnknown*` errors because ladybug's types can't be
+resolved):
+
+```
+uv sync --locked --dev --extra ladybug
+prek run --all-files
+```
+
+Notes:
+- Use `prek` (not the legacy `pre-commit` tool): `.pre-commit-config.yaml` uses `repo: builtin`
+  and `repo: local` blocks that older `pre-commit` versions reject with `InvalidConfigError`.
+- Do **not** rely on a git `pre-commit` hook alone: GSD's parallel executors commit with
+  `--no-verify` and worktree runs may skip hooks, so the full-suite run must be an explicit
+  verification step. (A git hook is also a footgun in a ladybug-absent env — basedpyright would
+  fail every commit.)
 <!-- GSD:conventions-end -->
 
 <!-- GSD:architecture-start source:ARCHITECTURE.md -->
