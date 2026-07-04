@@ -15,8 +15,8 @@ Two load-bearing conventions, both inherited from ``tests/test_revision_spine.py
    on BOTH the in-memory oracle and the ladybug reference adapter (D-05). The ladybug param is
    SKIPPED — never failed — when the optional driver is absent (``importorskip`` in the fixture).
 2. **Drive assertions through ``MemoryCore(backend)``, NOT the bare port** — the serialize/hydrate
-   discipline lives in ``core.py`` (``_append`` writes ``stance.name``; ``_hydrate`` reconstructs via
-   the ``Stance[...]`` NAME-lookup), so byte-stability must be proven at the core boundary.
+   discipline lives in ``core.py`` (``_append`` writes ``stance.name``; ``_hydrate`` reconstructs
+   via the ``Stance[...]`` NAME-lookup), so byte-stability must be proven at the core boundary.
 
 Every assertion is member-identity (``is``): a value-vs-name hydrate regression (09 Pitfall 1 —
 ``Stance(props["stance"])`` instead of ``Stance[props["stance"]]``) would raise on read rather than
@@ -30,7 +30,7 @@ import uuid
 from typing import TYPE_CHECKING
 
 from doxastica import MemoryCore
-from doxastica.models import BeliefFilter, Stance
+from doxastica.models import BeliefFilter, Stance, Status
 
 if TYPE_CHECKING:
     from doxastica.ports import BackendPort
@@ -68,3 +68,35 @@ def test_stance_defaults_to_certain(backend: BackendPort) -> None:
     core.revise("alice", "b1", "v", _event_id())
     [state] = core.query_scope("alice", BeliefFilter())
     assert state.stance is Stance.certain, "the omitted default must round-trip as CERTAIN"
+
+
+# --------------------------------------------------------------------------------------------
+# STANCE-04 — contract copies the prior stance VERBATIM onto the retracted tail (both backends).
+# --------------------------------------------------------------------------------------------
+
+
+def test_contract_preserves_stance_verbatim(backend: BackendPort) -> None:
+    """STANCE-04: the retracted tail carries the active state's stance unchanged (verbatim copy)."""
+    core = MemoryCore(backend)
+    active = core.revise("alice", "p", "v", _event_id(), stance=Stance.believed)
+    core.contract("alice", "p", _event_id())
+    retracted = core.get_revision_chain("p")[-1]
+    assert retracted.status is Status.retracted, "the appended tail state must be RETRACTED"
+    assert retracted.stance is active.stance, (
+        "contract must copy the stored stance token VERBATIM — no decode/re-encode drift (D-02)"
+    )
+
+
+# --------------------------------------------------------------------------------------------
+# STANCE-05 — get_scope_at reconstructs stance unchanged along with the rest of the state.
+# --------------------------------------------------------------------------------------------
+
+
+def test_get_scope_at_reconstructs_stance(backend: BackendPort) -> None:
+    """STANCE-05: time-travel round-trips stance with the rest of the state (both backends)."""
+    core = MemoryCore(backend)
+    s = core.revise("alice", "p", "v", _event_id(), stance=Stance.suspected)
+    [state] = core.get_scope_at("alice", s.source_event_id)
+    assert state.stance is Stance.suspected, (
+        "get_scope_at must reconstruct the SUSPECTED member — _hydrate's name-lookup does it"
+    )
