@@ -355,16 +355,18 @@ else:
 | A2 | `mkdocs build --strict` remains a CI gate (docs.yml §45) and is the intended SC5 gate; it is NOT part of the prek suite, so it must be run explicitly in phase verification alongside `prek run --all-files`. | Docs plan / Pitfall 6 | If missed, a broken cross-ref/nav lands green locally and fails only in CI. `[VERIFIED: .github/workflows/docs.yml grep]` |
 | A3 | The existing hand-written `core.revise(...)` call examples across the 10 docs files need no edit (stance is optional; omitting it is valid and unchanged behavior); only *prose that enumerates the signature* and the new tutorial section need touching. | Docs plan (D-11) | If a doc block prose-lists the parameter roster, it must gain `stance`. Grep confirms no prose signature-roster listing exists today (only live `core.revise(..., source_event_id=...)` calls, which stay valid). Low risk. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Is `Stance` meant to be a top-level export?** (Blocks the tutorial import line.)
    - What we know: `Stance` is public API (accepted by `revise`/`expand`, returned on `BeliefState.stance`) but is absent from `doxastica/__init__.py` `__all__` (verified). Every other public type is `from doxastica import ...`.
    - What's unclear: whether adding `Stance` to `__all__` (a one-line, runtime-behavior-neutral packaging change) is within Phase 10's "tests + docs only, no src change" boundary, or must be deferred.
    - Recommendation: **Export it.** A public tutorial teaching a reader-side `Stance` comparison that must import from `doxastica.models` is an internal-structure leak. Adding one name to `__all__` changes no behavior and no signatures. If the user holds the boundary strictly, fall back to `from doxastica.models import Stance` in the tutorial and note it. Flag to the user in discuss/plan.
+   - **RESOLVED:** Export it. Locked as CONTEXT D-13; implemented in plan 10-04 Task 1 (`Stance` added to `doxastica/__init__.py` `__all__`). The tutorial imports `from doxastica import Stance`.
 
 2. **Does the reviewer want a hard programmatic non-vacuity assertion inside the stateful run, or is `event()` + the deterministic discrimination test sufficient?**
    - What we know: D-03 accepts "`hypothesis.event()` tag, or a targeted assertion / stats check."
    - Recommendation: `event()` (stats visibility) + the deterministic discrimination test (hard proof) satisfies D-03 cleanly; the module-level-counter approach is available but collection-order-fragile.
+   - **RESOLVED:** `event()` + the deterministic discrimination test (no hard programmatic assertion inside the stateful run). Implemented in plan 10-01 Task 2 — the deterministic `test_widened_key_discriminates_stance` (routed through the widened `_base_of`, breaks on revert) is the hard proof; the `hypothesis.event()` label gives stateful-oracle stats visibility.
 
 ## Environment Availability
 

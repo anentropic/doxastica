@@ -1,8 +1,8 @@
 ---
 phase: 10
 slug: stance-formal-proof-docs
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-07-04
 ---
