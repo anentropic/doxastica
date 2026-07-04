@@ -51,7 +51,9 @@ Full phase goals, success criteria, and plan breakdowns are archived in
   3. `BeliefState` carries a `stance` field (six fields → seven, closed-taxonomy docstring updated); `revise`/`expand` accept an **optional** `stance` defaulting to `certain`, and existing callers that omit it are unaffected.
   4. A stance written via `revise`/`expand` round-trips **byte-stable** through `query_scope` on **both** the in-memory and ladybug backends (same encode/hydrate discipline as `value`; serialized via member `.name`).
   5. `contract` preserves the prior stance **verbatim** on the retracted tail it appends, and `get_scope_at` reconstructs stance unchanged along with the rest of the state.
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 09-01-PLAN.md — Stance type, model & write-through spine (enum + required field + core/protocol/ladybug threading + SC2 unit proof)
+- [ ] 09-02-PLAN.md — Stance persistence & time-travel proof (dual-backend byte-stable round-trip, contract-verbatim, get_scope_at)
 
 ### Phase 10: Stance Formal Proof & Docs
 **Goal**: Stance is mechanically *proven* correct, not vacuously green — the dual-backend property suite tracks stance in its oracle and widens the base-comparison key so K*6 Extensionality parity actually compares stance — and the docs showcase stance as a within-scope epistemic gradient with reader-side comparison.
@@ -77,5 +79,5 @@ Full phase goals, success criteria, and plan breakdowns are archived in
 | 6. Structural Time-Travel | v0.1.0 | 2/2 | Complete | 2026-06-19 |
 | 7. AGM/Hansson Backend Conformance Suite & Irony Join | v0.1.0 | 4/4 | Complete | 2026-06-19 |
 | 8. Publishable Polish | v0.1.0 | 3/3 | Complete | 2026-06-19 |
-| 9. Stance Value Layer, Write & Persistence | v0.2.0 | 0/? | Not started | - |
+| 9. Stance Value Layer, Write & Persistence | v0.2.0 | 0/2 | Planned | - |
 | 10. Stance Formal Proof & Docs | v0.2.0 | 0/? | Not started | - |
