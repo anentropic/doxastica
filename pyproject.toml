@@ -31,28 +31,28 @@ Repository = "https://github.com/anentropic/doxastica"
 # reference-backend extra behind the Phase-1 BackendPort seam. `pip install doxastica`
 # yields a working in-memory AGM core with zero ladybug install; `[ladybug]` adds the
 # reference backend.
-ladybug = ["ladybug>=0.17,<0.18"]
+ladybug = ["ladybug>=0.18.0,<0.19"]
 all = ["doxastica[ladybug]"]
 # future backends slot in here as extras, e.g. neo4j = [...], surrealdb = [...]
 
 [build-system]
-requires = ["uv_build>=0.9.18,<1.0.0"]
+requires = ["uv_build>=0.11.26,<1.0.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "basedpyright>=1.38.0",
-    "hypothesis>=6.155",
-    "ipython>=9.10.0",
+    "basedpyright>=1.39.9",
+    "hypothesis>=6.156.1",
+    "ipython>=9.15.0",
     "pdbpp>=0.12.0.post1",
-    "pytest>=8.0.0",
+    "pytest>=9.1.1",
     "pytest-cov>=6.0.0",
-    "ruff>=0.15.1",
+    "ruff>=0.15.20",
 ]
 docs = [
     "mkdocs>=1.6.0",
     "mkdocs-material>=9.7.0",
-    "mkdocstrings[python]>=0.26.0",
+    "mkdocstrings[python]>=1.0.4",
     "mkdocs-gen-files>=0.5.0",
     "mkdocs-literate-nav>=0.6.0",
     "mkdocs-section-index>=0.3.0",
