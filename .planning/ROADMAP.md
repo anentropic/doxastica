@@ -75,7 +75,17 @@ Full phase goals, success criteria, and plan breakdowns are archived in
   4. The M0 conformance suite stays green on both backends (still SKIP-not-fail when the ladybug driver is absent).
   5. The Cluedo detective tutorial demonstrates a **within-scope epistemic gradient** (`suspected` → `believed` → `certain`) plus one **reader-side ordinal comparison** driving a decision, reconciles stance (within-scope degree) against the certain/provisional **scope** split (cross-scope); `revise`/`expand` signature references are refreshed across the docs site and `mkdocs build --strict` stays green.
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+**Wave 1** *(three independent test tracks — disjoint files, parallel-friendly)*
+
+- [ ] 10-01-PLAN.md — SC1: widen the stateful oracle to carry stance + mandatory non-vacuity discrimination proof (tests/test_invariants.py)
+- [ ] 10-02-PLAN.md — SC2: exhaustive order-law enumeration (antisymmetry/transitivity/trichotomy) + no-arithmetic closure guard (tests/test_stance.py)
+- [ ] 10-03-PLAN.md — SC3: stance-quantified persistence — round-trip / contract-verbatim / get_scope_at over all four members × both backends (tests/test_stance_persistence.py)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 10-04-PLAN.md — D-13 export `Stance` + SC5 Cluedo tutorial (gradient + reader-side ordinal decision + stance/scope reconciliation) + SC4 dual-env SKIP-not-fail confirmation
 
 ## Progress
 
