@@ -21,7 +21,7 @@ Protocol whose correctness is *provable* — with zero narrative semantics leaki
 
 Decision-grade edits to the frozen value layer — reversing them is a rewrite.
 
-- [ ] **STANCE-01**: A canonical `Stance` enum defines the ordinal epistemic taxonomy with
+- [x] **STANCE-01**: A canonical `Stance` enum defines the ordinal epistemic taxonomy with
       members `doubted < suspected < believed < certain` and a **total order**, implemented as a
       **plain `Enum` + `functools.total_ordering`** with an explicit integer rank (`__lt__`
       compares `.value`, returning `NotImplemented` for non-`Stance` operands). `IntEnum` is
@@ -31,13 +31,13 @@ Decision-grade edits to the frozen value layer — reversing them is a rewrite.
       as an operable number. First *ordered* enum in the codebase; `Status`/`EdgeType` stay
       unordered `StrEnum`s.
 
-- [ ] **STANCE-02**: `BeliefState` (the frozen, `extra="forbid"` pydantic v2 model) gains a
+- [x] **STANCE-02**: `BeliefState` (the frozen, `extra="forbid"` pydantic v2 model) gains a
       `stance: Stance` field — six fields → seven. The closed-taxonomy docstring is updated to
       keep the field roster honest.
 
 ### Write & Persistence
 
-- [ ] **STANCE-03**: The write surface (`revise` / `expand`) accepts an **optional** `stance`
+- [x] **STANCE-03**: The write surface (`revise` / `expand`) accepts an **optional** `stance`
       parameter **defaulting to `certain`** ("core default, NVM overrides"). The value
       round-trips **byte-stable on both backends** (in-memory + ladybug), using the same
       encode/hydrate discipline as `value`. Serialization leans on the member `.name` (a bare
@@ -45,7 +45,7 @@ Decision-grade edits to the frozen value layer — reversing them is a rewrite.
       base64/STRING-column safe), hydrated back to the `Stance` member — exact wire form
       confirmed at planning. Existing callers that omit `stance` are unaffected.
 
-- [ ] **STANCE-04**: `contract` preserves the prior stance **verbatim** on the retracted tail
+- [x] **STANCE-04**: `contract` preserves the prior stance **verbatim** on the retracted tail
       it appends (mirrors the existing verbatim-value copy; Pitfall-2 sibling).
 
 - [ ] **STANCE-05**: `get_scope_at` reconstructs stance unchanged — time-travel round-trips the
@@ -53,7 +53,7 @@ Decision-grade edits to the frozen value layer — reversing them is a rewrite.
 
 ### Comparison Contract
 
-- [ ] **STANCE-06**: Ordinal **comparison** (`<`, `>`, `==`, ordering) is the only operation
+- [x] **STANCE-06**: Ordinal **comparison** (`<`, `>`, `==`, ordering) is the only operation
       the `Stance` type supports. Arithmetic is a **type-level guarantee**, not a lint:
       `Stance.certain + Stance.doubted`, `Stance.certain * 2`, and `Stance.believed < 5` each
       raise `TypeError` (the plain-`Enum` base defines no `__add__`/`__mul__`, and `__lt__`
@@ -65,17 +65,21 @@ Decision-grade edits to the frozen value layer — reversing them is a rewrite.
 - [ ] **STANCE-07**: Hypothesis property suite (both backends, **oracle-independent** — the
       shadow oracle never calls the SUT), in the style of `tests/test_invariants.py`, that
       actually *carries* stance rather than staying vacuously green:
+
     - **(a) Oracle tracks stance per entry.** The shadow/fold oracle model records `stance`
       alongside `value` for every tracked belief-in-scope entry, so the oracle can diverge from
       the SUT on stance.
+
     - **(b) Base comparison includes stance.** The harness's state-equality key widens from
       `{belief_id: value}` to `{belief_id: (value, stance)}` everywhere the SUT is compared to
       the oracle. This is the load-bearing change: **Extensionality (K*6) `revise ≡ expand`
       parity now compares stance too**, so two ops that agree on value but differ on stance
       correctly *fail* parity instead of passing vacuously.
+
     - **(c) Round-trip / preservation / reconstruction properties.** `stance` survives
       `revise → query_scope` unchanged; `contract` preserves the prior stance **verbatim** on
       the retracted tail (STANCE-04); `get_scope_at` reconstructs stance (STANCE-05).
+
     - **(d) Type-level ordering guarantees.** The enum order is **total and antisymmetric**, and
       **no arithmetic operator is reachable** on the type (assert the negative — `+`/`*`/int-`<`
       raise `TypeError`, STANCE-06).
@@ -119,11 +123,11 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STANCE-01 | Phase 9 | Pending |
-| STANCE-02 | Phase 9 | Pending |
-| STANCE-03 | Phase 9 | Pending |
-| STANCE-04 | Phase 9 | Pending |
+| STANCE-01 | Phase 9 | Complete |
+| STANCE-02 | Phase 9 | Complete |
+| STANCE-03 | Phase 9 | Complete |
+| STANCE-04 | Phase 9 | Complete |
 | STANCE-05 | Phase 9 | Pending |
-| STANCE-06 | Phase 9 | Pending |
+| STANCE-06 | Phase 9 | Complete |
 | STANCE-07 | Phase 10 | Pending |
 | DOCS-01 | Phase 10 | Pending |

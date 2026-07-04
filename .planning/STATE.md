@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.2.0
 milestone_name: — Stance
-status: planning
+status: executing
 stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-07-04T20:00:30.197Z"
-last_activity: 2026-07-04 — v0.2.0 roadmap created (Phases 9–10)
+last_updated: "2026-07-04T20:14:03.297Z"
+last_activity: 2026-07-04 -- Phase 09 execution started
 progress:
   total_phases: 2
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-13)
 
 **Core value:** A correct, append-only belief-revision core behind a clean `BeliefStore` Protocol whose correctness is *provable* — AGM/Hansson postulate compliance and structural invariants verified mechanically, zero narrative semantics leaking in.
-**Current focus:** v0.2.0 Stance (R21) — Phase 9 (Stance value layer, write & persistence) next
+**Current focus:** Phase 09 — stance-value-layer-write-persistence
 
 ## Current Position
 
-Phase: 9 — Stance Value Layer, Write & Persistence (not started)
-Plan: —
-Status: Roadmapped — awaiting phase planning
-Last activity: 2026-07-04 — v0.2.0 roadmap created (Phases 9–10)
+Phase: 09 (stance-value-layer-write-persistence) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-07-04 -- Phase 09 execution started
 
 ## Performance Metrics
 
@@ -83,6 +83,7 @@ Last activity: 2026-07-04 — v0.2.0 roadmap created (Phases 9–10)
 | Phase 08 P01 | 2min | 2 tasks | 3 files |
 | Phase 08 P02 | 3min | 2 tasks | 2 files |
 | Phase 08 P03 | 15m | 3 tasks | 5 files |
+| Phase 09 P01 | 8min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -139,6 +140,8 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase 08]: 08-02: README leads with PKG-03 Kumiho framing (reference implementation of Kumiho, multi-scope extension, no recovery) + D-03 install split; docs/src/index.md Quick Start is a runnable zero-dep MemoryCore.in_memory->revise->query_scope example using uuid7 (verified by running it)
 - [Phase ?]: Used git mv (relocation, not duplication) to publish the backend contract inside docs_dir
 - [Phase ?]: Pinned CI git-cliff to .cliff.toml explicitly (default search path is cliff.toml, not the dot-file)
+- [Phase 09]: 09-01: Stance is a plain Enum + total_ordering with an isinstance-guarded __lt__ (not IntEnum/StrEnum); +/*/cross-type < raise TypeError by base-class choice. Serialize .name / hydrate Stance[token] name-lookup (never value-lookup on the wire token).
+- [Phase 09]: 09-01: stance is a REQUIRED 7th BeliefState field (no model default, D-01); the certain default lives on revise/expand. protocol.py imports Stance at RUNTIME because the =Stance.certain default is evaluated at class-definition time (TYPE_CHECKING-only would NameError).
 
 ### Pending Todos
 
@@ -176,7 +179,7 @@ Items acknowledged at v0.1.0 milestone close (5 open artifacts; none are functio
 
 ## Session Continuity
 
-Last session: 2026-06-19T15:31:36.201Z
+Last session: 2026-07-04T20:13:27.739Z
 Stopped at: Completed 08-02-PLAN.md
 Resume file: .planning/phases/07-agm-hansson-conformance-suite/07-04-PLAN.md
 

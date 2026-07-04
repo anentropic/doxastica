@@ -56,7 +56,7 @@ Full phase goals, success criteria, and plan breakdowns are archived in
 
 **Wave 1**
 
-- [ ] 09-01-PLAN.md — Stance type, model & write-through spine (enum + required field + core/protocol/ladybug threading + SC2 unit proof)
+- [x] 09-01-PLAN.md — Stance type, model & write-through spine (enum + required field + core/protocol/ladybug threading + SC2 unit proof)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -89,5 +89,5 @@ Full phase goals, success criteria, and plan breakdowns are archived in
 | 6. Structural Time-Travel | v0.1.0 | 2/2 | Complete | 2026-06-19 |
 | 7. AGM/Hansson Backend Conformance Suite & Irony Join | v0.1.0 | 4/4 | Complete | 2026-06-19 |
 | 8. Publishable Polish | v0.1.0 | 3/3 | Complete | 2026-06-19 |
-| 9. Stance Value Layer, Write & Persistence | v0.2.0 | 0/2 | Planned | - |
+| 9. Stance Value Layer, Write & Persistence | v0.2.0 | 1/2 | In Progress|  |
 | 10. Stance Formal Proof & Docs | v0.2.0 | 0/? | Not started | - |
