@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 Phase: 08
 Plan: Not started
 Status: Phase complete — ready for verification
-Last activity: 2026-06-21 - Completed quick task 260621-mjb: removed factories layer (pure DI)
+Last activity: 2026-07-04 - Completed quick task 260704-1x1: replaced agent-team tutorial with Cluedo detective (belief-revision Story B)
 
 Progress: [██████████] 100% (4/4 plans)
 
@@ -162,6 +162,7 @@ None yet.
 | 260622-hiy | PR #1 review fixes: broken `MemoryCore.in_memory()` Quick Start → `MemoryCore(InMemoryBackend())`; drop stored `CURRENT_STATE` from backend-contract; test `-> None` consistency; assert port surface is exactly five primitives | 2026-06-22 | 3fac85b | [260622-hiy-pr1-review-fixes](./quick/260622-hiy-pr1-review-fixes/) |
 | 260702-tab | Switch mkdocs docs to top tabs navigation — add `navigation.tabs` to theme features (kept `navigation.sections` for per-tab section grouping) | 2026-07-02 | be5a828 | — (gsd-fast) |
 | 260702-bpc | Nest Backend Port Contract under Explanation — move `backend-contract.md` into `docs/src/explanation/`, drop its top-level tab | 2026-07-02 | 3eee04e | — (gsd-fast) |
+| 260704-1x1 | Replace agent-team tutorial with Cluedo detective belief-revision tutorial (centers Story B: contradiction → supersede → stale cascade) | 2026-07-04 | c22f7f7 | [260704-1x1-replace-agent-team-tutorial-with-cluedo-](./quick/260704-1x1-replace-agent-team-tutorial-with-cluedo-/) |
 
 ## Deferred Items
 
