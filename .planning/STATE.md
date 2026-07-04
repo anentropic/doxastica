@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.1.0
-milestone_name: milestone
-status: Awaiting next milestone
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-07-04T11:11:37.407Z"
-last_activity: 2026-07-04 — Milestone v0.1.0 completed and archived
+milestone: v0.2.0
+milestone_name: Stance
+status: planning
+last_updated: "2026-07-04T13:28:13.397Z"
+last_activity: 2026-07-04
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 26
-  completed_plans: 26
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 
 ## Current Position
 
-Phase: Milestone v0.1.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-07-04 — Milestone v0.1.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-07-04 — Milestone v0.2.0 started
 
 ## Performance Metrics
 

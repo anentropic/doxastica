@@ -21,6 +21,33 @@ correctness is *provable* — AGM postulate compliance and structural invariants
 mechanically, with zero narrative semantics leaking into it. If everything else is
 deferred, the formal core and its property-test suite must be right.
 
+## Current Milestone: v0.2.0 Stance
+
+**Goal:** Add `stance` — a comparison-only ordinal epistemic enum — as a first-class field
+on `BeliefState`, closing the ratified NVM **R21** gap, with the canonical ordering owned by
+the core, all stance *policy* left to NVM, and the docs updated to showcase it.
+
+**Target features:**
+- A canonical `Stance` `IntEnum` with a property-tested total order:
+  `doubted < suspected < believed < certain`.
+- `stance` on the frozen `BeliefState` (six fields → seven) — a decision-grade taxonomy edit.
+- `stance` accepted on the write surface (`revise`/`expand`, optional, defaulting to
+  `certain`); `contract` preserves the prior stance verbatim on its retracted tail; the value
+  round-trips byte-stable on **both** backends.
+- Ordinal **comparison** exposed as the only core operation over stance — no arithmetic path
+  reachable (asserted negatively).
+- STANCE-05 Hypothesis property suite (dual-backend, oracle-independent, `test_invariants.py`
+  style).
+- Docs: update the Cluedo detective tutorial to demonstrate stance (a within-scope epistemic
+  gradient + reader-side ordinal comparison) and refresh `revise`/`expand` signature references
+  across the docs site.
+
+**Boundaries:** `IntEnum` (native total order, no rank map); **edge stance out of scope**
+(core edges stay generic; R21's "edges carry stance" reconciled as NVM metadata, not silently
+dropped); **no policy in core** (no assignment/propagation/contradiction/torn-mind logic;
+`test_import_purity`-style boundary intact); **no numeric `confidence` field, ever**; the
+closed `BeliefFilter` stays closed (no stance predicate).
+
 ## Requirements
 
 ### Validated
@@ -42,53 +69,27 @@ deferred, the formal core and its property-test suite must be right.
 
 <!-- Current scope. Building toward these. All hypotheses until shipped. -->
 
-> **All items below shipped in v0.1.0** (see Validated above). No milestone is currently
-> active — run `/gsd-new-milestone` to scope the next version's Active requirements. The
-> list is retained as the original v0.1.0 scope hypotheses for historical reference.
+> **v0.2.0 — Stance (R21).** The v0.1.0 M0 core shipped (see Validated); its original scope
+> hypotheses are archived in [milestones/v0.1.0-ROADMAP.md](milestones/v0.1.0-ROADMAP.md).
+> Active scope below is the Stance feature only.
 
-- [ ] **`BeliefStore` Protocol** as the public seam consumers (NVM and others) code against
-- [ ] **Ports & Adapters / pluggable backends** — the belief-revision discipline lives in a
-      backend-agnostic core (`MemoryCore`) above a defined **backend port**; alternative
-      backends can be written for any labelled property graph meeting the documented
-      constraint. `ladybug` is the **reference backend**; an **in-memory backend** ships as
-      the second backend (proves the seam *and* doubles as the property-test oracle). The
-      AGM/Hansson property suite runs as a **backend conformance suite** — every backend
-      passes the same postulate tests.
-- [ ] **Flexible connection (ladybug backend)** — accept an **injected** connection +
-      namespace prefix (NVM's primary need — it owns the handle and leases it under label
-      tenancy), *and* open/manage its own connection for standalone use. Tests use private
-      throwaway databases.
-- [ ] **Scopes** as named belief-holders, including a privileged **world scope** where
-      `contract()` is an error (append-only / no-retcon enforcement point)
-- [ ] **`Belief` / `BeliefState` split** — stable identity + immutable, append-only
-      revision chain; current per belief-in-scope is **derived** (D-01: no stored
-      `CURRENT_STATE` pointer — a profiling-driven optimization, addable without changing
-      the public surface); one belief per `Belief` node
-- [ ] Core belief operations: `revise`, `expand`, `contract`, `get_or_create_scope`
-- [x] **Generic typed edges** — `SUPERSEDES`, `DEPENDS_ON`, `DERIVED_FROM` (no epistemic
-      semantics; NVM layers meaning on top) via `add_edge` — *shipped Phase 5 (EDGE-01)*
-- [x] **`get_impact`** — bounded-depth contraction-cascade traversal over dependency edges
-      (mechanism only; policy is NVM's) — *shipped Phase 5 (EDGE-02)*
-- [x] **`get_scope_at`** — structural time-travel query ("what did this scope hold as of
-      event E"), answerable from immutable event-id-ordered states — *shipped Phase 6 (HIST-03)*
-- [x] `get_revision_chain` and `query_scope` (with `include_retracted` flag) retrieval — *shipped Phase 4*
-- [ ] **Opaque values + opaque event ids** — the core stores `value: Any` and UUID7
-      event ids it never interprets (no triple structure, no provenance semantics inside)
-- [ ] **Deprecated vs. superseded** as a structural/query distinction (core), with meaning
-      left to NVM
-- [x] **AGM postulate property-test suite** (Hypothesis over operation sequences): success,
-      inclusion, vacuity, consistency, extensionality — recovery deliberately excluded;
-      plus the Hansson base-contraction postulates — *shipped Phase 7 (FORMAL-01/02/04)*
-- [x] **Structural-invariant tests**: `CURRENT_STATE` uniqueness per belief, chain
-      immutability, `get_scope_at` ≡ event replay — *shipped Phase 7 (FORMAL-03)*
-- [x] **Irony-join demonstration** on synthetic data: actor-scope vs. world-scope
-      divergence computed as a single query — *shipped Phase 7 (FORMAL-05)*
-- [ ] Packaged from the `cookiecutter-python-uv-library` template (uv, basedpyright strict,
-      ruff, pytest) depending on **`ladybug` (the LadybugDB PyPI package) + `pydantic` only**,
-      zero NVM imports
-- [ ] **Publication-ready**: MIT license, docs site, GitHub Actions CI + release config,
-      PyPI-ready packaging; README leads with "standalone reference implementation of
-      Kumiho (arXiv 2603.17244), multi-scope extension, no recovery"
+- [ ] **Canonical `Stance` `IntEnum`** with a property-tested **total order**
+      (`doubted < suspected < believed < certain`); comparison is the only permitted operation
+      (no arithmetic path reachable)
+- [ ] **`stance` on `BeliefState`** — the frozen value model grows from six fields to seven; a
+      decision-grade edit to the closed taxonomy
+- [ ] **Write surface accepts stance** — `revise`/`expand` take an optional `stance` defaulting
+      to `certain` ("core default, NVM overrides"); the value round-trips byte-stable on **both**
+      backends (same encode/hydrate discipline as `value`)
+- [ ] **`contract` preserves prior stance** — the retracted tail carries the prior stance
+      verbatim (mirrors the existing verbatim-value copy)
+- [ ] **`get_scope_at` reconstructs stance** — time-travel round-trips stance unchanged
+- [ ] **STANCE-05 property suite** — dual-backend, oracle-independent (`test_invariants.py`
+      style): order is total and antisymmetric; stance survives revise→query and `get_scope_at`
+      round-trips; `contract` preserves it; no arithmetic operator is reachable on the type
+- [ ] **Docs: Cluedo tutorial demonstrates stance** — a within-scope epistemic gradient plus
+      reader-side ordinal comparison (policy stays the reader's, per R21); `revise`/`expand`
+      signature references refreshed across the docs site
 
 ### Out of Scope
 
@@ -182,6 +183,9 @@ deferred, the formal core and its property-test suite must be right.
 | `get_impact` default `depth=5` | Sketch number from the recovered Protocol; truncation policy undesigned | ⚠️ Revisit (soft spot §10.3) |
 | **Pluggable backends via a port (Ports & Adapters)** — reverses NVM's "no storage abstraction" stance | Justified by the new context: doxastica is a *publishable standalone* library, so backend pluggability is a real product goal, not speculative generality. The port sits **below** the unchanged NVM↔core seam, so NVM and R19 tenancy are unaffected; the property suite becomes a backend conformance suite proving every backend correct | ⚠️ Revisit — port *granularity* (Cypher-level vs. LPG-primitive) undecided (Phase 1) |
 | Ship a second (in-memory) backend in M0 | Proves the port is real *and* is the shadow oracle Phase 7 needs anyway — nearly free, load-bearing, not speculative | — Pending |
+| **Stance is a core `IntEnum`** (v0.2.0, R21) | The reason stance exists is its *total order*; `IntEnum` makes that native and un-fakeable (`certain > believed` is `3 > 2`) with no auxiliary rank map to drift. Cost: persists as `0..3`, less legible than the StrEnum tokens of `Status`/`EdgeType` (neither of which is ordered today) | — v0.2.0 |
+| **Edge stance is out of scope** (v0.2.0) | Belief-state stance is core; core edges are generic (`SUPERSEDES`/`DEPENDS_ON`/`DERIVED_FROM`) and the epistemic edges are NVM specialisations that don't exist in core. R21's "edges carry stance" reconciled as NVM edge metadata, not silently dropped; avoids adding a property payload to `add_edge` (a bigger port change) | — v0.2.0 |
+| **`revise`/`expand` default `stance=certain`** (v0.2.0) | Assignment is an NVM concern, so the core needs a neutral default; `certain` matches world-scope authored-canon and observed facts (common M0 synthetic case). Optional param → existing callers/tests unchanged. Documented "core default, NVM overrides" | — v0.2.0 |
 
 ### Open questions to resolve during planning
 
@@ -237,4 +241,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 - **Phase 8 — Publishable Polish** (complete 2026-06-19): the green-suite core made citable and shippable as a standalone OSS reference implementation. Overwhelmingly verification + wiring + content over an infrastructure base the cookiecutter and earlier phases had already front-loaded (mkdocs-material, CI/release/docs workflows, MIT LICENSE, `.cliff.toml`, `py.typed`, D-03 packaging). Closed the genuine gaps: PyPI-ready `pyproject.toml` metadata (PEP 639 SPDX `license`, `classifiers`, `keywords`, `[project.urls]`) — fresh wheel METADATA proves `pydantic` is the sole required dep with `ladybug` only under `extra == 'ladybug'`/`'all'`, `Requires-Python >=3.14` (PKG-02); README rewritten to lead with the Kumiho reference-implementation framing ("multi-scope extension, no recovery") + a runnable `docs/src/index.md` Quick Start that executes against the base install (PKG-03); the backend port contract relocated into `docs_dir` and wired into the mkdocs nav so `mkdocs build --strict` publishes `site/backend-contract/index.html`, git-cliff pinned to `.cliff.toml` in both `docs.yml` and `release.yml` (the dot-config was silently ignored), and the fresh-wheel `py.typed`/import gate confirmed (PKG-04). Also reconciled the phase's own stale acceptance prose (REQUIREMENTS PKG-02 + ROADMAP SC1) to the decided D-03 + 3.14-floor bar. No core logic touched; no PyPI tag pushed (pipeline-ready ≠ published, by design). Verification 13/13 must-haves; Phase-7 conformance suite unchanged (102 passed, 74 ladybug-extra skips, 1 strict xfail). **M0 / v0.1.0 milestone complete.**
 
-*Last updated: 2026-07-04 after v0.1.0 milestone completion (M0 / Kumiho AGM Core)*
+*Last updated: 2026-07-04 — v0.2.0 Stance (R21) milestone scoped (`/gsd-new-milestone`)*
