@@ -36,10 +36,15 @@ deferred, the formal core and its property-test suite must be right.
 - **Generic typed edges + bounded contraction cascade** — `add_edge` lays closed-`EdgeType` (`SUPERSEDES`/`DEPENDS_ON`/`DERIVED_FROM`) edges with no epistemic semantics; `get_impact` is the cycle-safe, depth-bounded cascade returning `ImpactResult(reached, frontier, truncated)` over `{DEPENDS_ON, DERIVED_FROM}` in the **dependent→source (`direction="in"`)** sense, the start excluded, hydration-gap closed via `match_nodes` re-fetch. Enabled by a new keyword-only `direction` parameter on the `BackendPort.traverse` primitive (default `"out"`, a cross-phase contract for Phase 6) — reverse-adjacency in-memory, 3-site arrow-flip in ladybug. Mechanism only; AGM Relevance/Core-Retainment postulate tests deferred to Phase 7 (Phase 5, EDGE-01/EDGE-02).
 - **`get_scope_at` structural time-travel** — reconstructs a scope's active base *as of* an event purely structurally from immutable `source_event_id`-ordered states, composing only `match_nodes` (no `traverse`, core stays driver-blind). A temporal variant of `query_scope`: the one structural change is an inclusive `source_event_id <= as_of` **cut applied before** the per-belief ordering-max (cut-then-max = REWIND, not `event_id_max`'s max-then-filter DROP), with a cut-window retracted collapse. The "most complex query" weight is cashed in the proof: a pure-Python operational-fold oracle asserts `get_scope_at(scope, cut) == fold(ops, cut)` under Hypothesis on both backends, with intra-ms-colliding/out-of-order UUID7 ids (SC3) and `as_of` stepped across event ids (SC2). The last `BeliefStore` method to land (Phase 6, HIST-03).
 - **M0 exit-gate conformance suite** — the mechanically-verified proof, parameterised over every registered backend (in-memory oracle + ladybug conforming identically, BACK-05). AGM revision postulates (Success K*2, Inclusion K*3, Vacuity K*4, Consistency K*5, Extensionality K*6; Closure K*1 dropped by construction) and the Hansson base-contraction postulates (Success, Inclusion, Relevance, Core-Retainment, Uniformity, phrased against append-only superseded-chain semantics, not classical partial-meet) assert against an **independent** shadow oracle that never calls the system-under-test. The named structural-invariant set (derived-current uniqueness, chain immutability, `get_scope_at ≡ replay`, world-scope no-contraction) is registered as a conformance set. AGM **Recovery** appears only as a loud `@pytest.mark.xfail(strict=True)` counterexample (the single deliberate exclusion — a strict-xfail drift guard, never asserted true), with positive superseded-chain replacement tests in its place. The irony/divergence join is demonstrated on synthetic data: two scopes diverging on `belief_id` in **one `match_nodes` round-trip** over the generic port, validated against a plain-Python oracle, no narrative naming in core. Suite green (194 passed, 1 xfailed) on both backends (Phase 7, FORMAL-01..05/BACK-05).
+- **Publishable polish** — shipped as an OSS reference implementation: `pydantic`-only base install with `ladybug` demoted to the `doxastica[ladybug]` extra, split isolation/full CI, PEP 639 PyPI-ready `pyproject.toml` metadata, a `mkdocs-material` docs site (Diataxis) including the published backend-port contract, a tag-triggered PyPI `release.yml` pipeline, `py.typed`, and an MIT license (Phase 8, PKG-01..04).
 
 ### Active
 
 <!-- Current scope. Building toward these. All hypotheses until shipped. -->
+
+> **All items below shipped in v0.1.0** (see Validated above). No milestone is currently
+> active — run `/gsd-new-milestone` to scope the next version's Active requirements. The
+> list is retained as the original v0.1.0 scope hypotheses for historical reference.
 
 - [ ] **`BeliefStore` Protocol** as the public seam consumers (NVM and others) code against
 - [ ] **Ports & Adapters / pluggable backends** — the belief-revision discipline lives in a
@@ -113,6 +118,10 @@ deferred, the formal core and its property-test suite must be right.
 
 ## Context
 
+- **Current state (v0.1.0 shipped 2026-07-04).** All eight phases complete (26 plans);
+  ~1,970 LOC `src` / ~3,800 LOC `tests`; conformance suite green on both backends
+  (194 passed, 1 strict xfail). Pipeline-ready for PyPI at `0.1.0` (tag `v0.1.0` triggers
+  `release.yml`); not yet published.
 - **This is NVM's M0.** The library extracts the "memory core seam" designed in
   `narrative-vm/_design/v2/05-nvm-memory-core.md` and scoped as the M0 milestone in
   `15-nvm-milestones.md`. The downstream consumer (NVM's `ladybug` adapter) implements
@@ -228,4 +237,4 @@ This document evolves at phase transitions and milestone boundaries.
 
 - **Phase 8 — Publishable Polish** (complete 2026-06-19): the green-suite core made citable and shippable as a standalone OSS reference implementation. Overwhelmingly verification + wiring + content over an infrastructure base the cookiecutter and earlier phases had already front-loaded (mkdocs-material, CI/release/docs workflows, MIT LICENSE, `.cliff.toml`, `py.typed`, D-03 packaging). Closed the genuine gaps: PyPI-ready `pyproject.toml` metadata (PEP 639 SPDX `license`, `classifiers`, `keywords`, `[project.urls]`) — fresh wheel METADATA proves `pydantic` is the sole required dep with `ladybug` only under `extra == 'ladybug'`/`'all'`, `Requires-Python >=3.14` (PKG-02); README rewritten to lead with the Kumiho reference-implementation framing ("multi-scope extension, no recovery") + a runnable `docs/src/index.md` Quick Start that executes against the base install (PKG-03); the backend port contract relocated into `docs_dir` and wired into the mkdocs nav so `mkdocs build --strict` publishes `site/backend-contract/index.html`, git-cliff pinned to `.cliff.toml` in both `docs.yml` and `release.yml` (the dot-config was silently ignored), and the fresh-wheel `py.typed`/import gate confirmed (PKG-04). Also reconciled the phase's own stale acceptance prose (REQUIREMENTS PKG-02 + ROADMAP SC1) to the decided D-03 + 3.14-floor bar. No core logic touched; no PyPI tag pushed (pipeline-ready ≠ published, by design). Verification 13/13 must-haves; Phase-7 conformance suite unchanged (102 passed, 74 ladybug-extra skips, 1 strict xfail). **M0 / v0.1.0 milestone complete.**
 
-*Last updated: 2026-06-19 after Phase 8 completion (M0 / v0.1.0 milestone complete)*
+*Last updated: 2026-07-04 after v0.1.0 milestone completion (M0 / Kumiho AGM Core)*

@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v0.1.0
 milestone_name: milestone
-status: verifying
+status: Awaiting next milestone
 stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-06-19T15:36:05.773Z"
-last_activity: 2026-06-19
+last_updated: "2026-07-04T11:11:37.407Z"
+last_activity: 2026-07-04 — Milestone v0.1.0 completed and archived
 progress:
   total_phases: 8
   completed_phases: 8
@@ -25,12 +25,10 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 
 ## Current Position
 
-Phase: 08
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-07-04 - Completed quick task 260704-1x1: replaced agent-team tutorial with Cluedo detective (belief-revision Story B)
-
-Progress: [██████████] 100% (4/4 plans)
+Phase: Milestone v0.1.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-07-04 — Milestone v0.1.0 completed and archived
 
 ## Performance Metrics
 
@@ -166,14 +164,22 @@ None yet.
 
 ## Deferred Items
 
-Items acknowledged and carried forward from previous milestone close:
+Items acknowledged at v0.1.0 milestone close (5 open artifacts; none are functional gaps):
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| *(none)* | | | |
+| quick_task | 260619-put — add `.github/copilot-instructions.md` | done (audit status "unknown"; work complete) | 2026-07-04 |
+| quick_task | 260704-1x1 — replace agent-team tutorial with Cluedo | done (audit status "unknown"; work complete) | 2026-07-04 |
+| seed | SEED-001 — doxastica-demo TUI "belief inspector" | dormant (future work) | 2026-07-04 |
+| context_question | Phase 01 — 2 CONTEXT open questions | resolved in the Phase-2 ladybug spike | 2026-07-04 |
+| context_question | Phase 02 — 3 CONTEXT open questions | resolved in the Phase-2 ladybug spike | 2026-07-04 |
 
 ## Session Continuity
 
 Last session: 2026-06-19T15:31:36.201Z
 Stopped at: Completed 08-02-PLAN.md
 Resume file: .planning/phases/07-agm-hansson-conformance-suite/07-04-PLAN.md
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
