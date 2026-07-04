@@ -376,18 +376,21 @@ def test_belief_state_field_set_is_the_closed_seven() -> None:
 *All other claims are `[VERIFIED: local run]` against py3.14 + pydantic 2.13, or `[VERIFIED: grep]`
 against the actual tree. This table is intentionally short — the phase is well-specified.*
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Exact basedpyright ignore code for the arithmetic-negative asserts.**
+1. **Exact basedpyright ignore code for the arithmetic-negative asserts. — RESOLVED (verify-on-contact).**
    - What we know: strict mode will reject `Stance.certain + Stance.doubted` and `Stance.believed < 5`
      statically (that rejection is *part of* the STANCE-06 guarantee).
    - What's unclear: whether the code is `reportOperatorIssue` (likely) or `reportGeneralTypeIssues`.
-   - Recommendation: write the tests, run `uv sync --locked --dev --extra ladybug && prek run
-     --all-files`, and adopt whatever narrow `# pyright: ignore[...]` code basedpyright names.
+   - RESOLVED: the test structure is correct regardless of the exact code name. 09-01 Task 1 carries
+     the execution-time procedure — write the tests, run `uv sync --locked --dev --extra ladybug &&
+     prek run --all-files`, and adopt whatever narrow `# pyright: ignore[...]` code basedpyright names.
+     Not a decision gap; a name basedpyright supplies on first run.
 
-2. **Placement of `Stance` within `models.py` (Claude's discretion per CONTEXT).**
-   - Recommendation: directly after `EdgeType` and before `Scope`, grouped with the other taxonomy
+2. **Placement of `Stance` within `models.py` (Claude's discretion per CONTEXT). — RESOLVED.**
+   - RESOLVED: directly after `EdgeType` and before `Scope`, grouped with the other taxonomy
      enums; add `Enum`/`total_ordering` imports at the top alongside the existing `StrEnum` import.
+     Adopted by the plan.
 
 ## Environment Availability
 

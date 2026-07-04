@@ -1,10 +1,11 @@
 ---
 gsd_state_version: 1.0
 milestone: v0.2.0
-milestone_name: Stance
-status: roadmapped
-last_updated: "2026-07-04T13:28:13.397Z"
-last_activity: 2026-07-04
+milestone_name: — Stance
+status: planning
+stopped_at: Completed 08-02-PLAN.md
+last_updated: "2026-07-04T20:00:30.197Z"
+last_activity: 2026-07-04 — v0.2.0 roadmap created (Phases 9–10)
 progress:
   total_phases: 2
   completed_phases: 0

@@ -42,29 +42,39 @@ Full phase goals, success criteria, and plan breakdowns are archived in
 ## Phase Details
 
 ### Phase 9: Stance Value Layer, Write & Persistence
+
 **Goal**: The core *stores and compares* stance — a canonical ordinal enum lands on `BeliefState`, is accepted on the write surface (optional, defaulting to `certain`), is preserved verbatim by `contract`, reconstructed by `get_scope_at`, and round-trips byte-stable on both backends, with ordinal comparison the only reachable operation over the type.
 **Depends on**: Phase 8 (v0.1.0 shipped — frozen value layer, dual backends, write spine, `get_scope_at` all in place)
 **Requirements**: STANCE-01, STANCE-02, STANCE-03, STANCE-04, STANCE-05, STANCE-06
 **Success Criteria** (what must be TRUE):
+
   1. A `Stance` enum exists with a **total order** `doubted < suspected < believed < certain` (plain `Enum` + `functools.total_ordering` + explicit integer rank; `IntEnum`/`StrEnum` rejected) — `Stance.doubted < Stance.certain` is `True` and every pair is ordered.
   2. Arithmetic and cross-type comparison on stance raise `TypeError` at the type level — `Stance.certain + Stance.doubted`, `Stance.certain * 2`, and `Stance.believed < 5` each raise; no core code path performs arithmetic on stance.
   3. `BeliefState` carries a `stance` field (six fields → seven, closed-taxonomy docstring updated); `revise`/`expand` accept an **optional** `stance` defaulting to `certain`, and existing callers that omit it are unaffected.
   4. A stance written via `revise`/`expand` round-trips **byte-stable** through `query_scope` on **both** the in-memory and ladybug backends (same encode/hydrate discipline as `value`; serialized via member `.name`).
-  5. `contract` preserves the prior stance **verbatim** on the retracted tail it appends, and `get_scope_at` reconstructs stance unchanged along with the rest of the state.
-**Plans**: 2 plans
+  5. `contract` preserves the prior stance **verbatim** on the retracted tail it appends, and `get_scope_at` reconstructs stance unchanged along with the rest of the state.**Plans**: 2 plans
+
+**Wave 1**
+
 - [ ] 09-01-PLAN.md — Stance type, model & write-through spine (enum + required field + core/protocol/ladybug threading + SC2 unit proof)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 09-02-PLAN.md — Stance persistence & time-travel proof (dual-backend byte-stable round-trip, contract-verbatim, get_scope_at)
 
 ### Phase 10: Stance Formal Proof & Docs
+
 **Goal**: Stance is mechanically *proven* correct, not vacuously green — the dual-backend property suite tracks stance in its oracle and widens the base-comparison key so K*6 Extensionality parity actually compares stance — and the docs showcase stance as a within-scope epistemic gradient with reader-side comparison.
 **Depends on**: Phase 9
 **Requirements**: STANCE-07, DOCS-01
 **Success Criteria** (what must be TRUE):
+
   1. The shadow/fold oracle records `stance` per tracked belief-in-scope entry, and the harness state-equality key widens `{belief_id: value}` → `{belief_id: (value, stance)}` everywhere the SUT is compared to the oracle — so a pair of ops agreeing on `value` but differing on `stance` **fails** K*6 (`revise ≡ expand`) parity instead of passing vacuously.
   2. Hypothesis property tests (both backends, oracle-independent, `test_invariants.py` style) assert the order is **total and antisymmetric** and that **no arithmetic operator is reachable** on the type (the negative is asserted — `+`/`*`/int-`<` raise `TypeError`).
   3. Round-trip / preservation / reconstruction properties hold under Hypothesis on both backends: stance survives `revise → query_scope`; `contract` preserves the prior stance verbatim (STANCE-04); `get_scope_at` reconstructs it (STANCE-05).
   4. The M0 conformance suite stays green on both backends (still SKIP-not-fail when the ladybug driver is absent).
   5. The Cluedo detective tutorial demonstrates a **within-scope epistemic gradient** (`suspected` → `believed` → `certain`) plus one **reader-side ordinal comparison** driving a decision, reconciles stance (within-scope degree) against the certain/provisional **scope** split (cross-scope); `revise`/`expand` signature references are refreshed across the docs site and `mkdocs build --strict` stays green.
+
 **Plans**: TBD
 
 ## Progress
