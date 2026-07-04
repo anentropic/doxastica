@@ -89,7 +89,11 @@ class Stance(Enum):
     certain = 3
 
     def __lt__(self, other: object) -> bool:
-        if self.__class__ is other.__class__:
+        # isinstance narrows for basedpyright-strict and is exactly equivalent to an
+        # ``is``-class check here: an ``Enum`` with members cannot be subclassed, so there is
+        # no subclass to admit. A non-``Stance`` operand yields ``NotImplemented`` so Python
+        # raises ``TypeError`` on a cross-type comparison (STANCE-06) rather than coercing.
+        if isinstance(other, Stance):
             return self.value < other.value
         return NotImplemented
 
