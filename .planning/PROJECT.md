@@ -109,8 +109,9 @@ _(none — awaiting next milestone)_
   conformance + property suite green (574 passed, 1 strict xfail with the ladybug extra;
   467 passed / 88 SKIP-not-fail without it). v0.2.0 added the ordinal `stance` field, its
   canonical total order, dual-backend persistence, and a proven-non-vacuous formal suite,
-  closing the ratified NVM **R21** gap. Pipeline-ready for PyPI (tags trigger `release.yml`);
-  not yet published.
+  closing the ratified NVM **R21** gap. **Published on PyPI** — `0.1.0` (2026-07-04) and
+  `0.2.0` (2026-07-05), each via a `v*` tag triggering `release.yml` (PyPI trusted publishing +
+  a GitHub Release). `pip install doxastica` / `doxastica[ladybug]`.
 - **This is NVM's M0.** The library extracts the "memory core seam" designed in
   `narrative-vm/_design/v2/05-nvm-memory-core.md` and scoped as the M0 milestone in
   `15-nvm-milestones.md`. The downstream consumer (NVM's `ladybug` adapter) implements
