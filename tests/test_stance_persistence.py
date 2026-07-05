@@ -79,14 +79,18 @@ def test_stance_defaults_to_certain(backend: BackendPort) -> None:
 
 
 # --------------------------------------------------------------------------------------------
-# STANCE-04 — contract copies the prior stance VERBATIM onto the retracted tail (both backends).
+# STANCE-04 / D-08 — contract copies EVERY prior stance VERBATIM onto the retracted tail, both
+# backends. Exhaustive over ``list(Stance)`` × the ``backend`` fixture (8 cases). A member-specific
+# hydrate bug (``Stance(props["stance"])`` value-lookup instead of ``Stance[...]`` name-lookup) makes
+# the ``is``-identity assertion RAISE for that member's parametrization (VALIDATION SC3 vacuous-pass).
 # --------------------------------------------------------------------------------------------
 
 
-def test_contract_preserves_stance_verbatim(backend: BackendPort) -> None:
-    """STANCE-04: the retracted tail carries the active state's stance unchanged (verbatim copy)."""
+@pytest.mark.parametrize("stance", list(Stance))
+def test_contract_preserves_stance_verbatim(backend: BackendPort, stance: Stance) -> None:
+    """STANCE-04/D-08: the retracted tail carries the active stance unchanged, every member."""
     core = MemoryCore(backend)
-    active = core.revise("alice", "p", "v", _event_id(), stance=Stance.believed)
+    active = core.revise("alice", "p", "v", _event_id(), stance=stance)
     core.contract("alice", "p", _event_id())
     retracted = core.get_revision_chain("p")[-1]
     assert retracted.status is Status.retracted, "the appended tail state must be RETRACTED"
@@ -96,15 +100,17 @@ def test_contract_preserves_stance_verbatim(backend: BackendPort) -> None:
 
 
 # --------------------------------------------------------------------------------------------
-# STANCE-05 — get_scope_at reconstructs stance unchanged along with the rest of the state.
+# STANCE-05 / D-08 — get_scope_at reconstructs EVERY stance member unchanged along with the rest
+# of the state, both backends. Exhaustive over ``list(Stance)`` × the ``backend`` fixture (8 cases).
 # --------------------------------------------------------------------------------------------
 
 
-def test_get_scope_at_reconstructs_stance(backend: BackendPort) -> None:
-    """STANCE-05: time-travel round-trips stance with the rest of the state (both backends)."""
+@pytest.mark.parametrize("stance", list(Stance))
+def test_get_scope_at_reconstructs_stance(backend: BackendPort, stance: Stance) -> None:
+    """STANCE-05/D-08: time-travel round-trips every stance member with the rest of the state."""
     core = MemoryCore(backend)
-    s = core.revise("alice", "p", "v", _event_id(), stance=Stance.suspected)
+    s = core.revise("alice", "p", "v", _event_id(), stance=stance)
     [state] = core.get_scope_at("alice", s.source_event_id)
-    assert state.stance is Stance.suspected, (
-        "get_scope_at must reconstruct the SUSPECTED member — _hydrate's name-lookup does it"
+    assert state.stance is stance, (
+        "get_scope_at must reconstruct the exact member — _hydrate's name-lookup does it"
     )
