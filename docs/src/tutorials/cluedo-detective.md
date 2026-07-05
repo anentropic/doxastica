@@ -32,6 +32,7 @@ By the end you will have:
 - [Superseded](../reference/doxastica/core.md#doxastica.core.MemoryCore.revise) a refuted belief and read the crossed-out notebook back with [`get_revision_chain`](../reference/doxastica/core.md#doxastica.core.MemoryCore.get_revision_chain).
 - Recorded a defeasible inference with a [`DERIVED_FROM`](../reference/doxastica/models.md#doxastica.models.EdgeType) edge, retracted its basis, and used [`get_impact`](../reference/doxastica/core.md#doxastica.core.MemoryCore.get_impact) to find the conclusion left dangling.
 - Hit the [`WorldScopeContractionError`](../reference/doxastica/errors.md#doxastica.errors.WorldScopeContractionError) guard that makes certainty un-retractable.
+- Watched a `"theory"` belief harden along a within-scope **stance** gradient (`suspected → believed → certain`) and gated one decision on it — while keeping stance distinct from the certain/provisional scope split.
 - Reconstructed the theory as it stood at accusation time with [`get_scope_at`](../reference/doxastica/core.md#doxastica.core.MemoryCore.get_scope_at).
 
 **Time:** about 20 minutes.
@@ -53,6 +54,7 @@ beyond `pip install doxastica`. It helps to have met the core operations first i
 |---|---|---|
 | Your own hand, and a card you were shown | a belief in the **world scope** (`WORLD_SCOPE_ID`) | Certain, never retracted: you cannot un-see a card. |
 | The current theory (culprit, weapon, room) | a belief in the scope `"theory"` | Provisional: superseded as evidence lands. |
+| How firmly you hold a theory belief | its **stance** (`suspected` / `believed` / `certain`) | A within-scope epistemic degree; *you* decide what each rung licenses. |
 | A defeasible inference ("assume Plum has the Rope") | a belief in `"theory"` plus a [`DERIVED_FROM`](../reference/doxastica/models.md#doxastica.models.EdgeType) edge to what it rests on | Can be proven false, then contracted, cascading to its dependents. |
 | A conclusion drawn *from* that inference | a belief in `"theory"`, `DERIVED_FROM` the inference | Goes stale when its basis is retracted. |
 | "What I believed when I accused" | [`get_scope_at(theory, as_of=…)`](../reference/doxastica/core.md#doxastica.core.MemoryCore.get_scope_at) | Reconstruct the theory at a past event. |
@@ -71,6 +73,7 @@ from doxastica import (
     EdgeType,
     InMemoryBackend,
     MemoryCore,
+    Stance,
     WORLD_SCOPE_ID,
     WorldScopeContractionError,
 )
@@ -97,13 +100,13 @@ core.revise(WORLD_SCOPE_ID, "seen:mustard", "Colonel Mustard", source_event_id=u
 ```
 
 Nothing here will ever be superseded or retracted. That is the promise of the world scope, and
-Step 7 shows what happens if you try to break it.
+Step 8 shows what happens if you try to break it.
 
 ## Step 3: Form a first theory
 
 Your working theory of the crime lives in an ordinary scope named `"theory"`. Right now it is a
 guess, not a fact. Capture the event id of this first theory: it is the moment you would have
-accused, and Step 8 rewinds to it.
+accused, and Step 9 rewinds to it.
 
 ```python
 accusation_event = uuid7()
@@ -157,10 +160,12 @@ flowchart LR
 ## Step 5: Contradiction #1 — the theory is overturned
 
 An opponent shows you the Mustard card. *You* recognise that it refutes `culprit="Mustard"` and
-record the correction by revising the belief. The prior value is superseded, not deleted.
+record the correction by revising the belief. The prior value is superseded, not deleted. Plum is
+only your new *prime suspect*, though, so you record it at a tentative `stance` — how firmly you
+hold the belief, which Step 6 develops.
 
 ```python
-core.revise("theory", "culprit", "Plum", source_event_id=uuid7())
+core.revise("theory", "culprit", "Plum", source_event_id=uuid7(), stance=Stance.suspected)
 
 print([s.value for s in core.get_revision_chain("culprit")])
 ```
@@ -176,7 +181,54 @@ nothing erased.
 The `"Mustard"` guess is still on the chain, marked as history. `get_revision_chain` is
 cross-scope by `belief_id`, so we keep `culprit` unique across scopes in this notebook.
 
-## Step 6: Contradiction #2 — a false inference and its fallout
+## Step 6: How sure are you? A within-scope stance gradient
+
+Naming Plum is not the same as being sure it is Plum. Every belief in the `"theory"` scope also
+carries a **stance**: *how firmly* you hold it, on a fixed four-rung ladder
+`doubted < suspected < believed < certain`. You just superseded Mustard, so Plum entered as a
+mere `suspected` guess (that is why Step 5 passed `stance=Stance.suspected`). As cards fall your
+way you revise the *same value* at a higher stance — the notebook records rising confidence
+without changing who you would accuse.
+
+```python
+# A second card is consistent with Plum: upgrade the suspicion to a working belief.
+core.revise("theory", "culprit", "Plum", source_event_id=uuid7(), stance=Stance.believed)
+
+# A forced reveal clinches it: now you hold Plum as certain.
+core.revise("theory", "culprit", "Plum", source_event_id=uuid7(), stance=Stance.certain)
+```
+
+The value never moved — only the stance climbed `suspected → believed → certain`. Reading the
+belief back hands you the current stance, and **you** decide what a given rung licenses. Here the
+policy is "do not accuse on a mere suspicion":
+
+```python
+[culprit] = core.query_scope("theory", BeliefFilter(belief_ids={"culprit"}))
+if culprit.stance >= Stance.believed:
+    print(f"Accuse {culprit.value}.")
+else:
+    print("Keep gathering evidence.")
+```
+
+```text
+Accuse Plum.
+```
+
+That `>=` is *your* policy, not the library's. doxastica stores and returns the stance and never
+interprets it: it has no notion that `believed` is "enough to accuse". The ordering exists so a
+reader can compare rungs; the decision is always yours.
+
+!!! warning "A certain *stance* is not the certain *scope*"
+    Two different "certainties" meet here, and conflating them is the easy mistake. **Stance** is
+    a *within-scope* epistemic degree — `doubted < suspected < believed < certain` — attached to a
+    single belief inside one scope; it says how firmly you hold *that* belief. The **scope** split
+    is a *cross-scope* distinction: the reserved world scope holds facts you can never retract,
+    while the `"theory"` scope holds a provisional theory. A `"theory"` belief held at
+    `Stance.certain` is still a *provisional* belief in a revisable scope — it is not promoted into
+    the world scope, and it can still be superseded. "Certain stance" answers *how firmly*;
+    "certain versus provisional scope" answers *which partition*. Keep them apart.
+
+## Step 7: Contradiction #2 — a false inference and its fallout
 
 Now new evidence disproves the assumption itself: Plum does *not* hold the Rope. You retract the
 assumption with [`contract`](../reference/doxastica/core.md#doxastica.core.MemoryCore.contract).
@@ -216,7 +268,7 @@ print([(b.belief_id, b.status.value) for b in tail])
     the Wrench is actually wrong now is your call as the detective; doxastica only surfaces the
     dependency so you know where to look.
 
-## Step 7: You can't un-see a card
+## Step 8: You can't un-see a card
 
 The whole reason the world scope is privileged is that its facts are not revisable. Try to
 retract the card you were shown and doxastica refuses:
@@ -236,7 +288,7 @@ The guard fires before any write, so a forbidden contraction can never leak a pa
 A world-scope fact that genuinely changes is *superseded* with a new `revise`, never punched out.
 The reasoning is in [Scopes and the World Scope](../explanation/scopes-and-world-scope.md#why-world-scope-contraction-is-forbidden).
 
-## Step 8: The audit trail
+## Step 9: The audit trail
 
 Because nothing is ever overwritten, you can reconstruct the theory exactly as it stood at any
 past event. Rewind to the accusation moment you captured in Step 3 with
@@ -259,7 +311,7 @@ Mustard
 This answers "who was I about to accuse, and on what theory?" without keeping a single manual
 snapshot.
 
-## Step 9: Theory of mind is just another scope
+## Step 10: Theory of mind is just another scope
 
 Modeling what an *opponent* has seen needs no new machinery: it is one more belief scope. Record
 what you have deduced Miss Scarlett must be holding, kept separate from your own theory.
@@ -311,6 +363,7 @@ from doxastica import (
     EdgeType,
     InMemoryBackend,
     MemoryCore,
+    Stance,
     WORLD_SCOPE_ID,
     WorldScopeContractionError,
 )
@@ -334,9 +387,15 @@ assume = core.revise(
 weapon_state = core.revise("theory", "weapon", "Wrench", source_event_id=uuid7())
 core.add_edge(weapon_state.state_id, assume.state_id, EdgeType.DERIVED_FROM)
 
-# Contradiction #1 — the Mustard card refutes culprit="Mustard"; supersede it.
-core.revise("theory", "culprit", "Plum", source_event_id=uuid7())
+# Contradiction #1 — the Mustard card refutes culprit="Mustard"; Plum enters as a suspicion.
+core.revise("theory", "culprit", "Plum", source_event_id=uuid7(), stance=Stance.suspected)
 assert [s.value for s in core.get_revision_chain("culprit")] == ["Mustard", "Plum"]
+
+# Evidence hardens the same value up the stance ladder: suspected -> believed -> certain.
+core.revise("theory", "culprit", "Plum", source_event_id=uuid7(), stance=Stance.believed)
+core.revise("theory", "culprit", "Plum", source_event_id=uuid7(), stance=Stance.certain)
+[culprit] = core.query_scope("theory", BeliefFilter(belief_ids={"culprit"}))
+assert culprit.stance is Stance.certain  # reader-side policy would now accuse
 
 # Contradiction #2 — the assumption dies; its conclusion is now stale.
 core.contract("theory", "assume-plum-has-rope", source_event_id=uuid7())
@@ -372,6 +431,9 @@ at accusation time.
   notebook back, oldest first, with nothing destroyed.
 - **Edges make cascades answerable.** A `DERIVED_FROM` edge from a conclusion to its basis is what
   lets `get_impact` find the belief left dangling when the basis is retracted.
+- **Stance is a within-scope degree, not a scope.** A `"theory"` belief hardens
+  `suspected → believed → certain` while staying provisional; *you* compare rungs to drive a
+  decision, and a `certain` stance never promotes a belief into the world scope.
 - **History is a free audit log.** `get_scope_at` rewinds the theory to any past event without a
   single manual snapshot.
 
