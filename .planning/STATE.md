@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.2.0
 milestone_name: — Stance
 status: executing
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-07-04T22:06:47.231Z"
-last_activity: 2026-07-04 -- Phase 10 planning complete
+stopped_at: None
+last_updated: "2026-07-05T00:18:01.966Z"
+last_activity: 2026-07-04 -- Phase 10 execution started
 progress:
   total_phases: 2
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 6
+  completed_plans: 3
   percent: 50
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-13)
 
 **Core value:** A correct, append-only belief-revision core behind a clean `BeliefStore` Protocol whose correctness is *provable* — AGM/Hansson postulate compliance and structural invariants verified mechanically, zero narrative semantics leaking in.
-**Current focus:** Phase 09 — stance-value-layer-write-persistence
+**Current focus:** Phase 10 — stance-formal-proof-docs
 
 ## Current Position
 
-Phase: 10
-Plan: Not started
+Phase: 10 (stance-formal-proof-docs) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-07-04 -- Phase 10 planning complete
+Last activity: 2026-07-04 -- Phase 10 execution started
 
 ## Performance Metrics
 
@@ -86,6 +86,7 @@ Last activity: 2026-07-04 -- Phase 10 planning complete
 | Phase 08 P03 | 15m | 3 tasks | 5 files |
 | Phase 09 P01 | 8min | 2 tasks | 6 files |
 | Phase 09 P02 | 8min | 2 tasks | 1 files |
+| Phase 10 P01 | 35min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -145,6 +146,8 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase 09]: 09-01: Stance is a plain Enum + total_ordering with an isinstance-guarded __lt__ (not IntEnum/StrEnum); +/*/cross-type < raise TypeError by base-class choice. Serialize .name / hydrate Stance[token] name-lookup (never value-lookup on the wire token).
 - [Phase 09]: 09-01: stance is a REQUIRED 7th BeliefState field (no model default, D-01); the certain default lives on revise/expand. protocol.py imports Stance at RUNTIME because the =Stance.certain default is evaluated at class-definition time (TYPE_CHECKING-only would NameError).
 - [Phase ?]: STANCE persistence proofs driven through MemoryCore(backend) with member-identity assertions; a value-vs-name hydrate regression raises on read (T-09-02)
+- [Phase 10]: Stance discrimination flows through the real widened _base_of (never an inline literal) so a value-only revert breaks the proof (VALIDATION SC1)
+- [Phase 10]: The deterministic _base_of/K*6 guard and the stateful-oracle event() flip label are kept as two distinct surfaces, not conflated (D-03)
 
 ### Pending Todos
 
@@ -182,8 +185,8 @@ Items acknowledged at v0.1.0 milestone close (5 open artifacts; none are functio
 
 ## Session Continuity
 
-Last session: 2026-07-04T20:20:38.651Z
-Stopped at: Completed 08-02-PLAN.md
+Last session: 2026-07-05T00:18:01.882Z
+Stopped at: None
 Resume file: .planning/phases/07-agm-hansson-conformance-suite/07-04-PLAN.md
 
 ## Operator Next Steps

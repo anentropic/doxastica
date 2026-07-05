@@ -62,7 +62,7 @@ Decision-grade edits to the frozen value layer — reversing them is a rewrite.
 
 ### Formal Correctness
 
-- [ ] **STANCE-07**: Hypothesis property suite (both backends, **oracle-independent** — the
+- [x] **STANCE-07**: Hypothesis property suite (both backends, **oracle-independent** — the
       shadow oracle never calls the SUT), in the style of `tests/test_invariants.py`, that
       actually *carries* stance rather than staying vacuously green:
 
@@ -129,5 +129,5 @@ Which phases cover which requirements. Populated during roadmap creation.
 | STANCE-04 | Phase 9 | Complete |
 | STANCE-05 | Phase 9 | Complete |
 | STANCE-06 | Phase 9 | Complete |
-| STANCE-07 | Phase 10 | Pending |
+| STANCE-07 | Phase 10 | Complete |
 | DOCS-01 | Phase 10 | Pending |
