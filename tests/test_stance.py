@@ -8,16 +8,57 @@ hydrate-via-``Stance[token]`` discipline holds (value-lookup on the token fails
 loud). The write/persist/read round-trip lives in ``test_stance_persistence.py``.
 """
 
+from __future__ import annotations
+
 import itertools
+import operator
+from typing import TYPE_CHECKING
 
 import pytest
 
 from doxastica.models import Stance
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 # Exhaustive enumeration of the 4-member domain (D-05): a complete enumeration is a
 # proof, a sample is an anecdote. 16 ordered pairs, 64 ordered triples.
 _PAIRS = list(itertools.product(Stance, repeat=2))  # 16
 _TRIPLES = list(itertools.product(Stance, repeat=3))  # 64
+
+
+def _binop(name: str) -> Callable[[object, object], object]:
+    # Fetch an ``operator.*`` binary function as a uniformly-typed ``(object, object) ->
+    # object`` callable. Going through ``getattr`` (rather than ``operator.xor`` etc. by
+    # attribute) keeps basedpyright-strict clean: several ``operator`` members are only
+    # partially typed in the stubs, so a literal ``[operator.xor, ...]`` list trips
+    # ``reportUnknownMemberType`` — replacing the old per-line ``reportOperatorIssue`` wall
+    # with a single typed seam here instead of scattered ignores (D-06).
+    return getattr(operator, name)
+
+
+# Every arithmetic / bitwise binary operator. The no-arithmetic guard (D-06) is a CLOSURE
+# claim: none of these is reachable for ANY member pair — not a three-witness sample.
+_ARITH = [
+    _binop(n)
+    for n in (
+        "add",
+        "sub",
+        "mul",
+        "truediv",
+        "floordiv",
+        "mod",
+        "pow",
+        "and_",
+        "or_",
+        "xor",
+        "lshift",
+        "rshift",
+    )
+]
+
+# The four ordering comparisons — cross-type application must raise (STANCE-06).
+_ORDERINGS = [_binop(n) for n in ("lt", "gt", "le", "ge")]
 
 
 def test_stance_total_order() -> None:
@@ -95,20 +136,40 @@ def test_transitivity(a: Stance, b: Stance, c: Stance) -> None:
         assert a < c
 
 
-def test_stance_arithmetic_and_cross_type_raise() -> None:
+# --- No-arithmetic closure + cross-type ordering (SC2, STANCE-06, D-06) ----------------
+
+
+@pytest.mark.parametrize("op", _ARITH)
+@pytest.mark.parametrize("a,b", _PAIRS)
+def test_no_arithmetic_operator_is_reachable(
+    op: Callable[[object, object], object], a: Stance, b: Stance
+) -> None:
     # STANCE-06: comparison is the ONLY reachable operation. The plain-Enum base leaves no
-    # numeric protocol (so `+` / `*` raise), and __lt__ returns NotImplemented for a
-    # non-Stance operand (so cross-type `<` / `>` raise) — all TypeError at the type level.
-    # basedpyright-strict statically rejects each of these operations; that static rejection
-    # is itself part of the STANCE-06 guarantee, hence the narrow per-line ignores.
+    # numeric/bitwise protocol, so EVERY arithmetic op raises TypeError for EVERY member
+    # pair — a closure claim (D-06), not three fixed witnesses.
     with pytest.raises(TypeError):
-        _ = Stance.certain + Stance.doubted  # pyright: ignore[reportOperatorIssue, reportUnknownVariableType]
-    with pytest.raises(TypeError):
-        _ = Stance.certain * 2  # pyright: ignore[reportOperatorIssue, reportUnknownVariableType]
-    with pytest.raises(TypeError):
-        _ = Stance.believed < 5  # pyright: ignore[reportOperatorIssue]
-    with pytest.raises(TypeError):
-        _ = Stance.believed > 5  # pyright: ignore[reportOperatorIssue]
+        op(a, b)
+
+
+@pytest.mark.parametrize("other", [5, "certain", None, 1.5, Stance])
+@pytest.mark.parametrize("member", list(Stance))
+def test_cross_type_comparison_raises(member: Stance, other: object) -> None:
+    # Cross-type ORDERING raises: __lt__ returns NotImplemented for a non-Stance operand,
+    # so Python raises TypeError on `<`/`>`/`<=`/`>=` rather than coercing (STANCE-06).
+    for cmp in _ORDERINGS:
+        with pytest.raises(TypeError):
+            cmp(member, other)
+
+
+@pytest.mark.parametrize("other", [5, "certain", None, 1.5, Stance])
+@pytest.mark.parametrize("member", list(Stance))
+def test_cross_type_equality_does_not_raise(member: Stance, other: object) -> None:
+    # Pitfall 5: `==` / `!=` DO NOT raise cross-type — Enum.__eq__ falls back to identity,
+    # returning a bool (False / True), never TypeError. STANCE-06 constrains ORDERING only.
+    eq = member == other
+    ne = member != other
+    assert isinstance(eq, bool) and eq is False
+    assert isinstance(ne, bool) and ne is True
 
 
 def test_stance_hydration_is_name_based() -> None:
