@@ -42,7 +42,9 @@ the core, all stance *policy* left to NVM, and the docs updated to showcase it.
   gradient + reader-side ordinal comparison) and refresh `revise`/`expand` signature references
   across the docs site.
 
-**Boundaries:** `IntEnum` (native total order, no rank map); **edge stance out of scope**
+**Boundaries:** `Stance` is a plain `Enum` + `functools.total_ordering` with an explicit rank
+(`IntEnum` **rejected** — it inherits `int`'s numeric protocol, so arithmetic would be
+reachable, contradicting the comparison-only contract); **edge stance out of scope**
 (core edges stay generic; R21's "edges carry stance" reconciled as NVM metadata, not silently
 dropped); **no policy in core** (no assignment/propagation/contradiction/torn-mind logic;
 `test_import_purity`-style boundary intact); **no numeric `confidence` field, ever**; the
@@ -73,9 +75,10 @@ closed `BeliefFilter` stays closed (no stance predicate).
 > hypotheses are archived in [milestones/v0.1.0-ROADMAP.md](milestones/v0.1.0-ROADMAP.md).
 > Active scope below is the Stance feature only.
 
-- [ ] **Canonical `Stance` `IntEnum`** with a property-tested **total order**
-      (`doubted < suspected < believed < certain`); comparison is the only permitted operation
-      (no arithmetic path reachable)
+- [ ] **Canonical `Stance` enum** (plain `Enum` + `functools.total_ordering` + explicit rank)
+      with a property-tested **total order** (`doubted < suspected < believed < certain`);
+      comparison is the only permitted operation, with arithmetic raising `TypeError` at the
+      type level (not `IntEnum`, which would leak the numeric protocol)
 - [ ] **`stance` on `BeliefState`** — the frozen value model grows from six fields to seven; a
       decision-grade edit to the closed taxonomy
 - [ ] **Write surface accepts stance** — `revise`/`expand` take an optional `stance` defaulting
@@ -183,7 +186,7 @@ closed `BeliefFilter` stays closed (no stance predicate).
 | `get_impact` default `depth=5` | Sketch number from the recovered Protocol; truncation policy undesigned | ⚠️ Revisit (soft spot §10.3) |
 | **Pluggable backends via a port (Ports & Adapters)** — reverses NVM's "no storage abstraction" stance | Justified by the new context: doxastica is a *publishable standalone* library, so backend pluggability is a real product goal, not speculative generality. The port sits **below** the unchanged NVM↔core seam, so NVM and R19 tenancy are unaffected; the property suite becomes a backend conformance suite proving every backend correct | ⚠️ Revisit — port *granularity* (Cypher-level vs. LPG-primitive) undecided (Phase 1) |
 | Ship a second (in-memory) backend in M0 | Proves the port is real *and* is the shadow oracle Phase 7 needs anyway — nearly free, load-bearing, not speculative | — Pending |
-| **Stance is a core `IntEnum`** (v0.2.0, R21) | The reason stance exists is its *total order*; `IntEnum` makes that native and un-fakeable (`certain > believed` is `3 > 2`) with no auxiliary rank map to drift. Cost: persists as `0..3`, less legible than the StrEnum tokens of `Status`/`EdgeType` (neither of which is ordered today) | — v0.2.0 |
+| **Stance is a plain ordered `Enum`** (v0.2.0, R21) — `IntEnum` reversed | R21 mandates *comparison-only*. `IntEnum` was initially chosen for its free ordering but is **rejected on contact**: an `IntEnum` *is* an `int`, so `+`/`*`/`< 5` are all reachable and never raise — it cannot satisfy the no-arithmetic contract. `StrEnum` orders lexically (`"certain" < "believed"` — wrong) and `+` concatenates. Resolution: plain `Enum` + `functools.total_ordering` + explicit integer rank; `__lt__` compares `.value` and returns `NotImplemented` for non-`Stance`, so ordering is total *and* `TypeError` on arithmetic is a real type-level guarantee. `.value` is never exposed as an operable number; persists by `.name` (legible token, matches `Status`/`EdgeType`) | — v0.2.0 |
 | **Edge stance is out of scope** (v0.2.0) | Belief-state stance is core; core edges are generic (`SUPERSEDES`/`DEPENDS_ON`/`DERIVED_FROM`) and the epistemic edges are NVM specialisations that don't exist in core. R21's "edges carry stance" reconciled as NVM edge metadata, not silently dropped; avoids adding a property payload to `add_edge` (a bigger port change) | — v0.2.0 |
 | **`revise`/`expand` default `stance=certain`** (v0.2.0) | Assignment is an NVM concern, so the core needs a neutral default; `certain` matches world-scope authored-canon and observed facts (common M0 synthetic case). Optional param → existing callers/tests unchanged. Documented "core default, NVM overrides" | — v0.2.0 |
 
