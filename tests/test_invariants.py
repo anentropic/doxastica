@@ -43,7 +43,7 @@ import uuid
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from hypothesis import given, settings
+from hypothesis import event, given, settings
 from hypothesis import strategies as st
 from hypothesis.stateful import (
     Bundle,
@@ -232,6 +232,13 @@ class _SpineMachine(RuleBasedStateMachine):
         stance: Stance,
     ) -> None:
         """Append an active state via ``revise`` and mirror it into the shadow oracle (OPS-01)."""
+        # Observability guard for the STATEFUL-oracle surface (D-03): emit BEFORE mirroring the op,
+        # when this write flips the CURRENT winning stance of an already-asserted belief. This makes
+        # ``--hypothesis-show-statistics`` document that the differing-stance discriminating path
+        # through the Task-1 (``Entry`` / ``_shadow_base``) widening is actually generated.
+        has_cur, _v, cur_stance = self._shadow_current(scope_id, belief_id)
+        if has_cur and cur_stance is not stance:
+            event("write flips the current stance of an existing belief")
         self.core.revise(scope_id, belief_id, value, source_event_id, stance)
         self._record(scope_id, belief_id, value, source_event_id, "active", stance)
 
@@ -251,6 +258,11 @@ class _SpineMachine(RuleBasedStateMachine):
         stance: Stance,
     ) -> None:
         """Append an active state via ``expand`` (mechanically identical to revise, D-04/OPS-02)."""
+        # Same stateful-oracle observability guard as ``revise`` (D-03): emit BEFORE mirroring when
+        # this expansion flips the current winning stance of an already-asserted belief.
+        has_cur, _v, cur_stance = self._shadow_current(scope_id, belief_id)
+        if has_cur and cur_stance is not stance:
+            event("write flips the current stance of an existing belief")
         self.core.expand(scope_id, belief_id, value, source_event_id, stance)
         self._record(scope_id, belief_id, value, source_event_id, "active", stance)
 
@@ -260,7 +272,7 @@ class _SpineMachine(RuleBasedStateMachine):
 
     def _shadow_base(self, scope_id: str) -> dict[str, tuple[Any, Stance]]:
         """
-        The oracle's belief base for ``scope_id``: ``{belief_id: (value, stance)}`` of active currents.
+        Oracle belief base for ``scope_id``: ``{belief_id: (value, stance)}`` of active currents.
 
         This IS the AGM belief base ``K`` for ``scope_id``, computed INDEPENDENTLY from
         ``self.entries`` via the oracle's own ``(source_event_id, seq)`` winner selection — it never
@@ -285,9 +297,9 @@ class _SpineMachine(RuleBasedStateMachine):
 
         ``query_scope(scope, BeliefFilter())`` IS the observed belief base. Returned as
         ``{belief_id: (decoded value, stance)}`` for direct comparison against ``_shadow_base`` (the
-        oracle). ``s.stance`` is a hydrated ``Stance`` MEMBER, so the tuple compares directly against
-        the oracle's stored member (SC1/D-02). This is the SINGLE SUT read; the expected side is
-        always the independent oracle.
+        oracle). ``s.stance`` is a hydrated ``Stance`` MEMBER, so the tuple compares directly
+        against the oracle's stored member (SC1/D-02). This is the SINGLE SUT read; the expected
+        side is always the independent oracle.
         """
         return {
             s.belief_id: (s.value, s.stance)
@@ -329,9 +341,9 @@ class _SpineMachine(RuleBasedStateMachine):
         assert self._observed_base(scope_id) == base_before  # SUT agrees with the oracle BEFORE
 
         self.core.contract(scope_id, belief_id, source_event_id)
-        # STANCE-04 verbatim-copy mirror (D-02): the retracted tail carries the PRIOR stance, exactly
-        # as the SUT's contract copies ``prior["stance"]``. Recording a default here would make the
-        # oracle disagree with the SUT and false-positive K*2/K*3.
+        # STANCE-04 verbatim-copy mirror (D-02): the retracted tail carries the PRIOR stance,
+        # exactly as the SUT's contract copies ``prior["stance"]``. Recording a default here would
+        # make the oracle disagree with the SUT and false-positive K*2/K*3.
         self._record(scope_id, belief_id, prior_value, source_event_id, "retracted", prior_stance)
 
         # Oracle bases AFTER the contract (independent).
@@ -477,7 +489,8 @@ class _SpineMachine(RuleBasedStateMachine):
                 # agree with the oracle's expected stance too (cross-check, not a tautology).
                 assert tail["stance"] is expected_stance, (
                     f"HAS_REVISION chain-tail stance must match the oracle for "
-                    f"({scope_id}, {belief_id}): expected {expected_stance!r}, got {tail['stance']!r}"
+                    f"({scope_id}, {belief_id}): expected {expected_stance!r}, "
+                    f"got {tail['stance']!r}"
                 )
 
     @invariant()
@@ -640,9 +653,54 @@ def _build_backend(backend_kind: str) -> BackendPort:
     return InMemoryBackend()
 
 
-def _base_of(core: MemoryCore, scope_id: str) -> dict[str, Any]:
-    """The observed belief base ``{belief_id: value}`` of ``scope_id`` (one query_scope read)."""
-    return {s.belief_id: s.value for s in core.query_scope(scope_id, BeliefFilter())}
+def _base_of(core: MemoryCore, scope_id: str) -> dict[str, tuple[Any, Stance]]:
+    """
+    Observed belief base ``{belief_id: (value, stance)}`` of ``scope_id`` (one query_scope read).
+
+    SC1/D-02: this is the SINGLE widened projection the deterministic non-vacuity proof
+    (``test_widened_key_discriminates_stance``) routes through — reverting it to ``{belief_id:
+    value}`` collapses that proof's discriminating assertion, so the guard is genuinely non-vacuous
+    (VALIDATION SC1). ``s.stance`` is a hydrated ``Stance`` member.
+    """
+    return {s.belief_id: (s.value, s.stance) for s in core.query_scope(scope_id, BeliefFilter())}
+
+
+@pytest.mark.parametrize("backend_kind", ["memory", "ladybug"])
+def test_widened_key_discriminates_stance(backend_kind: str) -> None:
+    """
+    D-03 non-vacuity proof: the widened base key DISCRIMINATES on stance (VALIDATION SC1).
+
+    Two writes that AGREE on ``value`` but DIFFER only on ``stance`` — ``revise b1=v`` in ``alice``
+    with ``Stance.believed`` vs ``expand b1=v`` in ``bob`` with ``Stance.certain`` — MUST project to
+    DIFFERENT bases. The discrimination flows through the ACTUAL widened ``_base_of`` (NOT an inline
+    ``{belief_id: (value, stance)}`` literal): because both scopes route through the one widened
+    helper, reverting ``_base_of`` to ``{belief_id: value}`` collapses ``a`` and ``b`` to
+    ``{"b1": v}`` and makes ``a != b`` FALSE — so the revert GENUINELY breaks this test. That is the
+    load-bearing VALIDATION SC1 vacuous-pass detection: an inline literal would read ``stance`` off
+    the unchanged SUT and still pass after a revert, making the guard decorative.
+
+    Scope note: this deterministic proof guards the standalone ``_base_of`` / K*6 path ONLY. The
+    STATEFUL oracle ``Entry`` / ``_shadow_base`` widening (Task 1, the K*2/K*3 path) is a SEPARATE
+    surface, guarded by the ``event("write flips the current stance of an existing belief")``
+    coverage label in the ``revise``/``expand`` rules — the two guards are distinct and both kept.
+    """
+    be = _build_backend(backend_kind)
+    try:
+        core = MemoryCore(be)
+        value = "v"  # ONE fixed value shared by both writes — they differ ONLY on stance
+        core.revise("alice", "b1", value, uuid.uuid7(), Stance.believed)
+        core.expand("bob", "b1", value, uuid.uuid7(), Stance.certain)
+        # Route BOTH scopes through the ACTUAL widened ``_base_of`` (the single projection
+        # under test — an inline literal here would defeat the vacuous-pass detection).
+        a = _base_of(core, "alice")
+        b = _base_of(core, "bob")
+        assert a != b, "widened (value, stance) key must distinguish same-value/different-stance"
+        assert a == {"b1": (value, Stance.believed)}
+        assert b == {"b1": (value, Stance.certain)}
+    finally:
+        close = getattr(be, "close", None)
+        if callable(close):
+            close()
 
 
 @pytest.mark.parametrize("backend_kind", ["memory", "ladybug"])
@@ -665,11 +723,13 @@ def test_vacuity_k4(backend_kind: str, value: Any) -> None:
         # prior base, established by writes the test fully controls — the independent expectation
         core.revise("alice", "b1", 1, e())
         core.revise("alice", "b2", 2, e())
-        prior_expected = {"b1": 1, "b2": 2}
+        # SC1/D-02: the widened base key is ``{belief_id: (value, stance)}``; these writes take the
+        # default stance (``Stance.certain``), so the expected tuples carry it explicitly.
+        prior_expected = {"b1": (1, Stance.certain), "b2": (2, Stance.certain)}
         assert _base_of(core, "alice") == prior_expected
         # revise a FRESH belief_id (b3 is not asserted) — Vacuity says this equals expansion
         core.revise("alice", "b3", value, e())
-        assert _base_of(core, "alice") == {**prior_expected, "b3": value}
+        assert _base_of(core, "alice") == {**prior_expected, "b3": (value, Stance.certain)}
     finally:
         close = getattr(be, "close", None)
         if callable(close):
@@ -677,28 +737,32 @@ def test_vacuity_k4(backend_kind: str, value: Any) -> None:
 
 
 @pytest.mark.parametrize("backend_kind", ["memory", "ladybug"])
-@given(value=_values)
+@given(value=_values, stance=st.sampled_from(Stance))
 @settings(max_examples=50, deadline=None)
-def test_extensionality_k6(backend_kind: str, value: Any) -> None:
+def test_extensionality_k6(backend_kind: str, value: Any, stance: Stance) -> None:
     """
     K*6 Extensionality: ``revise(s, p, v)`` and ``expand(s, p, v)`` yield byte-identical bases.
 
     The core treats ``belief_id`` and ``value`` opaquely; "logically equivalent inputs" =
-    identical ``(belief_id, value)`` writes. Extensionality is asserted by comparing the
+    identical ``(belief_id, value, stance)`` writes. Extensionality is asserted by comparing the
     ``query_scope`` projection produced by ``revise`` against the one produced by ``expand`` on a
     SEPARATE scope — the two derived bases must be byte-identical (modulo the differing scope_id).
     Both projections are SUT reads of DISTINCT operations, not a tautological re-read of one op. A
     FRESH backend per example covers both backends (BACK-05).
+
+    SC1/D-02: the comparison now runs over the widened ``_base_of`` projection
+    ``{belief_id: (value, stance)}``, and both ops are driven with the SAME drawn ``stance`` — so
+    the byte-identical base equality proves ``revise ≡ expand`` agrees on stance, not only value.
     """
     be = _build_backend(backend_kind)
     try:
         core = MemoryCore(be)
         src = uuid.uuid7()  # identical inputs (same belief_id, value, source_event_id) into both
-        core.revise("alice", "b1", value, src)
-        core.expand("bob", "b1", value, src)
+        core.revise("alice", "b1", value, src, stance)
+        core.expand("bob", "b1", value, src, stance)
         revised = _base_of(core, "alice")
         expanded = _base_of(core, "bob")
-        assert revised == expanded == {"b1": value}
+        assert revised == expanded == {"b1": (value, stance)}
     finally:
         close = getattr(be, "close", None)
         if callable(close):
@@ -727,7 +791,10 @@ def test_uniformity(backend_kind: str, value: Any) -> None:
         core.revise("alice", "q", "kept", e())
         core.contract("alice", "p", e())
         base_after_first = _base_of(core, "alice")
-        assert base_after_first == {"q": "kept"}  # p dropped, q surgically retained
+        # SC1/D-02: the widened base key carries the default ``Stance.certain`` for ``q``.
+        assert base_after_first == {
+            "q": ("kept", Stance.certain)
+        }  # p dropped, q surgically retained
         core.contract("alice", "p", e())  # second contract on the SAME key — vacuous no-op (D-05)
         assert _base_of(core, "alice") == base_after_first  # idempotent at the base level
     finally:
