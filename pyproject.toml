@@ -1,6 +1,6 @@
 [project]
 name = "doxastica"
-version = "0.1.0"
+version = "0.2.0"
 description = "Graph-native AGM belief-revision core (Kumiho M0)"
 readme = "README.md"
 authors = [
