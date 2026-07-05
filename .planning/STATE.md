@@ -4,13 +4,13 @@ milestone: v0.2.0
 milestone_name: — Stance
 status: executing
 stopped_at: None
-last_updated: "2026-07-05T00:27:51.720Z"
+last_updated: "2026-07-05T00:36:49.210Z"
 last_activity: 2026-07-04 -- Phase 10 execution started
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
   percent: 50
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 ## Current Position
 
 Phase: 10 (stance-formal-proof-docs) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-07-04 -- Phase 10 execution started
 
@@ -88,6 +88,7 @@ Last activity: 2026-07-04 -- Phase 10 execution started
 | Phase 09 P02 | 8min | 2 tasks | 1 files |
 | Phase 10 P01 | 35min | 2 tasks | 1 files |
 | Phase 10 P02 | 20min | 2 tasks | 1 files |
+| Phase 10 P03 | 20min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -149,6 +150,7 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase ?]: STANCE persistence proofs driven through MemoryCore(backend) with member-identity assertions; a value-vs-name hydrate regression raises on read (T-09-02)
 - [Phase 10]: Stance discrimination flows through the real widened _base_of (never an inline literal) so a value-only revert breaks the proof (VALIDATION SC1)
 - [Phase 10]: The deterministic _base_of/K*6 guard and the stateful-oracle event() flip label are kept as two distinct surfaces, not conflated (D-03)
+- [Phase ?]: Phase 10 (10-03): exhaustive parametrize over list(Stance) proves stance round-trip/contract-verbatim/get_scope_at for every member on both backends; vacuous-pass caught by a doubted-only hydrate-bug injection (D-05/D-08, SC3)
 
 ### Pending Todos
 
@@ -186,7 +188,7 @@ Items acknowledged at v0.1.0 milestone close (5 open artifacts; none are functio
 
 ## Session Continuity
 
-Last session: 2026-07-05T00:27:38.043Z
+Last session: 2026-07-05T00:35:50.844Z
 Stopped at: None
 Resume file: .planning/phases/07-agm-hansson-conformance-suite/07-04-PLAN.md
 

@@ -81,7 +81,7 @@ Full phase goals, success criteria, and plan breakdowns are archived in
 
 - [x] 10-01-PLAN.md — SC1: widen the stateful oracle to carry stance + mandatory non-vacuity discrimination proof (tests/test_invariants.py)
 - [x] 10-02-PLAN.md — SC2: exhaustive order-law enumeration (antisymmetry/transitivity/trichotomy) + no-arithmetic closure guard (tests/test_stance.py)
-- [ ] 10-03-PLAN.md — SC3: stance-quantified persistence — round-trip / contract-verbatim / get_scope_at over all four members × both backends (tests/test_stance_persistence.py)
+- [x] 10-03-PLAN.md — SC3: stance-quantified persistence — round-trip / contract-verbatim / get_scope_at over all four members × both backends (tests/test_stance_persistence.py)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -100,4 +100,4 @@ Full phase goals, success criteria, and plan breakdowns are archived in
 | 7. AGM/Hansson Backend Conformance Suite & Irony Join | v0.1.0 | 4/4 | Complete | 2026-06-19 |
 | 8. Publishable Polish | v0.1.0 | 3/3 | Complete | 2026-06-19 |
 | 9. Stance Value Layer, Write & Persistence | v0.2.0 | 2/2 | Complete    | 2026-07-04 |
-| 10. Stance Formal Proof & Docs | v0.2.0 | 2/4 | In Progress|  |
+| 10. Stance Formal Proof & Docs | v0.2.0 | 3/4 | In Progress|  |
