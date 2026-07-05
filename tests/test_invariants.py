@@ -62,6 +62,11 @@ from doxastica import (
 )
 from doxastica.models import Stance
 
+# Sibling conformance machine — imported so the FORMAL-03 registry resolver test (WR-01) can
+# dereference the `scope_at_equals_fold_for_every_cut` member against its real owning class rather
+# than trusting a bare method-name string.
+from tests.test_scope_at import _ScopeAtMachine
+
 if TYPE_CHECKING:
     from doxastica.ports import BackendPort
 
@@ -829,3 +834,34 @@ _FORMAL_03_CONFORMANCE_SET: tuple[str, ...] = (
     "world_contract_raises",
     "scope_at_equals_fold_for_every_cut",  # tests/test_scope_at.py (D-08)
 )
+
+# Owning RuleBasedStateMachine class for each registered name. Members 1–3 live on `_SpineMachine`
+# (this file); the `get_scope_at ≡ replay` member lives on `_ScopeAtMachine` (sibling). This map is
+# the mechanical bridge between the string registry and real code (WR-01).
+_FORMAL_03_OWNERS: dict[str, type[RuleBasedStateMachine]] = {
+    "current_is_total_single_valued_and_chain_tail": _SpineMachine,
+    "chain_is_immutable": _SpineMachine,
+    "world_contract_raises": _SpineMachine,
+    "scope_at_equals_fold_for_every_cut": _ScopeAtMachine,
+}
+
+
+def test_formal_03_conformance_set_resolves() -> None:
+    """
+    Every FORMAL-03 registry name resolves to a callable on its owning machine (WR-01).
+
+    The registry above is a tuple of method-name STRINGS. In a project whose ethos is "verified
+    mechanically, not asserted by construction," an unchecked string registry can silently go stale
+    if a machine method is renamed. This dereferences every registered name against its owning
+    class, so a rename that isn't mirrored in the registry fails here instead of drifting silently.
+    """
+    # The owner map must cover EXACTLY the registered set: a name added to (or removed from) the
+    # registry without a matching owner entry is itself drift, and fails right here.
+    assert set(_FORMAL_03_OWNERS) == set(_FORMAL_03_CONFORMANCE_SET)
+    for name in _FORMAL_03_CONFORMANCE_SET:
+        owner = _FORMAL_03_OWNERS[name]
+        member = getattr(owner, name, None)
+        assert callable(member), (
+            f"FORMAL-03 registry name {name!r} does not resolve to a callable on "
+            f"{owner.__name__} — the registry has drifted from the machine definition."
+        )
