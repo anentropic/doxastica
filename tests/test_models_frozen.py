@@ -17,6 +17,7 @@ from doxastica.models import (
     BeliefState,
     EdgeType,
     ImpactResult,
+    Stance,
     Status,
 )
 
@@ -29,6 +30,7 @@ def _make_belief_state() -> BeliefState:
         source_event_id=uuid7(),
         value={"opaque": "blob"},
         status=Status.active,
+        stance=Stance.certain,
     )
 
 
@@ -56,7 +58,7 @@ def test_edge_type_excludes_structural_edges() -> None:
     assert "CURRENT_STATE" not in members
 
 
-def test_belief_state_field_set_is_the_closed_six() -> None:
+def test_belief_state_field_set_is_the_closed_seven() -> None:
     assert set(BeliefState.model_fields) == {
         "state_id",
         "belief_id",
@@ -64,6 +66,7 @@ def test_belief_state_field_set_is_the_closed_six() -> None:
         "source_event_id",
         "value",
         "status",
+        "stance",
     }
 
 
@@ -115,5 +118,6 @@ def test_belief_state_rejects_unknown_field() -> None:
             source_event_id=uuid7(),
             value={"opaque": "blob"},
             status=Status.active,
+            stance=Stance.certain,
             provenance="leaked",  # type: ignore[call-arg]
         )

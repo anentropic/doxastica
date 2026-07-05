@@ -15,6 +15,7 @@ from doxastica.models import (
     EdgeType,
     ImpactResult,
     Scope,
+    Stance,
     Status,
 )
 from doxastica.protocol import BeliefStore
@@ -31,6 +32,7 @@ __all__ = [
     "InMemoryBackend",
     "MemoryCore",
     "Scope",
+    "Stance",
     "Status",
     "WORLD_SCOPE_ID",
     "WorldScopeContractionError",

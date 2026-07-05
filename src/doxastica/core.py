@@ -58,6 +58,7 @@ from doxastica.models import (
     EdgeType,
     ImpactResult,
     Scope,
+    Stance,
     Status,
 )
 
@@ -264,6 +265,12 @@ class MemoryCore:
         Inverse of the ``_encode_value`` write encode: ``value`` is decoded back to the opaque
         object; pydantic coerces the ``state_id`` / ``source_event_id`` strings to ``UUID`` at the
         seam, and ``status`` is rebuilt as a ``Status`` member.
+
+        CRITICAL (Pitfall 1, the single most likely bug): ``stance`` is reconstructed via
+        ``Stance[props["stance"]]`` — a NAME-lookup on the stored ``.name`` token — NOT
+        ``Stance(props["stance"])``. The adjacent ``Status(props["status"])`` value-lookup works
+        only because ``Status`` is a ``StrEnum`` where value==name; ``Stance.value`` is the integer
+        rank, so value-lookup on the ``"certain"`` token would raise ``ValueError``.
         """
         return BeliefState(
             state_id=props["state_id"],
@@ -272,6 +279,7 @@ class MemoryCore:
             source_event_id=props["source_event_id"],
             value=self._decode_value(props["value"]),
             status=Status(props["status"]),
+            stance=Stance[props["stance"]],  # NAME-lookup — NOT Stance(props["stance"])
         )
 
     # --- Shared revise/expand append (D-04) ---------------------------------
@@ -282,6 +290,7 @@ class MemoryCore:
         encoded_value: str,
         source_event_id: UUID,
         status: Status,
+        stance: str,
         prior: dict[str, Any] | None,
     ) -> BeliefState:
         """
@@ -289,7 +298,10 @@ class MemoryCore:
 
         Mints a fresh ``state_id`` (stdlib ``uuid.uuid7()``); builds the ``BeliefState`` props with
         the ALREADY-ENCODED ``value`` (the caller owns the encode policy — ``_append`` passes
-        ``_encode_value(value)``; ``contract`` passes the prior STORED token VERBATIM, Pitfall 2);
+        ``_encode_value(value)``; ``contract`` passes the prior STORED token VERBATIM, Pitfall 2)
+        and the ALREADY-SERIALIZED ``stance`` token (D-02 Option A — ``_append`` passes
+        ``stance.name``; ``contract`` passes ``prior["stance"]`` VERBATIM; this helper NEVER
+        interprets stance, no ``.name`` / ``.value`` call here — exactly like ``encoded_value``);
         upserts the ``BeliefState``; lays the ``HAS_REVISION`` hub edge (raw string — NOT an
         ``EdgeType`` member, D-07); and, when ``prior`` is non-``None``, lays ``SUPERSEDES new →
         prior`` (raw string). Returns the hydrated new state. Centralizing this body means a future
@@ -307,6 +319,7 @@ class MemoryCore:
             "source_event_id": str(source_event_id),
             "value": encoded_value,  # caller-supplied stored form (encode policy is the caller's)
             "status": status.value,
+            "stance": stance,  # pre-serialized .name token — helper NEVER interprets it (D-02)
         }
         self._backend.upsert_node("BeliefState", state_id, props)
         self._backend.add_edge("HAS_REVISION", belief_id, str(state_id))  # hub form (D-07)
@@ -321,15 +334,17 @@ class MemoryCore:
         value: Any,
         source_event_id: UUID,
         status: Status,
+        stance: Stance,
     ) -> BeliefState:
         """
         The shared ``revise`` ≡ ``expand`` body (D-04) — one append, inside ONE unit_of_work.
 
         Steps (CHAIN-02/03, D-06, D-07, DEF-02-01), all composing the port primitives:
         auto-create the scope and ``Belief`` node (D-06); compute ``prior`` BEFORE the new
-        append (Pitfall 3); ``json.dumps`` the opaque value once (DEF-02-01); then delegate the
-        node + ``HAS_REVISION`` + optional ``SUPERSEDES`` body to the shared ``_append_state``
-        helper (IN-02). Returns the hydrated new state.
+        append (Pitfall 3); ``json.dumps`` the opaque value once (DEF-02-01); serialize ``stance``
+        once at the write boundary via ``stance.name`` (mirroring ``_encode_value(value)``); then
+        delegate the node + ``HAS_REVISION`` + optional ``SUPERSEDES`` body to the shared
+        ``_append_state`` helper (IN-02). Returns the hydrated new state.
         """
         with self._backend.unit_of_work():  # exactly one (CHAIN-03)
             self._ensure_scope(scope_id)  # D-06
@@ -341,6 +356,7 @@ class MemoryCore:
                 self._encode_value(value),  # encode once on write (DEF-02-01)
                 source_event_id,
                 status,
+                stance.name,  # D-02: serialize stance once at the write boundary
                 prior,
             )
 
@@ -351,9 +367,16 @@ class MemoryCore:
         belief_id: str,
         value: Any,
         source_event_id: UUID,
+        stance: Stance = Stance.certain,
     ) -> BeliefState:
-        """AGM revision: append a new active ``BeliefState`` for ``belief_id`` (OPS-01)."""
-        return self._append(scope_id, belief_id, value, source_event_id, Status.active)
+        """
+        AGM revision: append a new active ``BeliefState`` for ``belief_id`` (OPS-01).
+
+        ``stance`` is the optional ordinal epistemic taxonomy (STANCE-03), defaulting to
+        ``Stance.certain`` HERE on the API surface (not on the model — D-01). NVM overrides it;
+        existing callers that omit it stay unaffected.
+        """
+        return self._append(scope_id, belief_id, value, source_event_id, Status.active, stance)
 
     def expand(
         self,
@@ -361,15 +384,17 @@ class MemoryCore:
         belief_id: str,
         value: Any,
         source_event_id: UUID,
+        stance: Stance = Stance.certain,
     ) -> BeliefState:
         """
         AGM expansion — MECHANICALLY IDENTICAL to ``revise`` (D-04, OPS-02).
 
         A one-line delegate to the shared ``_append`` (not a bare ``expand = revise`` class-body
         alias) so basedpyright-strict keeps the bound-method type; both names stay on the public
-        surface (``protocol.py`` requires both; Phase 7 exercises both AGM families).
+        surface (``protocol.py`` requires both; Phase 7 exercises both AGM families). ``stance``
+        carries the identical STANCE-03 default as ``revise`` (the D-04 twin).
         """
-        return self._append(scope_id, belief_id, value, source_event_id, Status.active)
+        return self._append(scope_id, belief_id, value, source_event_id, Status.active, stance)
 
     def contract(
         self,
@@ -415,6 +440,7 @@ class MemoryCore:
                 prior["value"],  # D-05: copy STORED form verbatim (no re-dumps, Pitfall 2)
                 source_event_id,
                 Status.retracted,
+                prior["stance"],  # STANCE-04: copy the stored stance token VERBATIM (no re-encode)
                 prior,
             )
 
@@ -479,7 +505,7 @@ class MemoryCore:
         HYDRATION GAP (RESEARCH Pitfall 1, the single most likely parity bug): the reference
         ``traverse`` returns ``reached`` rows shaped ``{"state_id": ...}`` ONLY, while the in-memory
         backend returns full props — so ``reached`` CANNOT be hydrated directly (``_hydrate`` needs
-        all six ``BeliefState`` fields). Option A (driver-blind, parity-clean): take each reached
+        all seven ``BeliefState`` fields). Option A (driver-blind, parity-clean): take each reached
         row's ``state_id`` and RE-FETCH its full props via the already-parity-tested
         ``match_nodes("BeliefState", {"state_id": sid})``, then ``_hydrate`` — identical on both
         backends. A re-fetch that returns nothing is skipped defensively (it should not happen for a

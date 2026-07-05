@@ -39,7 +39,49 @@
 
 ---
 
+## Milestone: v0.2.0 — Stance (R21)
+
+**Shipped:** 2026-07-05
+**Phases:** 2 | **Plans:** 6 | **Tasks:** 13
+
+### What Was Built
+- A canonical ordinal `Stance` enum (plain `Enum` + `functools.total_ordering` + explicit integer rank — `IntEnum`/`StrEnum` rejected) as a required seventh `BeliefState` field, threaded write → persist → read on both backends with `certain` as the API default (`.name`-serialize / `Stance[token]`-hydrate).
+- Byte-stable dual-backend persistence proven exhaustively over all four members × both backends (24 cases): round-trip, `contract`-verbatim, and `get_scope_at` reconstruction.
+- A **non-vacuous** formal proof: the shadow oracle's state-equality key widened to `{belief_id: (value, stance)}` so K*6 Extensionality (`revise ≡ expand`) fails on a stance mismatch instead of passing vacuously — plus an exhaustive order-law enumeration and a no-arithmetic closure guard proving `+`/`*`/int-`<` raise `TypeError`.
+- `Stance` exported from the package root; the Cluedo tutorial teaches the within-scope epistemic gradient + a reader-side ordinal decision + a stance-vs-scope reconciliation; `mkdocs build --strict` green. Closes the ratified NVM R21 gap.
+
+### What Worked
+- **Non-vacuity treated as a first-class requirement, not an afterthought.** The milestone's definition of done was "proven non-vacuous," so each success criterion shipped with a mutation/revert probe (broken `_base_of`, broken `__lt__`, `doubted`-only hydrate) and a `hypothesis.event()` label confirming the discriminating path actually fires. This is the pattern that stops a green-but-vacuous suite.
+- **Reusing the v0.1.0 oracle harness.** Widening the existing stateful oracle's base key to carry stance was a small, load-bearing change — the port-first / in-memory-oracle foundation paid off directly.
+- **Type-choice validated against its operational contract before locking.** `IntEnum` was rejected on contact because it inherits `int`'s arithmetic; the comparison-only contract forced a plain `Enum` + `total_ordering`. Catching this at decision time (not in review) avoided a rework.
+
+### What Was Inefficient
+- **A VALIDATION.md artifact was left in `draft` for Phase 9** even though the phase passed VERIFICATION 5/5 with substantive dual-backend tests — a stale artifact, not a coverage gap, but it surfaced as a Nyquist "partial" at audit. Close validation artifacts as part of phase completion.
+- **Minor doc-anchor / conformance-registry drift** (WR-01/WR-02) carried as advisory tech debt; a mechanical conformance-registry check was added mid-milestone (`bb486be`) to prevent the unchecked-string-registry drift recurring.
+
+### Patterns Established
+- **Prove non-vacuity with a mutation probe per success criterion.** For any "the suite now checks X" claim, ship a deliberately-broken variant that must fail, plus a coverage label that must fire. A widening that can't fail is vacuous.
+- **Widen the oracle key, not just the SUT.** When adding a tracked field to a property suite, the oracle's comparison key must widen too, or parity passes vacuously.
+- **Validate an enum/type against its operational contract before locking** (comparison-only ⇒ not `IntEnum`).
+
+### Key Lessons
+1. "Green suite" ≠ "meaningful suite." When adding a field to a property-tested invariant, prove the new dimension can *fail* — a mutation probe per criterion is the cheapest credible evidence.
+2. A tracked field must be added to the oracle's equality key, not only to the system under test, or the postulate that should discriminate it passes vacuously.
+3. Close per-phase validation artifacts (VALIDATION.md draft → approved) at phase completion, so milestone audit doesn't flag stale-but-passing phases.
+
+### Cost Observations
+- Model mix: predominantly opus (planner + executor), sonnet for checker/verifier roles — unchanged from v0.1.0.
+- Notable: a small, tightly-scoped milestone (6 plans) riding on the v0.1.0 harness; most spend was in the Phase-10 formal-proof widening (oracle key + exhaustive parametrization), not new production code (~75 net `src` LOC).
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
 - v0.1.0 established the baseline: port-first design, in-memory-oracle conformance testing, and a full-`prek` verification gate. Future milestones should carry these forward.
+- v0.2.0 added a **non-vacuity discipline**: extending a property suite ships with a per-criterion mutation probe + coverage label proving the new dimension can fail. Carry this into any future field/invariant addition.
+
+### Recurring Lessons
+- **Local verification must mirror CI's gate** (full `prek`, correct extras synced) — v0.1.0 lesson, still standing.
+- **Green ≠ meaningful** — v0.2.0 sharpened this: prove the suite discriminates the thing it claims to test.
+- **Close artifacts at the boundary they belong to** — v0.1.0 (milestone label ↔ version), v0.2.0 (VALIDATION.md draft state) — leftover-artifact drift is a repeating small tax; close on completion.

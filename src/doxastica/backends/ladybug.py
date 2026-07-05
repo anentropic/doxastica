@@ -231,7 +231,7 @@ class LadybugBackend:
         self._exec(
             f"CREATE NODE TABLE IF NOT EXISTS {ns}_BeliefState"
             f"({_PK_BY_LABEL['BeliefState']} STRING, belief_id STRING, scope_id STRING, "
-            f"source_event_id STRING, value STRING, status STRING, "
+            f"source_event_id STRING, value STRING, status STRING, stance STRING, "
             f"PRIMARY KEY({_PK_BY_LABEL['BeliefState']}))"
         )
         for edge_type in ("SUPERSEDES", "DEPENDS_ON", "DERIVED_FROM"):

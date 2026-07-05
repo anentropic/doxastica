@@ -13,6 +13,7 @@ writes against (Ports & Adapters).
 ## Milestones
 
 - ✅ **v0.1.0 — Kumiho AGM Core (M0)** — Phases 1–8 (shipped 2026-07-04) — full detail: [milestones/v0.1.0-ROADMAP.md](milestones/v0.1.0-ROADMAP.md)
+- ✅ **v0.2.0 — Stance (R21)** — Phases 9–10 (shipped 2026-07-05) — full detail: [milestones/v0.2.0-ROADMAP.md](milestones/v0.2.0-ROADMAP.md)
 
 ## Phases
 
@@ -33,9 +34,18 @@ Full phase goals, success criteria, and plan breakdowns are archived in
 
 </details>
 
-### Next milestone (planned)
+<details>
+<summary>✅ v0.2.0 — Stance (R21) (Phases 9–10) — SHIPPED 2026-07-05</summary>
 
-Not yet defined — run `/gsd-new-milestone` to scope the next version.
+- [x] Phase 9: Stance Value Layer, Write & Persistence (2/2 plans) — 2026-07-04
+- [x] Phase 10: Stance Formal Proof & Docs (4/4 plans) — 2026-07-05
+
+Adds the ordinal `stance` field, its canonical total order, and dual-backend persistence
+plus a proven-non-vacuous formal suite — closing the ratified NVM R21 gap. Full phase goals,
+success criteria, and plan breakdowns are archived in
+[milestones/v0.2.0-ROADMAP.md](milestones/v0.2.0-ROADMAP.md).
+
+</details>
 
 ## Progress
 
@@ -49,3 +59,5 @@ Not yet defined — run `/gsd-new-milestone` to scope the next version.
 | 6. Structural Time-Travel | v0.1.0 | 2/2 | Complete | 2026-06-19 |
 | 7. AGM/Hansson Backend Conformance Suite & Irony Join | v0.1.0 | 4/4 | Complete | 2026-06-19 |
 | 8. Publishable Polish | v0.1.0 | 3/3 | Complete | 2026-06-19 |
+| 9. Stance Value Layer, Write & Persistence | v0.2.0 | 2/2 | Complete | 2026-07-04 |
+| 10. Stance Formal Proof & Docs | v0.2.0 | 4/4 | Complete | 2026-07-05 |

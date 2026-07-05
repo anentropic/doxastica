@@ -21,7 +21,8 @@ Encodes the Phase-1 data-model decisions:
   epistemic concepts belong to the NVM layer, never here.
 """
 
-from enum import StrEnum
+from enum import Enum, StrEnum
+from functools import total_ordering
 from typing import Any
 from uuid import UUID  # noqa: TC003  (pydantic resolves field annotations at runtime)
 
@@ -61,6 +62,42 @@ class EdgeType(StrEnum):
     DERIVED_FROM = "DERIVED_FROM"
 
 
+@total_ordering
+class Stance(Enum):
+    """
+    The canonical ordinal epistemic taxonomy (STANCE-01).
+
+    A *total order* ``doubted < suspected < believed < certain``. Comparison is the ONLY
+    operation over the type: ``+`` / ``*`` / cross-type ``<`` each raise ``TypeError`` at
+    the type level (STANCE-06). It is a plain ``Enum`` (NOT ``IntEnum`` / ``StrEnum``) so no
+    numeric or string protocol leaks in — the integer ``.value`` is the rank, used ONLY
+    inside ``__lt__`` and NEVER exposed as an operable number. ``functools.total_ordering``
+    synthesizes ``>`` / ``>=`` / ``<=`` from the single ``__lt__`` (which returns
+    ``NotImplemented`` for a non-``Stance`` operand, so Python raises ``TypeError`` on a
+    cross-type comparison rather than coercing).
+
+    Serialization discipline (the load-bearing trap): serialized as its ``.name`` token
+    (``"certain"`` — a legible, STRING-column-safe wire form), and hydrated via
+    ``Stance[token]`` (name-lookup), NEVER ``Stance(token)`` (value-lookup would fail on the
+    token because ``.value`` is the integer rank). The first *ordered* enum in the codebase;
+    ``Status`` / ``EdgeType`` stay unordered ``StrEnum``s.
+    """
+
+    doubted = 0
+    suspected = 1
+    believed = 2
+    certain = 3
+
+    def __lt__(self, other: object) -> bool:
+        # isinstance narrows for basedpyright-strict and is exactly equivalent to an
+        # ``is``-class check here: an ``Enum`` with members cannot be subclassed, so there is
+        # no subclass to admit. A non-``Stance`` operand yields ``NotImplemented`` so Python
+        # raises ``TypeError`` on a cross-type comparison (STANCE-06) rather than coercing.
+        if isinstance(other, Stance):
+            return self.value < other.value
+        return NotImplemented
+
+
 class Scope(BaseModel, frozen=True, extra="forbid"):
     """
     A named belief-holder.
@@ -84,11 +121,14 @@ class BeliefState(BaseModel, frozen=True, extra="forbid"):
     """
     An immutable, append-only revision of a belief.
 
-    Carries EXACTLY the closed six-field set — the DATA-05/DATA-06 boundary. No
-    provenance/temporal/epistemic fields: those live in the opaque ``value`` or on
-    downstream NVM labels. ``state_id`` is the core-minted UUID7 primary-key handle;
-    ``source_event_id`` is a caller-supplied opaque, non-unique handle; ``value`` is
-    opaque (the core never inspects it).
+    Carries EXACTLY the closed seven-field set — the DATA-05/DATA-06 boundary. No
+    provenance/temporal fields: those live in the opaque ``value`` or on downstream NVM
+    labels. ``state_id`` is the core-minted UUID7 primary-key handle; ``source_event_id``
+    is a caller-supplied opaque, non-unique handle; ``value`` is opaque (the core never
+    inspects it); ``stance`` is the required ordinal epistemic taxonomy (STANCE-01/02) —
+    REQUIRED with no model-level default (D-01: the ``certain`` default lives on the
+    ``revise`` / ``expand`` API surface, and ``_hydrate`` always supplies it on read, so
+    every construction path sets it explicitly).
     """
 
     state_id: UUID
@@ -97,6 +137,7 @@ class BeliefState(BaseModel, frozen=True, extra="forbid"):
     source_event_id: UUID
     value: Any
     status: Status
+    stance: Stance
 
 
 class BeliefFilter(BaseModel, frozen=True, extra="forbid"):

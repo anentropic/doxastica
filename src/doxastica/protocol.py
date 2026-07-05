@@ -27,6 +27,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Protocol
 
+# Runtime import (models only — never the driver, so import-purity holds): ``Stance`` is needed
+# at runtime, not just for typing, because it supplies the ``stance=Stance.certain`` DEFAULT VALUE
+# on ``revise`` / ``expand`` — a default expression is evaluated at class-definition time even under
+# ``from __future__ import annotations`` (which only defers the annotation, not the default).
+from doxastica.models import Stance
+
 if TYPE_CHECKING:
     from uuid import UUID
 
@@ -74,8 +80,9 @@ class BeliefStore(Protocol):
         belief_id: str,
         value: Any,
         source_event_id: UUID,
+        stance: Stance = Stance.certain,
     ) -> BeliefState:
-        """AGM revision: append a new current ``BeliefState`` for ``belief_id``."""
+        """AGM revision: append a new current ``BeliefState`` for ``belief_id`` (STANCE-03)."""
         ...
 
     def expand(
@@ -84,8 +91,9 @@ class BeliefStore(Protocol):
         belief_id: str,
         value: Any,
         source_event_id: UUID,
+        stance: Stance = Stance.certain,
     ) -> BeliefState:
-        """AGM expansion: append a ``BeliefState`` without consistency enforcement."""
+        """AGM expansion: append a ``BeliefState`` without consistency enforcement (STANCE-03)."""
         ...
 
     def contract(

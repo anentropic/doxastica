@@ -43,7 +43,7 @@ import uuid
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from hypothesis import given, settings
+from hypothesis import event, given, settings
 from hypothesis import strategies as st
 from hypothesis.stateful import (
     Bundle,
@@ -60,6 +60,12 @@ from doxastica import (
     MemoryCore,
     WorldScopeContractionError,
 )
+from doxastica.models import Stance
+
+# Sibling conformance machine — imported so the FORMAL-03 registry resolver test (WR-01) can
+# dereference the `scope_at_equals_fold_for_every_cut` member against its real owning class rather
+# than trusting a bare method-name string.
+from tests.test_scope_at import _ScopeAtMachine
 
 if TYPE_CHECKING:
     from doxastica.ports import BackendPort
@@ -106,7 +112,9 @@ def _chain_tail(core: MemoryCore, scope_id: str, belief_id: str) -> dict[str, An
     tail = scoped[-1]  # get_revision_chain is already (source_event_id, state_id)-ordered
     if tail.status.value == "retracted":
         return None
-    return {"state_id": str(tail.state_id), "value": tail.value}
+    # ``tail.stance`` is a ``Stance`` MEMBER (get_revision_chain returns hydrated BeliefStates),
+    # carried so the keystone can cross-check the chain-tail stance against the oracle (SC1/D-02).
+    return {"state_id": str(tail.state_id), "value": tail.value, "stance": tail.stance}
 
 
 class _SpineMachine(RuleBasedStateMachine):
@@ -132,7 +140,13 @@ class _SpineMachine(RuleBasedStateMachine):
     # tail ⇒ no active current, D-05). This models out-of-order / colliding ``source_event_id``s
     # correctly: a contraction recorded against an EARLIER event than the assertion it targets does
     # NOT win the ordering and so leaves the assertion current (Pitfall 6).
-    Entry = tuple[str, int, Any, str]
+    #
+    # SC1/D-02 widening: each entry ALSO carries the ``Stance`` MEMBER as its 5th slot, so the
+    # oracle's derived base key widens ``{belief_id: value}`` → ``{belief_id: (value, stance)}``.
+    # The MEMBER (not the ``.name`` token) is stored so ``_observed_base == _shadow_base`` is a
+    # direct tuple-equality (``BeliefState.stance`` is also a member). ``contract`` mirrors the
+    # prior stance VERBATIM (STANCE-04), matching the SUT — a default here false-positives K*2/K*3.
+    Entry = tuple[str, int, Any, str, Stance]
 
     def _make_backend(self) -> BackendPort:
         """Construct a fresh throwaway backend for ``backend_kind`` (mirrors ``conftest.py``)."""
@@ -163,29 +177,36 @@ class _SpineMachine(RuleBasedStateMachine):
         self._state_count = 0  # monotonic-state-count watermark (CHAIN-02)
 
     def _record(
-        self, scope_id: str, belief_id: str, value: Any, source_event_id: uuid.UUID, status: str
+        self,
+        scope_id: str,
+        belief_id: str,
+        value: Any,
+        source_event_id: uuid.UUID,
+        status: str,
+        stance: Stance,
     ) -> None:
         """Append one entry to the shadow oracle, bumping the monotonic append seq + state count."""
         self._seq += 1
         self.entries.setdefault((scope_id, belief_id), []).append(
-            (str(source_event_id), self._seq, value, status)
+            (str(source_event_id), self._seq, value, status, stance)
         )
         self._state_count += 1
 
-    def _shadow_current(self, scope_id: str, belief_id: str) -> tuple[bool, Any]:
+    def _shadow_current(self, scope_id: str, belief_id: str) -> tuple[bool, Any, Stance | None]:
         """
-        Compute the oracle's derived current for (scope, belief): ``(has_current, value)``.
+        Compute the oracle's derived current for (scope, belief): ``(has_current, value, stance)``.
 
         The winner is the entry with max ``(source_event_id, seq)`` — the same ordering contract
-        ``_current`` applies. ``has_current`` is ``True`` only when that winning entry is active.
+        ``_current`` applies. ``has_current`` is ``True`` only when that winning entry is active;
+        the third slot is the winner's ``Stance`` member (``None`` when there is no active current).
         """
         entries = self.entries.get((scope_id, belief_id))
         if not entries:
-            return (False, None)
-        _src, _seq, value, status = max(entries, key=lambda e: (e[0], e[1]))
+            return (False, None, None)
+        _src, _seq, value, status, stance = max(entries, key=lambda e: (e[0], e[1]))
         if status == "retracted":
-            return (False, None)
-        return (True, value)
+            return (False, None, None)
+        return (True, value, stance)
 
     # --- bundle feeders: register real ids so later rules draw hits, not misses --------------
     @rule(target=scopes, scope_id=_scope_ids)
@@ -205,54 +226,90 @@ class _SpineMachine(RuleBasedStateMachine):
         belief_id=beliefs,
         value=_values,
         source_event_id=_event_ids,
+        stance=st.sampled_from(Stance),
     )
-    def revise(self, scope_id: str, belief_id: str, value: Any, source_event_id: uuid.UUID) -> None:
+    def revise(
+        self,
+        scope_id: str,
+        belief_id: str,
+        value: Any,
+        source_event_id: uuid.UUID,
+        stance: Stance,
+    ) -> None:
         """Append an active state via ``revise`` and mirror it into the shadow oracle (OPS-01)."""
-        self.core.revise(scope_id, belief_id, value, source_event_id)
-        self._record(scope_id, belief_id, value, source_event_id, "active")
+        # Observability guard for the STATEFUL-oracle surface (D-03): emit BEFORE mirroring the op,
+        # when this write flips the CURRENT winning stance of an already-asserted belief. This makes
+        # ``--hypothesis-show-statistics`` document that the differing-stance discriminating path
+        # through the Task-1 (``Entry`` / ``_shadow_base``) widening is actually generated.
+        has_cur, _v, cur_stance = self._shadow_current(scope_id, belief_id)
+        if has_cur and cur_stance is not stance:
+            event("write flips the current stance of an existing belief")
+        self.core.revise(scope_id, belief_id, value, source_event_id, stance)
+        self._record(scope_id, belief_id, value, source_event_id, "active", stance)
 
     @rule(
         scope_id=scopes,
         belief_id=beliefs,
         value=_values,
         source_event_id=_event_ids,
+        stance=st.sampled_from(Stance),
     )
-    def expand(self, scope_id: str, belief_id: str, value: Any, source_event_id: uuid.UUID) -> None:
+    def expand(
+        self,
+        scope_id: str,
+        belief_id: str,
+        value: Any,
+        source_event_id: uuid.UUID,
+        stance: Stance,
+    ) -> None:
         """Append an active state via ``expand`` (mechanically identical to revise, D-04/OPS-02)."""
-        self.core.expand(scope_id, belief_id, value, source_event_id)
-        self._record(scope_id, belief_id, value, source_event_id, "active")
+        # Same stateful-oracle observability guard as ``revise`` (D-03): emit BEFORE mirroring when
+        # this expansion flips the current winning stance of an already-asserted belief.
+        has_cur, _v, cur_stance = self._shadow_current(scope_id, belief_id)
+        if has_cur and cur_stance is not stance:
+            event("write flips the current stance of an existing belief")
+        self.core.expand(scope_id, belief_id, value, source_event_id, stance)
+        self._record(scope_id, belief_id, value, source_event_id, "active", stance)
 
     def _asserted_keys(self) -> list[tuple[str, str]]:
         """Return the (scope, belief) pairs the oracle currently derives an active current for."""
         return sorted(k for k in self.entries if self._shadow_current(*k)[0])
 
-    def _shadow_base(self, scope_id: str) -> dict[str, Any]:
+    def _shadow_base(self, scope_id: str) -> dict[str, tuple[Any, Stance]]:
         """
-        The oracle's belief base for ``scope_id``: ``{belief_id: value}`` of active currents.
+        Oracle belief base for ``scope_id``: ``{belief_id: (value, stance)}`` of active currents.
 
         This IS the AGM belief base ``K`` for ``scope_id``, computed INDEPENDENTLY from
         ``self.entries`` via the oracle's own ``(source_event_id, seq)`` winner selection — it never
         reads ``query_scope`` / ``_current`` (Pitfall 2, the anti-tautology rule). Every AGM
         postulate ``@invariant`` compares the SUT's observed base against this oracle-computed base.
+        SC1/D-02: the base value widens to ``(value, stance)`` so two currents agreeing on value but
+        differing on stance are DISTINCT — K*2/K*3/K*6 now compare stance, not just value.
         """
-        base: dict[str, Any] = {}
+        base: dict[str, tuple[Any, Stance]] = {}
         for s, b in self.entries:
             if s != scope_id:
                 continue
-            has_current, value = self._shadow_current(s, b)
+            has_current, value, stance = self._shadow_current(s, b)
             if has_current:
-                base[b] = value
+                assert stance is not None  # has_current ⇒ an active winner ⇒ a stance member
+                base[b] = (value, stance)
         return base
 
-    def _observed_base(self, scope_id: str) -> dict[str, Any]:
+    def _observed_base(self, scope_id: str) -> dict[str, tuple[Any, Stance]]:
         """
         The SUT's observed belief base for ``scope_id`` via ``query_scope`` (the AGM ``K``).
 
         ``query_scope(scope, BeliefFilter())`` IS the observed belief base. Returned as
-        ``{belief_id: decoded value}`` for direct comparison against ``_shadow_base`` (the oracle).
-        This is the SINGLE SUT read; the expected side is always the independent oracle.
+        ``{belief_id: (decoded value, stance)}`` for direct comparison against ``_shadow_base`` (the
+        oracle). ``s.stance`` is a hydrated ``Stance`` MEMBER, so the tuple compares directly
+        against the oracle's stored member (SC1/D-02). This is the SINGLE SUT read; the expected
+        side is always the independent oracle.
         """
-        return {s.belief_id: s.value for s in self.core.query_scope(scope_id, BeliefFilter())}
+        return {
+            s.belief_id: (s.value, s.stance)
+            for s in self.core.query_scope(scope_id, BeliefFilter())
+        }
 
     @precondition(lambda self: bool(self._asserted_keys()))
     @rule(
@@ -281,14 +338,18 @@ class _SpineMachine(RuleBasedStateMachine):
         """
         key = data.draw(st.sampled_from(self._asserted_keys()))
         scope_id, belief_id = key
-        _has, prior_value = self._shadow_current(scope_id, belief_id)
+        _has, prior_value, prior_stance = self._shadow_current(scope_id, belief_id)
+        assert prior_stance is not None  # precondition guarantees an active current here
 
         # Oracle bases BEFORE the contract (independent of the SUT, D-06/Pitfall 2).
         base_before = self._shadow_base(scope_id)
         assert self._observed_base(scope_id) == base_before  # SUT agrees with the oracle BEFORE
 
         self.core.contract(scope_id, belief_id, source_event_id)
-        self._record(scope_id, belief_id, prior_value, source_event_id, "retracted")
+        # STANCE-04 verbatim-copy mirror (D-02): the retracted tail carries the PRIOR stance,
+        # exactly as the SUT's contract copies ``prior["stance"]``. Recording a default here would
+        # make the oracle disagree with the SUT and false-positive K*2/K*3.
+        self._record(scope_id, belief_id, prior_value, source_event_id, "retracted", prior_stance)
 
         # Oracle bases AFTER the contract (independent).
         base_after = self._shadow_base(scope_id)
@@ -322,7 +383,7 @@ class _SpineMachine(RuleBasedStateMachine):
             f"before: {set(base_after) - set(base_before)}"
         )
         # Success: the belief is dropped exactly when the oracle's ordering-max tail is retracted
-        has_current, _value = self._shadow_current(scope_id, belief_id)
+        has_current, _value, _stance = self._shadow_current(scope_id, belief_id)
         if not has_current:
             assert belief_id not in base_after, (
                 f"Hansson Success: contract({scope_id}, {belief_id}) won the ordering but the "
@@ -399,7 +460,7 @@ class _SpineMachine(RuleBasedStateMachine):
         """
         for scope_id in _SCOPE_POOL:
             for belief_id in _BELIEF_POOL:
-                has_current, expected = self._shadow_current(scope_id, belief_id)
+                has_current, expected, expected_stance = self._shadow_current(scope_id, belief_id)
                 current = self.core._current(scope_id, belief_id)
                 if not has_current:
                     assert current is None, (
@@ -416,11 +477,25 @@ class _SpineMachine(RuleBasedStateMachine):
                     f"derived-current must be SINGLE-VALUED and match the oracle for "
                     f"({scope_id}, {belief_id}): expected {expected!r}, got {decoded!r}"
                 )
+                # SC1/D-02: the derived-current stance matches the oracle. ``current["stance"]`` is
+                # the stored ``.name`` TOKEN, so it is hydrated via ``Stance[...]`` NAME-lookup (NOT
+                # ``Stance(...)`` value-lookup, which raises on the token — Pitfall 3).
+                assert Stance[current["stance"]] is expected_stance, (
+                    f"derived-current stance must match the oracle for ({scope_id}, {belief_id}): "
+                    f"expected {expected_stance!r}, got {current['stance']!r}"
+                )
                 tail = _chain_tail(self.core, scope_id, belief_id)
                 assert tail is not None and tail["state_id"] == current["state_id"], (
                     f"derived-current must equal the HAS_REVISION chain tail for "
                     f"({scope_id}, {belief_id}): _current state_id {current['state_id']} != "
                     f"chain-tail {tail['state_id'] if tail else None}"
+                )
+                # The independently-recomputed chain tail carries a ``Stance`` MEMBER — it must
+                # agree with the oracle's expected stance too (cross-check, not a tautology).
+                assert tail["stance"] is expected_stance, (
+                    f"HAS_REVISION chain-tail stance must match the oracle for "
+                    f"({scope_id}, {belief_id}): expected {expected_stance!r}, "
+                    f"got {tail['stance']!r}"
                 )
 
     @invariant()
@@ -583,9 +658,54 @@ def _build_backend(backend_kind: str) -> BackendPort:
     return InMemoryBackend()
 
 
-def _base_of(core: MemoryCore, scope_id: str) -> dict[str, Any]:
-    """The observed belief base ``{belief_id: value}`` of ``scope_id`` (one query_scope read)."""
-    return {s.belief_id: s.value for s in core.query_scope(scope_id, BeliefFilter())}
+def _base_of(core: MemoryCore, scope_id: str) -> dict[str, tuple[Any, Stance]]:
+    """
+    Observed belief base ``{belief_id: (value, stance)}`` of ``scope_id`` (one query_scope read).
+
+    SC1/D-02: this is the SINGLE widened projection the deterministic non-vacuity proof
+    (``test_widened_key_discriminates_stance``) routes through — reverting it to ``{belief_id:
+    value}`` collapses that proof's discriminating assertion, so the guard is genuinely non-vacuous
+    (VALIDATION SC1). ``s.stance`` is a hydrated ``Stance`` member.
+    """
+    return {s.belief_id: (s.value, s.stance) for s in core.query_scope(scope_id, BeliefFilter())}
+
+
+@pytest.mark.parametrize("backend_kind", ["memory", "ladybug"])
+def test_widened_key_discriminates_stance(backend_kind: str) -> None:
+    """
+    D-03 non-vacuity proof: the widened base key DISCRIMINATES on stance (VALIDATION SC1).
+
+    Two writes that AGREE on ``value`` but DIFFER only on ``stance`` — ``revise b1=v`` in ``alice``
+    with ``Stance.believed`` vs ``expand b1=v`` in ``bob`` with ``Stance.certain`` — MUST project to
+    DIFFERENT bases. The discrimination flows through the ACTUAL widened ``_base_of`` (NOT an inline
+    ``{belief_id: (value, stance)}`` literal): because both scopes route through the one widened
+    helper, reverting ``_base_of`` to ``{belief_id: value}`` collapses ``a`` and ``b`` to
+    ``{"b1": v}`` and makes ``a != b`` FALSE — so the revert GENUINELY breaks this test. That is the
+    load-bearing VALIDATION SC1 vacuous-pass detection: an inline literal would read ``stance`` off
+    the unchanged SUT and still pass after a revert, making the guard decorative.
+
+    Scope note: this deterministic proof guards the standalone ``_base_of`` / K*6 path ONLY. The
+    STATEFUL oracle ``Entry`` / ``_shadow_base`` widening (Task 1, the K*2/K*3 path) is a SEPARATE
+    surface, guarded by the ``event("write flips the current stance of an existing belief")``
+    coverage label in the ``revise``/``expand`` rules — the two guards are distinct and both kept.
+    """
+    be = _build_backend(backend_kind)
+    try:
+        core = MemoryCore(be)
+        value = "v"  # ONE fixed value shared by both writes — they differ ONLY on stance
+        core.revise("alice", "b1", value, uuid.uuid7(), Stance.believed)
+        core.expand("bob", "b1", value, uuid.uuid7(), Stance.certain)
+        # Route BOTH scopes through the ACTUAL widened ``_base_of`` (the single projection
+        # under test — an inline literal here would defeat the vacuous-pass detection).
+        a = _base_of(core, "alice")
+        b = _base_of(core, "bob")
+        assert a != b, "widened (value, stance) key must distinguish same-value/different-stance"
+        assert a == {"b1": (value, Stance.believed)}
+        assert b == {"b1": (value, Stance.certain)}
+    finally:
+        close = getattr(be, "close", None)
+        if callable(close):
+            close()
 
 
 @pytest.mark.parametrize("backend_kind", ["memory", "ladybug"])
@@ -608,11 +728,13 @@ def test_vacuity_k4(backend_kind: str, value: Any) -> None:
         # prior base, established by writes the test fully controls — the independent expectation
         core.revise("alice", "b1", 1, e())
         core.revise("alice", "b2", 2, e())
-        prior_expected = {"b1": 1, "b2": 2}
+        # SC1/D-02: the widened base key is ``{belief_id: (value, stance)}``; these writes take the
+        # default stance (``Stance.certain``), so the expected tuples carry it explicitly.
+        prior_expected = {"b1": (1, Stance.certain), "b2": (2, Stance.certain)}
         assert _base_of(core, "alice") == prior_expected
         # revise a FRESH belief_id (b3 is not asserted) — Vacuity says this equals expansion
         core.revise("alice", "b3", value, e())
-        assert _base_of(core, "alice") == {**prior_expected, "b3": value}
+        assert _base_of(core, "alice") == {**prior_expected, "b3": (value, Stance.certain)}
     finally:
         close = getattr(be, "close", None)
         if callable(close):
@@ -620,28 +742,32 @@ def test_vacuity_k4(backend_kind: str, value: Any) -> None:
 
 
 @pytest.mark.parametrize("backend_kind", ["memory", "ladybug"])
-@given(value=_values)
+@given(value=_values, stance=st.sampled_from(Stance))
 @settings(max_examples=50, deadline=None)
-def test_extensionality_k6(backend_kind: str, value: Any) -> None:
+def test_extensionality_k6(backend_kind: str, value: Any, stance: Stance) -> None:
     """
     K*6 Extensionality: ``revise(s, p, v)`` and ``expand(s, p, v)`` yield byte-identical bases.
 
     The core treats ``belief_id`` and ``value`` opaquely; "logically equivalent inputs" =
-    identical ``(belief_id, value)`` writes. Extensionality is asserted by comparing the
+    identical ``(belief_id, value, stance)`` writes. Extensionality is asserted by comparing the
     ``query_scope`` projection produced by ``revise`` against the one produced by ``expand`` on a
     SEPARATE scope — the two derived bases must be byte-identical (modulo the differing scope_id).
     Both projections are SUT reads of DISTINCT operations, not a tautological re-read of one op. A
     FRESH backend per example covers both backends (BACK-05).
+
+    SC1/D-02: the comparison now runs over the widened ``_base_of`` projection
+    ``{belief_id: (value, stance)}``, and both ops are driven with the SAME drawn ``stance`` — so
+    the byte-identical base equality proves ``revise ≡ expand`` agrees on stance, not only value.
     """
     be = _build_backend(backend_kind)
     try:
         core = MemoryCore(be)
         src = uuid.uuid7()  # identical inputs (same belief_id, value, source_event_id) into both
-        core.revise("alice", "b1", value, src)
-        core.expand("bob", "b1", value, src)
+        core.revise("alice", "b1", value, src, stance)
+        core.expand("bob", "b1", value, src, stance)
         revised = _base_of(core, "alice")
         expanded = _base_of(core, "bob")
-        assert revised == expanded == {"b1": value}
+        assert revised == expanded == {"b1": (value, stance)}
     finally:
         close = getattr(be, "close", None)
         if callable(close):
@@ -670,7 +796,10 @@ def test_uniformity(backend_kind: str, value: Any) -> None:
         core.revise("alice", "q", "kept", e())
         core.contract("alice", "p", e())
         base_after_first = _base_of(core, "alice")
-        assert base_after_first == {"q": "kept"}  # p dropped, q surgically retained
+        # SC1/D-02: the widened base key carries the default ``Stance.certain`` for ``q``.
+        assert base_after_first == {
+            "q": ("kept", Stance.certain)
+        }  # p dropped, q surgically retained
         core.contract("alice", "p", e())  # second contract on the SAME key — vacuous no-op (D-05)
         assert _base_of(core, "alice") == base_after_first  # idempotent at the base level
     finally:
@@ -705,3 +834,34 @@ _FORMAL_03_CONFORMANCE_SET: tuple[str, ...] = (
     "world_contract_raises",
     "scope_at_equals_fold_for_every_cut",  # tests/test_scope_at.py (D-08)
 )
+
+# Owning RuleBasedStateMachine class for each registered name. Members 1–3 live on `_SpineMachine`
+# (this file); the `get_scope_at ≡ replay` member lives on `_ScopeAtMachine` (sibling). This map is
+# the mechanical bridge between the string registry and real code (WR-01).
+_FORMAL_03_OWNERS: dict[str, type[RuleBasedStateMachine]] = {
+    "current_is_total_single_valued_and_chain_tail": _SpineMachine,
+    "chain_is_immutable": _SpineMachine,
+    "world_contract_raises": _SpineMachine,
+    "scope_at_equals_fold_for_every_cut": _ScopeAtMachine,
+}
+
+
+def test_formal_03_conformance_set_resolves() -> None:
+    """
+    Every FORMAL-03 registry name resolves to a callable on its owning machine (WR-01).
+
+    The registry above is a tuple of method-name STRINGS. In a project whose ethos is "verified
+    mechanically, not asserted by construction," an unchecked string registry can silently go stale
+    if a machine method is renamed. This dereferences every registered name against its owning
+    class, so a rename that isn't mirrored in the registry fails here instead of drifting silently.
+    """
+    # The owner map must cover EXACTLY the registered set: a name added to (or removed from) the
+    # registry without a matching owner entry is itself drift, and fails right here.
+    assert set(_FORMAL_03_OWNERS) == set(_FORMAL_03_CONFORMANCE_SET)
+    for name in _FORMAL_03_CONFORMANCE_SET:
+        owner = _FORMAL_03_OWNERS[name]
+        member = getattr(owner, name, None)
+        assert callable(member), (
+            f"FORMAL-03 registry name {name!r} does not resolve to a callable on "
+            f"{owner.__name__} — the registry has drifted from the machine definition."
+        )

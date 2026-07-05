@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.1.0
-milestone_name: milestone
+milestone: v0.2.0
+milestone_name: — Stance
 status: Awaiting next milestone
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-07-04T11:11:37.407Z"
-last_activity: 2026-07-04 — Milestone v0.1.0 completed and archived
+stopped_at: Completed 10-04-PLAN.md (final plan of phase 10)
+last_updated: "2026-07-05T11:33:21.785Z"
+last_activity: 2026-07-05 — Milestone v0.2.0 completed and archived
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 26
-  completed_plans: 26
+  total_phases: 2
+  completed_phases: 2
+  total_plans: 6
+  completed_plans: 6
   percent: 100
 ---
 
@@ -21,20 +21,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-13)
 
 **Core value:** A correct, append-only belief-revision core behind a clean `BeliefStore` Protocol whose correctness is *provable* — AGM/Hansson postulate compliance and structural invariants verified mechanically, zero narrative semantics leaking in.
-**Current focus:** Phase 08 — publishable-polish
+**Current focus:** Planning next milestone (v0.2.0 shipped)
 
 ## Current Position
 
-Phase: Milestone v0.1.0 complete
+Phase: Milestone v0.2.0 complete
 Plan: —
 Status: Awaiting next milestone
-Last activity: 2026-07-04 — Milestone v0.1.0 completed and archived
+Last activity: 2026-07-05 — Milestone v0.2.0 completed and archived
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 26
+- Total plans completed: 32
 - Average duration: — min
 - Total execution time: 0.0 hours
 
@@ -50,6 +50,8 @@ Last activity: 2026-07-04 — Milestone v0.1.0 completed and archived
 | 06 | 2 | - | - |
 | 07 | 4 | - | - |
 | 08 | 3 | - | - |
+| 9 | 2 | - | - |
+| 10 | 4 | - | - |
 
 **Recent Trend:**
 
@@ -83,6 +85,12 @@ Last activity: 2026-07-04 — Milestone v0.1.0 completed and archived
 | Phase 08 P01 | 2min | 2 tasks | 3 files |
 | Phase 08 P02 | 3min | 2 tasks | 2 files |
 | Phase 08 P03 | 15m | 3 tasks | 5 files |
+| Phase 09 P01 | 8min | 2 tasks | 6 files |
+| Phase 09 P02 | 8min | 2 tasks | 1 files |
+| Phase 10 P01 | 35min | 2 tasks | 1 files |
+| Phase 10 P02 | 20min | 2 tasks | 1 files |
+| Phase 10 P03 | 20min | 2 tasks | 1 files |
+| Phase 10-stance-formal-proof-docs P04 | 25min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -139,6 +147,14 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase 08]: 08-02: README leads with PKG-03 Kumiho framing (reference implementation of Kumiho, multi-scope extension, no recovery) + D-03 install split; docs/src/index.md Quick Start is a runnable zero-dep MemoryCore.in_memory->revise->query_scope example using uuid7 (verified by running it)
 - [Phase ?]: Used git mv (relocation, not duplication) to publish the backend contract inside docs_dir
 - [Phase ?]: Pinned CI git-cliff to .cliff.toml explicitly (default search path is cliff.toml, not the dot-file)
+- [Phase 09]: 09-01: Stance is a plain Enum + total_ordering with an isinstance-guarded __lt__ (not IntEnum/StrEnum); +/*/cross-type < raise TypeError by base-class choice. Serialize .name / hydrate Stance[token] name-lookup (never value-lookup on the wire token).
+- [Phase 09]: 09-01: stance is a REQUIRED 7th BeliefState field (no model default, D-01); the certain default lives on revise/expand. protocol.py imports Stance at RUNTIME because the =Stance.certain default is evaluated at class-definition time (TYPE_CHECKING-only would NameError).
+- [Phase ?]: STANCE persistence proofs driven through MemoryCore(backend) with member-identity assertions; a value-vs-name hydrate regression raises on read (T-09-02)
+- [Phase 10]: Stance discrimination flows through the real widened _base_of (never an inline literal) so a value-only revert breaks the proof (VALIDATION SC1)
+- [Phase 10]: The deterministic _base_of/K*6 guard and the stateful-oracle event() flip label are kept as two distinct surfaces, not conflated (D-03)
+- [Phase ?]: Phase 10 (10-03): exhaustive parametrize over list(Stance) proves stance round-trip/contract-verbatim/get_scope_at for every member on both backends; vacuous-pass caught by a doubted-only hydrate-bug injection (D-05/D-08, SC3)
+- [Phase ?]: Phase 10 (D-13): exported Stance from the doxastica package root alongside Status — the one deliberate behavior-neutral src change; docs now use 'from doxastica import Stance'
+- [Phase ?]: Phase 10 SC4: dual-backend conformance green WITH ladybug (573 passed), SKIP-not-fail WITHOUT (467 passed, 88 skipped, 0 failures) — skips surfaced via -rs, never counted as passes
 
 ### Pending Todos
 
@@ -174,10 +190,14 @@ Items acknowledged at v0.1.0 milestone close (5 open artifacts; none are functio
 | context_question | Phase 01 — 2 CONTEXT open questions | resolved in the Phase-2 ladybug spike | 2026-07-04 |
 | context_question | Phase 02 — 3 CONTEXT open questions | resolved in the Phase-2 ladybug spike | 2026-07-04 |
 
+Re-acknowledged at v0.2.0 milestone close (2026-07-05): the sole remaining open
+artifact is `SEED-001` (doxastica-demo TUI, still `dormant`) — a captured future-work
+idea, out of the Stance milestone scope and not a functional gap.
+
 ## Session Continuity
 
-Last session: 2026-06-19T15:31:36.201Z
-Stopped at: Completed 08-02-PLAN.md
+Last session: 2026-07-05T00:50:03.460Z
+Stopped at: Completed 10-04-PLAN.md (final plan of phase 10)
 Resume file: .planning/phases/07-agm-hansson-conformance-suite/07-04-PLAN.md
 
 ## Operator Next Steps
