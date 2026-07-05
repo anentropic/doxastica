@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v0.2.0
 milestone_name: — Stance
-status: verifying
+status: Awaiting next milestone
 stopped_at: Completed 10-04-PLAN.md (final plan of phase 10)
-last_updated: "2026-07-05T01:06:44.308Z"
-last_activity: 2026-07-05
+last_updated: "2026-07-05T11:33:21.785Z"
+last_activity: 2026-07-05 — Milestone v0.2.0 completed and archived
 progress:
   total_phases: 2
   completed_phases: 2
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-13)
 
 **Core value:** A correct, append-only belief-revision core behind a clean `BeliefStore` Protocol whose correctness is *provable* — AGM/Hansson postulate compliance and structural invariants verified mechanically, zero narrative semantics leaking in.
-**Current focus:** Phase 10 — stance-formal-proof-docs
+**Current focus:** Planning next milestone (v0.2.0 shipped)
 
 ## Current Position
 
-Phase: 10
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-07-05
+Phase: Milestone v0.2.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-07-05 — Milestone v0.2.0 completed and archived
 
 ## Performance Metrics
 
@@ -190,6 +190,10 @@ Items acknowledged at v0.1.0 milestone close (5 open artifacts; none are functio
 | context_question | Phase 01 — 2 CONTEXT open questions | resolved in the Phase-2 ladybug spike | 2026-07-04 |
 | context_question | Phase 02 — 3 CONTEXT open questions | resolved in the Phase-2 ladybug spike | 2026-07-04 |
 
+Re-acknowledged at v0.2.0 milestone close (2026-07-05): the sole remaining open
+artifact is `SEED-001` (doxastica-demo TUI, still `dormant`) — a captured future-work
+idea, out of the Stance milestone scope and not a functional gap.
+
 ## Session Continuity
 
 Last session: 2026-07-05T00:50:03.460Z
@@ -198,4 +202,4 @@ Resume file: .planning/phases/07-agm-hansson-conformance-suite/07-04-PLAN.md
 
 ## Operator Next Steps
 
-- Plan Phase 9 with /gsd-plan-phase 9
+- Start the next milestone with /gsd-new-milestone
