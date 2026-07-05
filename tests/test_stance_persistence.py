@@ -29,6 +29,8 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
+import pytest
+
 from doxastica import MemoryCore
 from doxastica.models import BeliefFilter, Stance, Status
 
@@ -42,19 +44,25 @@ def _event_id() -> uuid.UUID:
 
 
 # --------------------------------------------------------------------------------------------
-# STANCE-03 — a non-default stance round-trips byte-stable through query_scope on both backends.
+# STANCE-03 / D-08 — EVERY stance member round-trips byte-stable through query_scope, both backends.
+# Exhaustive over ``list(Stance)`` × the ``backend`` fixture = 8 cases (4 members × 2 backends).
+# Parametrize (NOT a Hypothesis ``given`` decorator) is the correct tool: combining Hypothesis
+# with the function-scoped ``backend`` fixture would trip the ``function_scoped_fixture`` health check and bleed
+# state across examples (RESEARCH Pitfall 2). A single pinned witness would let a member-specific
+# hydrate bug (e.g. ``doubted``-only) sail through — exhaustive enumeration is the proof (D-05/D-07).
 # --------------------------------------------------------------------------------------------
 
 
-def test_stance_round_trips_byte_stable(backend: BackendPort) -> None:
-    """STANCE-03: a non-default stance survives revise → query_scope unchanged on both backends."""
+@pytest.mark.parametrize("stance", list(Stance))
+def test_stance_round_trips_byte_stable(backend: BackendPort, stance: Stance) -> None:
+    """STANCE-03/D-08: every stance member survives revise → query_scope unchanged, both backends."""
     core = MemoryCore(backend)
-    core.revise("alice", "b1", "v", _event_id(), stance=Stance.suspected)
+    core.revise("alice", "b1", "v", _event_id(), stance=stance)
     [state] = core.query_scope("alice", BeliefFilter())
-    assert state.stance is Stance.suspected, (
-        "the queried stance must be the SUSPECTED member (name-hydrated, not value-hydrated)"
+    assert state.stance is stance, (
+        "the queried stance must be the exact member (name-hydrated, not value-hydrated)"
     )
-    assert state.stance.name == "suspected", "the stored wire token is the member NAME (D-02)"
+    assert state.stance.name == stance.name, "the stored wire token is the member NAME (D-02)"
 
 
 # --------------------------------------------------------------------------------------------
