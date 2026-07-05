@@ -89,7 +89,7 @@ Decision-grade edits to the frozen value layer — reversing them is a rewrite.
 
 ### Documentation
 
-- [ ] **DOCS-01**: The Cluedo detective tutorial demonstrates stance — a **within-scope
+- [x] **DOCS-01**: The Cluedo detective tutorial demonstrates stance — a **within-scope
       epistemic gradient** (a first guess at `suspected`, upgraded to `believed`, a forced
       conclusion at `certain`) plus one **reader-side ordinal comparison** driving a decision
       (e.g. a shown card outranks a mere suspicion), keeping stance *policy* the reader's, per
@@ -130,4 +130,4 @@ Which phases cover which requirements. Populated during roadmap creation.
 | STANCE-05 | Phase 9 | Complete |
 | STANCE-06 | Phase 9 | Complete |
 | STANCE-07 | Phase 10 | Complete |
-| DOCS-01 | Phase 10 | Pending |
+| DOCS-01 | Phase 10 | Complete |

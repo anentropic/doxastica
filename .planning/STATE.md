@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.2.0
 milestone_name: — Stance
-status: executing
-stopped_at: None
-last_updated: "2026-07-05T00:36:49.210Z"
+status: verifying
+stopped_at: Completed 10-04-PLAN.md (final plan of phase 10)
+last_updated: "2026-07-05T00:50:03.465Z"
 last_activity: 2026-07-04 -- Phase 10 execution started
 progress:
   total_phases: 2
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
-  percent: 50
+  completed_plans: 6
+  percent: 100
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 
 Phase: 10 (stance-formal-proof-docs) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-04 -- Phase 10 execution started
 
 ## Performance Metrics
@@ -89,6 +89,7 @@ Last activity: 2026-07-04 -- Phase 10 execution started
 | Phase 10 P01 | 35min | 2 tasks | 1 files |
 | Phase 10 P02 | 20min | 2 tasks | 1 files |
 | Phase 10 P03 | 20min | 2 tasks | 1 files |
+| Phase 10-stance-formal-proof-docs P04 | 25min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -151,6 +152,8 @@ Open decisions to resolve during Phase 1 planning:
 - [Phase 10]: Stance discrimination flows through the real widened _base_of (never an inline literal) so a value-only revert breaks the proof (VALIDATION SC1)
 - [Phase 10]: The deterministic _base_of/K*6 guard and the stateful-oracle event() flip label are kept as two distinct surfaces, not conflated (D-03)
 - [Phase ?]: Phase 10 (10-03): exhaustive parametrize over list(Stance) proves stance round-trip/contract-verbatim/get_scope_at for every member on both backends; vacuous-pass caught by a doubted-only hydrate-bug injection (D-05/D-08, SC3)
+- [Phase ?]: Phase 10 (D-13): exported Stance from the doxastica package root alongside Status — the one deliberate behavior-neutral src change; docs now use 'from doxastica import Stance'
+- [Phase ?]: Phase 10 SC4: dual-backend conformance green WITH ladybug (573 passed), SKIP-not-fail WITHOUT (467 passed, 88 skipped, 0 failures) — skips surfaced via -rs, never counted as passes
 
 ### Pending Todos
 
@@ -188,8 +191,8 @@ Items acknowledged at v0.1.0 milestone close (5 open artifacts; none are functio
 
 ## Session Continuity
 
-Last session: 2026-07-05T00:35:50.844Z
-Stopped at: None
+Last session: 2026-07-05T00:50:03.460Z
+Stopped at: Completed 10-04-PLAN.md (final plan of phase 10)
 Resume file: .planning/phases/07-agm-hansson-conformance-suite/07-04-PLAN.md
 
 ## Operator Next Steps
