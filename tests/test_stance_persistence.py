@@ -44,18 +44,19 @@ def _event_id() -> uuid.UUID:
 
 
 # --------------------------------------------------------------------------------------------
-# STANCE-03 / D-08 — EVERY stance member round-trips byte-stable through query_scope, both backends.
-# Exhaustive over ``list(Stance)`` × the ``backend`` fixture = 8 cases (4 members × 2 backends).
-# Parametrize (NOT a Hypothesis ``given`` decorator) is the correct tool: combining Hypothesis
-# with the function-scoped ``backend`` fixture would trip the ``function_scoped_fixture`` health check and bleed
-# state across examples (RESEARCH Pitfall 2). A single pinned witness would let a member-specific
-# hydrate bug (e.g. ``doubted``-only) sail through — exhaustive enumeration is the proof (D-05/D-07).
+# STANCE-03 / D-08 — EVERY stance member round-trips byte-stable through query_scope, both
+# backends. Exhaustive over ``list(Stance)`` × the ``backend`` fixture = 8 cases (4 members ×
+# 2 backends). Parametrize (NOT a Hypothesis ``given`` decorator) is the correct tool: combining
+# Hypothesis with the function-scoped ``backend`` fixture would trip the ``function_scoped_fixture``
+# health check and bleed state across examples (RESEARCH Pitfall 2). A single pinned witness would
+# let a member-specific hydrate bug (e.g. ``doubted``-only) sail through — exhaustive enumeration
+# is the proof (D-05/D-07).
 # --------------------------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("stance", list(Stance))
 def test_stance_round_trips_byte_stable(backend: BackendPort, stance: Stance) -> None:
-    """STANCE-03/D-08: every stance member survives revise → query_scope unchanged, both backends."""
+    """STANCE-03/D-08: every member survives revise → query_scope unchanged (both backends)."""
     core = MemoryCore(backend)
     core.revise("alice", "b1", "v", _event_id(), stance=stance)
     [state] = core.query_scope("alice", BeliefFilter())
@@ -81,8 +82,8 @@ def test_stance_defaults_to_certain(backend: BackendPort) -> None:
 # --------------------------------------------------------------------------------------------
 # STANCE-04 / D-08 — contract copies EVERY prior stance VERBATIM onto the retracted tail, both
 # backends. Exhaustive over ``list(Stance)`` × the ``backend`` fixture (8 cases). A member-specific
-# hydrate bug (``Stance(props["stance"])`` value-lookup instead of ``Stance[...]`` name-lookup) makes
-# the ``is``-identity assertion RAISE for that member's parametrization (VALIDATION SC3 vacuous-pass).
+# hydrate bug (``Stance(props["stance"])`` value-lookup instead of ``Stance[...]`` name-lookup)
+# makes the ``is``-identity assertion RAISE for that member alone (VALIDATION SC3 vacuous-pass).
 # --------------------------------------------------------------------------------------------
 
 
