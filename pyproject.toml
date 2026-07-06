@@ -31,7 +31,7 @@ Repository = "https://github.com/anentropic/doxastica"
 # reference-backend extra behind the Phase-1 BackendPort seam. `pip install doxastica`
 # yields a working in-memory AGM core with zero ladybug install; `[ladybug]` adds the
 # reference backend.
-ladybug = ["ladybug>=0.17,<0.18"]
+ladybug = ["ladybug>=0.17,<0.19"]
 all = ["doxastica[ladybug]"]
 # future backends slot in here as extras, e.g. neo4j = [...], surrealdb = [...]
 
