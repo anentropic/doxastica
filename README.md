@@ -13,9 +13,6 @@ that just moved. Knowledge is held per scope, so several holders (several agents
 agent and the world) can believe contradictory things at once, and where they diverge is
 a query rather than a guess.
 
-No game, narrative, or LLM concepts inside: only scopes, beliefs, revisions, and edges,
-behind a `BeliefStore` protocol.
-
 It is a standalone **reference implementation of Kumiho**
 ([arXiv 2603.17244](https://arxiv.org/abs/2603.17244), Young Bin Park), a graph-native
 AGM belief-revision core, with one deliberate **multi-scope** extension (Kumiho is
