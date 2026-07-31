@@ -1,19 +1,35 @@
 # doxastica
 
-A standalone **reference implementation of Kumiho** ([arXiv 2603.17244](https://arxiv.org/abs/2603.17244), Young Bin Park) —
-a graph-native AGM belief-revision core — with one deliberate **multi-scope** extension
-(Kumiho is single-agent) and one deliberate exclusion (**no recovery**; AGM *recovery* is
-dropped in favour of superseded-chain semantics). Zero narrative concepts; correctness is
-*provable*, with AGM/Hansson postulates verified mechanically as a backend conformance suite.
+**Belief revision for systems whose knowledge goes stale.**
 
-## What it is
+Most stores let you write a fact and read it back. Few can answer the question that
+matters once a fact turns out to be wrong:
 
-doxastica is a standalone, append-only belief-revision library. It has **no game, narrative,
-or LLM concepts inside it** — only scopes, beliefs, and revisions behind a clean
-`BeliefStore` protocol. Revision is forward-only: no operation removes or rewrites a stored
-`BeliefState`; superseded states stay on the chain. The library ships a working in-memory AGM
-core that depends on `pydantic` alone, with the LadybugDB graph backend available as an
-optional extra.
+> *What did I conclude from this — and is any of it still true?*
+
+doxastica keeps beliefs on append-only revision chains, records what rests on what, and
+when something is retracted or superseded tells you exactly which conclusions stand on
+ground that just moved. Knowledge is held **per scope**, so several holders — several
+agents, or an agent and the world — can believe contradictory things at once, and where
+they diverge is a query rather than a guess.
+
+No game, narrative, or LLM concepts inside: only scopes, beliefs, revisions, and edges,
+behind a clean `BeliefStore` protocol. `pydantic` is the only required dependency.
+
+## What you get
+
+| Capability | API |
+|---|---|
+| Supersede without deleting — the prior state stays on the chain | `revise()` / `expand()`, `get_revision_chain()` |
+| Find what a retraction left stale | `add_edge(..., EdgeType.DEPENDS_ON)`, then `get_impact()` |
+| Per-holder knowledge, plus a privileged world scope that can never be retracted | `get_or_create_scope()`, `WORLD_SCOPE_ID`, `WorldScopeContractionError` |
+| Rank claims without inventing probabilities — an ordinal, comparison-only stance | `Stance.certain > believed > suspected > doubted` |
+| "What did we know at the time?" | `get_scope_at(scope_id, as_of_event_id)` |
+| Retrieval with no free-text predicate — injection and structure leaks unrepresentable | `query_scope(scope_id, BeliefFilter(...))` |
+
+`get_impact()` walks `DEPENDS_ON` and `DERIVED_FROM` (never `SUPERSEDES`) and returns an
+`ImpactResult` carrying `reached` plus `frontier` and `truncated` — so a depth-bounded
+cascade can never silently under-report.
 
 ## Installation
 
@@ -32,13 +48,82 @@ uv add doxastica
 uv add 'doxastica[ladybug]'
 ```
 
-The base install ships a fully working in-memory belief-revision core. The `[ladybug]` extra
-adds the LadybugDB-backed reference backend behind the same `BeliefStore` protocol.
+The base install ships a fully working in-memory belief-revision core. The `[ladybug]`
+extra adds the LadybugDB-backed reference backend behind the same `BeliefStore` protocol.
 
 ## Quick Start
 
-See the [Quick Start in the documentation](https://anentropic.github.io/doxastica/) for a
-runnable first program using `MemoryCore(InMemoryBackend())`.
+Build the zero-dependency in-memory core, revise a belief, and read the current base
+back. Revising the same belief again supersedes the prior value — `query_scope` returns
+exactly the current tail, never a duplicate.
+
+```python
+from uuid import uuid7
+
+from doxastica import BeliefFilter, InMemoryBackend, MemoryCore
+
+# Zero-dependency in-memory core (no ladybug install needed) — pure DI: build the
+# backend and inject it.
+core = MemoryCore(InMemoryBackend())
+
+scope_id = "agent-1"
+belief_id = "sky-colour"
+
+# Revise: append an active BeliefState for the belief.
+core.revise(scope_id, belief_id, "blue", source_event_id=uuid7())
+
+# Read the current base back.
+base = core.query_scope(scope_id, BeliefFilter())
+print({b.belief_id: b.value for b in base})  # {'sky-colour': 'blue'}
+
+# Revise the same belief to a new value — the prior state is superseded, not removed.
+core.revise(scope_id, belief_id, "grey", source_event_id=uuid7())
+
+# query_scope returns exactly the new current tail (one entry, no duplicate).
+base = core.query_scope(scope_id, BeliefFilter())
+print({b.belief_id: b.value for b in base})  # {'sky-colour': 'grey'}
+```
+
+For the cascade in full — laying `DEPENDS_ON` edges and reading an `ImpactResult` after a
+retraction — see [The Detective's Notebook](https://anentropic.github.io/doxastica/tutorials/cluedo-detective/),
+which revises a theory under contradiction end to end.
+
+## Why you can trust it
+
+doxastica is a standalone **reference implementation of Kumiho**
+([arXiv 2603.17244](https://arxiv.org/abs/2603.17244), Young Bin Park) — a graph-native
+AGM belief-revision core — with one deliberate **multi-scope** extension (Kumiho is
+single-agent) and one deliberate exclusion (**no recovery**; AGM *recovery* is dropped in
+favour of superseded-chain semantics).
+
+That lineage is the point: the specification is a forty-year formal literature rather
+than one project's taste, so correctness is *provable* — AGM/Hansson postulate compliance
+and structural invariants are verified mechanically as a property-test suite, LLM-free.
+Revision is forward-only: no operation removes or rewrites a stored `BeliefState`. The
+seam's backend-blindness is enforced by an AST scan in CI, so a storage dialect cannot
+leak across it.
+
+## Before you adopt
+
+Honest limits, so you can judge the fit before writing code:
+
+- **You mint the belief ids.** doxastica stores an opaque value under a `belief_id` you
+  choose; it does no entity resolution. Two phrasings of the same claim collide only if
+  you give them the same id, so the calling layer needs a deliberate keying discipline.
+  This is the real integration cost, and it is by design — the value stays opaque
+  precisely so the core cannot acquire your domain's semantics.
+- **It is not a vector store, and does not replace one.** It holds the comparatively small
+  set of load-bearing claims, not everything a system has read.
+- **The payoff scales with lifetime and holders.** Long-lived state with many revisions,
+  or several holders who can disagree, is where dependency tracking and scope joins earn
+  their keep; a short single-holder run gets little.
+- **The core API is synchronous** and single-writer by design — the reference backend's
+  embedded model enforces write serialization for free.
+
+## Documentation
+
+Full documentation — tutorials, how-to guides, architecture explanation, and the API
+reference — is at **[anentropic.github.io/doxastica](https://anentropic.github.io/doxastica/)**.
 
 ## License
 
