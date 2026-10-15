@@ -173,7 +173,9 @@ class InMemoryBackend:
         Snapshots node + edge state on entry; on an exception inside the block the snapshot
         is restored (logical rollback), so partial writes never persist. On success the
         writes stay (no-op restore). The in-memory transaction is logical, matching the
-        ladybug adapter's ``BEGIN``/``COMMIT``/``ROLLBACK`` semantics.
+        ladybug adapter's ``BEGIN``/``COMMIT``/``ROLLBACK`` semantics, except that a block
+        that catches a failed statement and finishes still commits here: Ladybug may have
+        ended its transaction at the failure (see ``LadybugBackend.unit_of_work``).
         """
         snapshot_nodes = deepcopy(self._nodes)
         snapshot_edges = deepcopy(self._edges)

@@ -204,6 +204,7 @@ class LadybugBackend:
         self._conn = conn
         self._ns = namespace
         self._owns_conn = owns_conn
+        self._db: lb.Database | None = None  # set by open(), the one place that creates one
         self._bootstrap_schema()
 
     @classmethod
@@ -212,14 +213,16 @@ class LadybugBackend:
         Open a self-managing backend over ``path`` (or ``":memory:"`` / ``""`` for in-memory).
 
         Constructs its own ``lb.Database`` + ``lb.Connection`` and takes ownership
-        (``owns_conn=True``) — :meth:`close` will close the connection. The sibling
+        (``owns_conn=True``) — :meth:`close` will close both. The sibling
         :meth:`from_connection` wraps a tenant-supplied connection instead. A ``:memory:`` /
         ``""`` path yields a fresh in-memory DB.
         """
         db_path = None if path in (":memory:", "") else path
         db = lb.Database(db_path) if db_path is not None else lb.Database()
         conn = lb.Connection(db)
-        return cls(conn, namespace=namespace, owns_conn=True)
+        backend = cls(conn, namespace=namespace, owns_conn=True)
+        backend._db = db
+        return backend
 
     @classmethod
     def from_connection(cls, conn: lb.Connection, *, namespace: str = "dx") -> LadybugBackend:
@@ -236,9 +239,17 @@ class LadybugBackend:
         return cls(conn, namespace=namespace, owns_conn=False)
 
     def close(self) -> None:
-        """Close the connection ONLY if owned (R19: never close an injected handle)."""
+        """
+        Close the connection ONLY if owned (R19: never close an injected handle).
+
+        A backend from :meth:`open` also closes the database it created, which would otherwise
+        stay open (its file lock and its address-space reservation held) until the garbage
+        collector reached it.
+        """
         if self._owns_conn:
             self._conn.close()  # idempotent — double-close is a no-op (verified live)
+            if self._db is not None:
+                self._db.close()  # idempotent too
 
     def _bootstrap_schema(self) -> None:
         """
@@ -565,7 +576,9 @@ class LadybugBackend:
         A unit opened inside another (which Ladybug allows only once the outer one's
         transaction has ended) counts as the outer one's writes, as far as it may have kept
         them: all of them if it committed, none if it rolled back, and otherwise those its
-        own notes would count.
+        own notes would count. Ladybug has one transaction per connection, so while a unit
+        opened inside this one is still open, the transaction is that unit's: this one exits
+        without a ``COMMIT`` or ``ROLLBACK``, as though it had found its transaction gone.
 
         Statements and writes are seen through every backend on the connection. One that
         failed on the bare connection isn't, so when the transaction is found gone with no
@@ -580,6 +593,14 @@ class LadybugBackend:
         except BaseException as error:
             failed, writes = unit.failed, unit.writes_after
             kept = unit.writes if failed is None else writes
+            if _UNITS.get(self._conn) is not unit:
+                # A unit opened inside this one holds the transaction; leave it to that one.
+                if failed is not None:
+                    if writes:
+                        error.add_note(_lost_note(failed, writes))
+                elif unit.writes:
+                    error.add_note(_unseen_note(unit.writes))
+                raise
             try:
                 self._exec("ROLLBACK", writes=False)
                 kept = 0
@@ -597,6 +618,16 @@ class LadybugBackend:
         else:
             failed, writes = unit.failed, unit.writes_after
             kept = unit.writes if failed is None else writes
+            if _UNITS.get(self._conn) is not unit:
+                # A unit opened inside this one holds the transaction; leave it to that one.
+                gone = RuntimeError(
+                    f"{_NO_TRANSACTION}COMMIT: the transaction belongs to a unit of work "
+                    "opened inside this one, which is still open."
+                )
+                gone.add_note(
+                    _unseen_note(unit.writes) if failed is None else _lost_note(failed, writes)
+                )
+                raise gone
             try:
                 self._exec("COMMIT", writes=False)
                 kept = unit.writes  # the transaction was open after all
@@ -684,9 +715,9 @@ def _restore(conn: lb.Connection, unit: _Unit, kept: int) -> None:
     """
     Put back the open unit ``unit`` was nested in, counting the ``kept`` writes it left.
 
-    Units exit in the order they opened unless something interleaves them (an ``ExitStack``,
-    say). One that exits before a unit nested in it still counts its writes in its own outer
-    unit, leaves the nested unit current, and is passed over when that one exits.
+    Units exit in the order they opened unless a caller exits them by hand. One that exits
+    before a unit nested in it leaves that unit the transaction and the place of current unit,
+    still counts its own writes in its outer unit, and is passed over when the nested one exits.
     """
     unit.done = True
     outer = unit.outer

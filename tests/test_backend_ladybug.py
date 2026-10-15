@@ -43,9 +43,14 @@ def test_ownership() -> None:
     # Self-managed (owns_conn=True via open()): the backend owns and closes its connection.
     owned_backend = LadybugBackend.open(":memory:", namespace="dx")
     owned_conn = owned_backend._conn  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    owned_db = owned_backend._db  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
     owned_backend.close()
     with pytest.raises(RuntimeError, match="closed"):
         owned_conn.execute("RETURN 1 AS one")
+    # ...and the database it created, not left for the garbage collector.
+    assert owned_db is not None
+    assert owned_db.is_closed
+    owned_backend.close()  # a second close is a no-op
 
 
 def test_namespace_isolation() -> None:
@@ -580,10 +585,59 @@ def test_unit_of_work_counts_what_a_unit_exited_out_of_order_kept() -> None:
         inner.__enter__()
         with contextlib.suppress(RuntimeError):
             middle.__exit__(None, None, None)
-        with contextlib.suppress(RuntimeError):
-            inner.__exit__(None, None, None)
+        inner.__exit__(None, None, None)
         raise RuntimeError("boom")
-    assert any("write(s)" in note for note in raised.value.__notes__)
+    assert any("the 1 write(s)" in note for note in raised.value.__notes__)
+    assert _ids(be.match_nodes("BeliefState", {})) == ["a", "c"]
+    be.close()
+
+
+def test_unit_of_work_exited_before_a_unit_inside_it_leaves_it_the_transaction() -> None:
+    """Ladybug's one transaction is the nested unit's: the unit exiting first doesn't commit it."""
+    be = _memory()
+    be.upsert_node("BeliefState", "a", {})
+    duplicate = "CREATE (n:dx_BeliefState {state_id:'a'})"
+    with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="duplicated primary key"):
+            be._exec(duplicate)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        middle, inner = be.unit_of_work(), be.unit_of_work()
+        middle.__enter__()
+        be.upsert_node("BeliefState", "x", {})
+        with pytest.raises(RuntimeError, match="duplicated primary key"):
+            be._exec(duplicate)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        inner.__enter__()
+        be.upsert_node("BeliefState", "y", {})
+        with pytest.raises(RuntimeError, match="No active transaction for COMMIT") as gone:
+            middle.__exit__(None, None, None)
+        assert any("nothing was written after it" in note for note in gone.value.__notes__)
+        inner.__exit__(None, None, None)  # commits y: the transaction was still inner's
+        raise RuntimeError("boom")
+    assert any("the 1 write(s)" in note for note in raised.value.__notes__)
+    assert _ids(be.match_nodes("BeliefState", {})) == ["a", "y"]
+    be.close()
+
+
+def test_unit_of_work_failing_before_a_unit_inside_it_leaves_it_the_rollback() -> None:
+    """A unit that fails while one nested in it is open leaves that one to roll back its writes."""
+    be = _memory()
+    be.upsert_node("BeliefState", "a", {})
+    duplicate = "CREATE (n:dx_BeliefState {state_id:'a'})"
+    with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="duplicated primary key"):
+            be._exec(duplicate)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        middle, inner = be.unit_of_work(), be.unit_of_work()
+        middle.__enter__()
+        with pytest.raises(RuntimeError, match="duplicated primary key"):
+            be._exec(duplicate)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        inner.__enter__()
+        be.upsert_node("BeliefState", "y", {})
+        middling = LookupError("middle")
+        middle.__exit__(LookupError, middling, None)
+        assert not getattr(middling, "__notes__", [])
+        inner.__exit__(LookupError, LookupError("inner"), None)  # rolls y back
+        raise RuntimeError("boom")
+    assert not getattr(raised.value, "__notes__", [])
+    assert _ids(be.match_nodes("BeliefState", {})) == ["a"]
     be.close()
 
 
