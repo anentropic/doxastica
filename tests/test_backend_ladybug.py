@@ -271,6 +271,33 @@ def test_unit_of_work_reports_the_failure_not_the_rollback(statement: str, failu
     be.close()
 
 
+def test_unit_of_work_notes_writes_after_a_failure_it_caught() -> None:
+    """A block that catches a failed statement and goes on is told its unit wasn't undone."""
+    be = LadybugBackend.open(":memory:", namespace="dx")
+    be.upsert_node("BeliefState", "a", {})
+    with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="duplicated primary key"):
+            be._exec("CREATE (n:dx_BeliefState {state_id:'a'})")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        # Ladybug rolled the transaction back: this write commits on its own.
+        be.upsert_node("BeliefState", "c", {})
+        raise RuntimeError("boom")
+    assert any("not undone" in note for note in raised.value.__notes__)
+    assert _ids(be.match_nodes("BeliefState", {})) == ["a", "c"]
+    be.close()
+
+
+def test_unit_of_work_reports_a_failure_it_explicitly_causes() -> None:
+    """An error raised ``from`` the failed statement passes silently, like the failure itself."""
+    be = LadybugBackend.open(":memory:", namespace="dx")
+    with pytest.raises(LookupError) as raised, be.unit_of_work():
+        try:
+            be._exec("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        except RuntimeError as failure:
+            raise LookupError("wrapped") from failure
+    assert not getattr(raised.value, "__notes__", [])
+    be.close()
+
+
 def test_unit_of_work_notes_a_rollback_that_fails() -> None:
     """A ROLLBACK that fails for another reason is noted on the block's error, not raised."""
     be = LadybugBackend.open(":memory:", namespace="dx")

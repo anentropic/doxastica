@@ -102,8 +102,7 @@ _DEPTH_CEILING = 10_000
 _DEFAULT_HOP_CAP = 30
 
 # What Ladybug says to a ROLLBACK when a statement that failed at run time has already rolled the
-# transaction back (verified on 0.17.1). ``unit_of_work`` lets it pass: the failure behind it is
-# the one to report.
+# transaction back (verified on 0.17.1). ``unit_of_work`` reports the failure behind it instead.
 _NO_TRANSACTION = "No active transaction for ROLLBACK"
 
 # Label -> PRIMARY KEY column. The SINGLE source of truth for each node table's PK: the
@@ -174,6 +173,9 @@ class LadybugBackend:
         self._conn = conn
         self._ns = namespace
         self._owns_conn = owns_conn
+        # The last statement Ladybug failed through ``_exec``: one failing at run time inside a
+        # ``unit_of_work`` has rolled its transaction back (see ``unit_of_work``).
+        self._failed: BaseException | None = None
         self._bootstrap_schema()
 
     @classmethod
@@ -514,18 +516,29 @@ class LadybugBackend:
 
         The block's exception is always the one raised. A statement Ladybug fails at run time
         (a duplicate key, a full buffer pool) has already rolled the transaction back, so the
-        ``ROLLBACK`` then finds none; that is expected and passes silently. Any other
-        ``ROLLBACK`` failure is added to the block's exception as a note, never in its place.
+        ``ROLLBACK`` then finds none. That passes silently when the block's exception is that
+        failure, or explicitly caused by it. Otherwise the block went on after the failure, and
+        its later writes were committed one by one, so a note on the block's exception says
+        the unit was not undone. Any other ``ROLLBACK`` failure is a note too, never raised in
+        the block's exception's place.
         """
         self._exec("BEGIN TRANSACTION")
+        self._failed = None
         try:
             yield
         except BaseException as error:
+            failed = self._failed
             try:
                 self._exec("ROLLBACK")
             except Exception as rollback:
                 if _NO_TRANSACTION not in str(rollback):
                     error.add_note(f"The ROLLBACK after it failed too: {rollback}")
+                elif not _caused_by(error, failed):
+                    error.add_note(
+                        "Ladybug had already rolled this unit of work back when a statement in "
+                        f"it failed ({failed or 'not through this backend'}); writes after that "
+                        "were committed and are not undone"
+                    )
             raise
         else:
             self._exec("COMMIT")
@@ -571,9 +584,25 @@ class LadybugBackend:
         otherwise a stripped assert would let a ``list`` leak out and fail with a confusing
         ``AttributeError`` far from here.
         """
-        result = self._conn.execute(cypher, parameters=parameters or {})
+        try:
+            result = self._conn.execute(cypher, parameters=parameters or {})
+        except Exception as error:
+            self._failed = error
+            raise
         if not isinstance(result, lb.QueryResult):
             raise TypeError(
                 f"single-statement execute must return one QueryResult; got {type(result)!r}"
             )
         return result
+
+
+def _caused_by(error: BaseException, failure: BaseException | None) -> bool:
+    """Whether ``error`` is ``failure`` or follows from it by explicit ``raise ... from``."""
+    seen: set[int] = set()
+    cause: BaseException | None = error
+    while cause is not None and id(cause) not in seen:
+        if cause is failure:
+            return True
+        seen.add(id(cause))
+        cause = cause.__cause__
+    return False
