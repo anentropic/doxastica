@@ -21,11 +21,16 @@ lb = pytest.importorskip("ladybug")
 
 from doxastica.backends.ladybug import LadybugBackend  # noqa: E402  (after importorskip gate)
 
+# Ladybug maps 8 TiB per database by default, and a test's caught exceptions can keep its
+# database alive until the garbage collector runs: a few dozen of those exhaust a 47-bit address
+# space ("Buffer manager exception: Mmap ... failed"). 1 GiB is ample for these tests.
+_MAPPING = 2**30
+
 
 def test_ownership() -> None:
     """Injected connections survive ``close()``; self-managed ones are closed (CONN-01 / R19)."""
     # Injected (owns_conn=False): the backend must NOT close the tenant's connection.
-    injected_db = lb.Database()
+    injected_db = lb.Database(max_db_size=_MAPPING)
     injected_conn = lb.Connection(injected_db)
     injected_backend = LadybugBackend(injected_conn, namespace="dx", owns_conn=False)
     injected_backend.close()
@@ -42,7 +47,7 @@ def test_ownership() -> None:
 
 def test_namespace_isolation() -> None:
     """Two namespaces coexist in one DB with no cross-reads (CONN-02)."""
-    db = lb.Database()
+    db = lb.Database(max_db_size=_MAPPING)
     conn_a = lb.Connection(db)
     conn_b = lb.Connection(db)
     backend_a = LadybugBackend(conn_a, namespace="a", owns_conn=False)
@@ -68,19 +73,26 @@ def test_namespace_isolation() -> None:
 @pytest.mark.parametrize("bad", ["has space", "with'quote", "with-hyphen", "1leading_digit", ""])
 def test_namespace_rejects_unsafe(bad: str) -> None:
     """An unsafe namespace raises ValueError BEFORE any DDL runs (D-04 / T-02-01)."""
-    conn = lb.Connection(lb.Database())
+    conn = lb.Connection(lb.Database(max_db_size=_MAPPING))
     with pytest.raises(ValueError, match="namespace must match"):
         LadybugBackend(conn, namespace=bad, owns_conn=False)
 
 
 def test_bootstrap_idempotent() -> None:
     """Re-running bootstrap on a shared DB (same namespace) raises no error (CONN-03)."""
-    db = lb.Database()
+    db = lb.Database(max_db_size=_MAPPING)
     conn = lb.Connection(db)
     first = LadybugBackend(conn, namespace="dx", owns_conn=False)
     # Constructing a second backend on the same DB + namespace re-runs CREATE ... IF NOT EXISTS.
     second = LadybugBackend(lb.Connection(db), namespace="dx", owns_conn=False)
     assert first is not second  # both constructed without error — the bootstrap is idempotent.
+
+
+def _memory() -> LadybugBackend:
+    """A throwaway in-memory backend over a bounded mapping (see :data:`_MAPPING`)."""
+    return LadybugBackend(
+        lb.Connection(lb.Database(max_db_size=_MAPPING)), namespace="dx", owns_conn=True
+    )
 
 
 def _ids(rows: list[dict[str, object]]) -> list[str]:
@@ -90,7 +102,7 @@ def _ids(rows: list[dict[str, object]]) -> list[str]:
 
 def test_five_primitives() -> None:
     """upsert, add_edge, match_nodes, traverse work end-to-end over LadybugDB (BACK-02)."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     be.upsert_node("BeliefState", "s1", {"status": "active"})
     be.upsert_node("BeliefState", "s2", {"status": "active"})
     be.add_edge("DEPENDS_ON", "s1", "s2")
@@ -106,7 +118,7 @@ def test_five_primitives() -> None:
 
 def test_upsert_and_edge_idempotent() -> None:
     """Double upsert = 1 node; double add_edge = 1 edge (BACK-02; MERGE, not CREATE)."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     be.upsert_node("BeliefState", "s1", {"status": "active"})
     be.upsert_node("BeliefState", "s1", {"status": "retracted"})  # re-upsert SET-updates props
     rows = be.match_nodes("BeliefState", {})
@@ -125,7 +137,7 @@ def test_upsert_and_edge_idempotent() -> None:
 
 def test_traverse_cycle_safe() -> None:
     """A 3-node cycle terminates with the de-duplicated reachable set (SC4 / Pitfall 3)."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     for nid in ("a", "b", "c"):
         be.upsert_node("BeliefState", nid, {})
     be.add_edge("DEPENDS_ON", "a", "b")
@@ -141,7 +153,7 @@ def test_traverse_cycle_safe() -> None:
 
 def test_traverse_unbounded_empty_frontier() -> None:
     """``max_depth=None`` returns the full closure with an EMPTY frontier (SC4 / Pitfall 1)."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     for nid in ("a", "b", "c", "d"):
         be.upsert_node("BeliefState", nid, {})
     be.add_edge("DEPENDS_ON", "a", "b")
@@ -157,7 +169,7 @@ def test_traverse_unbounded_empty_frontier() -> None:
 
 def test_traverse_bounded_frontier() -> None:
     """A chain longer than ``max_depth`` yields the boundary frontier (SC4)."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     for nid in ("a", "b", "c", "d"):
         be.upsert_node("BeliefState", nid, {})
     be.add_edge("DEPENDS_ON", "a", "b")
@@ -175,7 +187,7 @@ def test_traverse_bounded_frontier() -> None:
 
 def test_upsert_scope_and_belief_use_their_own_pk() -> None:
     """Scope/Belief upsert+match on their real PK columns, not a hardcoded state_id (CR-01)."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     # Scope's PK is `scope_id`; Belief's is `belief_id`. Before CR-01 these MERGEd on a
     # non-existent `state_id` column and errored (or silently lost the PK uniqueness guarantee).
     be.upsert_node("Scope", "world", {"is_world": True})
@@ -191,7 +203,7 @@ def test_upsert_scope_and_belief_use_their_own_pk() -> None:
 
 def test_upsert_tolerates_pk_in_props() -> None:
     """Passing the PK inside props is safe — it is the merge key, never re-SET (WR-01)."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     # Before WR-01 this raised: `SET n.state_id = $p0` re-SETs the merge key. Now the PK is
     # excluded from the SET loop, so the call (and a re-upsert) succeed.
     be.upsert_node("BeliefState", "s1", {"state_id": "s1", "status": "active"})
@@ -204,7 +216,7 @@ def test_upsert_tolerates_pk_in_props() -> None:
 
 def test_traverse_max_depth_zero() -> None:
     """max_depth=0 reaches nothing; start is the frontier iff it has an out-edge (WR-02)."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     be.upsert_node("BeliefState", "a", {})
     be.upsert_node("BeliefState", "b", {})
     be.add_edge("DEPENDS_ON", "a", "b")
@@ -225,7 +237,7 @@ def test_traverse_max_depth_zero() -> None:
 
 def test_traverse_negative_depth_raises_valueerror() -> None:
     """A negative max_depth raises ValueError (WR-03: a real raise survives python -O)."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     be.upsert_node("BeliefState", "a", {})
     with pytest.raises(ValueError, match="max_depth must be non-negative"):
         be.traverse("a", frozenset({"DEPENDS_ON"}), -1)
@@ -234,7 +246,7 @@ def test_traverse_negative_depth_raises_valueerror() -> None:
 
 def test_unit_of_work_rollback() -> None:
     """A write inside a ``unit_of_work`` that raises is discarded (A2 / BACK-02)."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     be.upsert_node("BeliefState", "a", {})
     with pytest.raises(RuntimeError, match="boom"), be.unit_of_work():
         be.upsert_node("BeliefState", "b", {})
@@ -257,7 +269,7 @@ def test_unit_of_work_rollback() -> None:
 )
 def test_unit_of_work_reports_the_failure_not_the_rollback(statement: str, failure: str) -> None:
     """A statement Ladybug fails at run time is the error raised, not the ROLLBACK after it."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     be.upsert_node("BeliefState", "a", {})
     with pytest.raises(RuntimeError, match=failure) as raised, be.unit_of_work():
         be.upsert_node("BeliefState", "b", {})
@@ -273,7 +285,7 @@ def test_unit_of_work_reports_the_failure_not_the_rollback(statement: str, failu
 
 def test_unit_of_work_notes_writes_after_a_failure_it_caught() -> None:
     """A block that catches a failed statement and goes on is told its unit wasn't undone."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     be.upsert_node("BeliefState", "a", {})
     with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
         with pytest.raises(RuntimeError, match="duplicated primary key"):
@@ -288,7 +300,7 @@ def test_unit_of_work_notes_writes_after_a_failure_it_caught() -> None:
 
 def test_unit_of_work_notes_writes_before_a_second_failure() -> None:
     """The note follows the first failure that may have ended the transaction, not the last."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     be.upsert_node("BeliefState", "a", {})
     with pytest.raises(RuntimeError, match="Divide by zero") as raised, be.unit_of_work():
         with pytest.raises(RuntimeError, match="duplicated primary key"):
@@ -303,7 +315,7 @@ def test_unit_of_work_notes_writes_before_a_second_failure() -> None:
 @pytest.mark.parametrize("cause", ["from", "context", "none"])
 def test_unit_of_work_reports_a_wrapped_failure_silently(cause: str) -> None:
     """However the block wraps the failure, nothing ran after it, so nothing is noted."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     with pytest.raises(LookupError) as raised, be.unit_of_work():
         try:
             be._exec("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
@@ -319,7 +331,7 @@ def test_unit_of_work_reports_a_wrapped_failure_silently(cause: str) -> None:
 
 def test_unit_of_work_counts_no_reads_after_a_failure_it_caught() -> None:
     """Reads after the failure, a deep walk's cap lift and restore among them, write nothing."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     be.upsert_node("BeliefState", "a", {})
     with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
         with pytest.raises(RuntimeError, match="Divide by zero"):
@@ -333,7 +345,7 @@ def test_unit_of_work_counts_no_reads_after_a_failure_it_caught() -> None:
 
 def test_unit_of_work_that_finishes_after_a_caught_failure_says_why_commit_fails() -> None:
     """Ladybug's COMMIT error carries the failure that ended the unit and what came after."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     be.upsert_node("BeliefState", "a", {})
     with (
         pytest.raises(RuntimeError, match="No active transaction for COMMIT") as raised,
@@ -350,7 +362,7 @@ def test_unit_of_work_that_finishes_after_a_caught_failure_says_why_commit_fails
 
 def test_unit_of_work_that_finishes_after_a_caught_failure_says_nothing_came_after() -> None:
     """With nothing written after the failure, the COMMIT error's note says so."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     with (
         pytest.raises(RuntimeError, match="No active transaction for COMMIT") as raised,
         be.unit_of_work(),
@@ -368,7 +380,7 @@ def test_unit_of_work_that_finishes_after_a_caught_failure_says_nothing_came_aft
 
 def test_unit_of_work_counts_writes_through_every_backend_on_its_connection() -> None:
     """Tenants share the connection, so a write through another one is counted too (R19)."""
-    db = lb.Database()
+    db = lb.Database(max_db_size=_MAPPING)
     conn = lb.Connection(db)
     a = LadybugBackend(conn, namespace="a", owns_conn=False)
     b = LadybugBackend(conn, namespace="b", owns_conn=False)
@@ -383,7 +395,7 @@ def test_unit_of_work_counts_writes_through_every_backend_on_its_connection() ->
 
 def test_unit_of_work_notes_a_failure_on_the_bare_connection() -> None:
     """A statement failed outside any backend still shows the unit wasn't undone."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
         with pytest.raises(RuntimeError, match="Divide by zero"):
             be._conn.execute("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
@@ -396,7 +408,7 @@ def test_unit_of_work_notes_a_failure_on_the_bare_connection() -> None:
 
 def test_unit_of_work_passes_a_failure_on_the_bare_connection_with_no_writes_silently() -> None:
     """With nothing written, nothing can have escaped the unit, whenever the failure came."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
         with pytest.raises(RuntimeError, match="Divide by zero"):
             be._conn.execute("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
@@ -412,7 +424,7 @@ def test_unit_of_work_that_finishes_after_a_failure_on_the_bare_connection_says_
     note: str,
 ) -> None:
     """Ladybug's COMMIT error says the transaction ended at a failure no backend saw."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     with (
         pytest.raises(RuntimeError, match="No active transaction for COMMIT") as raised,
         be.unit_of_work(),
@@ -427,7 +439,7 @@ def test_unit_of_work_that_finishes_after_a_failure_on_the_bare_connection_says_
 
 def test_unit_of_work_keeps_a_transaction_a_parameter_it_cant_bind_left_open() -> None:
     """A parameter Ladybug can't bind leaves the transaction open: what follows rolls back."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     with pytest.raises(RuntimeError, match="Divide by zero") as raised, be.unit_of_work():
         with pytest.raises(RuntimeError, match="Unknown parameter type"):
             be._exec(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
@@ -442,7 +454,7 @@ def test_unit_of_work_keeps_a_transaction_a_parameter_it_cant_bind_left_open() -
 
 def test_unit_of_work_keeps_a_transaction_a_syntax_error_left_open() -> None:
     """A statement that doesn't parse leaves the transaction open: what follows rolls back."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     with pytest.raises(RuntimeError, match="Divide by zero") as raised, be.unit_of_work():
         with pytest.raises(RuntimeError, match="Parser exception"):
             be._exec("NOT CYPHER")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
@@ -455,7 +467,7 @@ def test_unit_of_work_keeps_a_transaction_a_syntax_error_left_open() -> None:
 
 def test_unit_of_work_notes_a_rollback_that_fails() -> None:
     """A ROLLBACK that fails for another reason is noted on the block's error, not raised."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
         be._conn.close()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
         raise RuntimeError("boom")
@@ -464,7 +476,7 @@ def test_unit_of_work_notes_a_rollback_that_fails() -> None:
 
 def test_unit_of_work_persists_on_success() -> None:
     """A ``unit_of_work`` that completes normally commits its writes (BACK-02)."""
-    be = LadybugBackend.open(":memory:", namespace="dx")
+    be = _memory()
     with be.unit_of_work():
         be.upsert_node("BeliefState", "a", {})
     assert _ids(be.match_nodes("BeliefState", {})) == ["a"]
