@@ -658,6 +658,73 @@ def test_open_closes_what_it_opened_when_the_backend_fails() -> None:
     assert db.is_closed  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
 
 
+def test_open_closes_the_database_when_the_connection_fails() -> None:
+    """A connection that can't be opened leaves no database open either."""
+    opened: list[object] = []
+    real = lb.Database
+
+    def tracked(*args: object, **kwargs: object) -> object:
+        db = real(*args, **kwargs)
+        opened.append(db)
+        return db
+
+    def refused(_db: object) -> object:
+        raise RuntimeError("no connection")
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(lb, "Database", tracked)
+        patch.setattr(lb, "Connection", refused)
+        with pytest.raises(RuntimeError, match="no connection"):
+            LadybugBackend.open(":memory:")
+    [db] = opened
+    assert db.is_closed  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+
+
+def test_open_closes_the_database_when_the_backend_and_the_connection_close_fail() -> None:
+    """A bad namespace, then a connection that won't close: the database still closes."""
+    opened: list[object] = []
+    real_database, real_connection = lb.Database, lb.Connection
+
+    def tracked(*args: object, **kwargs: object) -> object:
+        db = real_database(*args, **kwargs)
+        opened.append(db)
+        return db
+
+    class Sticky:
+        def __init__(self, db: object) -> None:
+            self.real = real_connection(db)  # pyright: ignore[reportArgumentType]
+
+        def close(self) -> None:
+            self.real.close()
+            raise RuntimeError("stuck")
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(lb, "Database", tracked)
+        patch.setattr(lb, "Connection", Sticky)
+        with pytest.raises(RuntimeError, match="stuck") as raised:
+            LadybugBackend.open(":memory:", namespace="bad-ns")
+    assert isinstance(raised.value.__context__, ValueError)
+    [db] = opened
+    assert db.is_closed  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+
+
+def test_close_closes_the_database_when_the_connection_wont_close() -> None:
+    """A connection that fails to close still leaves the database closed."""
+    be = LadybugBackend.open(":memory:")
+    real = be._conn  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+    class Stuck:
+        def close(self) -> None:
+            real.close()  # closed for real, before its database, then reported stuck
+            raise RuntimeError("stuck")
+
+    be._conn = Stuck()  # pyright: ignore[reportAttributeAccessIssue, reportPrivateUsage]  # noqa: SLF001
+    with pytest.raises(RuntimeError, match="stuck"):
+        be.close()
+    assert be._db is not None  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    assert be._db.is_closed  # noqa: SLF001  # pyright: ignore[reportPrivateUsage, reportAttributeAccessIssue, reportUnknownMemberType]
+
+
 def test_unit_of_work_failing_before_a_unit_inside_it_leaves_it_the_rollback() -> None:
     """A unit that fails while one nested in it is open leaves that one to roll back its writes."""
     be = _memory()
@@ -679,6 +746,51 @@ def test_unit_of_work_failing_before_a_unit_inside_it_leaves_it_the_rollback() -
         raise RuntimeError("boom")
     assert not getattr(raised.value, "__notes__", [])
     assert _ids(be.match_nodes("BeliefState", {})) == ["a"]
+    be.close()
+
+
+def test_unit_of_work_failing_before_a_unit_inside_it_notes_its_writes_after() -> None:
+    """Failing early, a unit still notes what it wrote after a failure that ended its own."""
+    be = _memory()
+    be.upsert_node("BeliefState", "a", {})
+    duplicate = "CREATE (n:dx_BeliefState {state_id:'a'})"
+    with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="duplicated primary key"):
+            be._exec(duplicate)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        middle, inner = be.unit_of_work(), be.unit_of_work()
+        middle.__enter__()
+        with pytest.raises(RuntimeError, match="duplicated primary key"):
+            be._exec(duplicate)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        be.upsert_node("BeliefState", "x", {})  # outside any transaction
+        inner.__enter__()
+        be.upsert_node("BeliefState", "y", {})
+        middling = LookupError("middle")
+        middle.__exit__(LookupError, middling, None)
+        assert any("the 1 write(s) after it" in note for note in middling.__notes__)
+        inner.__exit__(LookupError, LookupError("inner"), None)  # rolls y back
+        raise RuntimeError("boom")
+    assert any("the 1 write(s) after it" in note for note in raised.value.__notes__)
+    assert _ids(be.match_nodes("BeliefState", {})) == ["a", "x"]
+    be.close()
+
+
+def test_unit_of_work_failing_before_a_unit_inside_it_notes_an_unseen_failure() -> None:
+    """Failing early after a failure no backend saw, a unit notes what it may have lost."""
+    be = _memory()
+    be.upsert_node("BeliefState", "a", {})
+    duplicate = "CREATE (n:dx_BeliefState {state_id:'a'})"
+    middle, inner = be.unit_of_work(), be.unit_of_work()
+    middle.__enter__()
+    with pytest.raises(RuntimeError, match="duplicated primary key"):
+        be._conn.execute(duplicate)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    be.upsert_node("BeliefState", "x", {})  # outside any transaction
+    inner.__enter__()
+    be.upsert_node("BeliefState", "y", {})
+    middling = LookupError("middle")
+    middle.__exit__(LookupError, middling, None)
+    assert any("any of its 1 write(s)" in note for note in middling.__notes__)
+    inner.__exit__(LookupError, LookupError("inner"), None)  # rolls y back
+    assert _ids(be.match_nodes("BeliefState", {})) == ["a", "x"]
     be.close()
 
 
