@@ -35,7 +35,7 @@ backend = LadybugBackend.open("beliefs.db")  # (2)!
 ```
 
 1. Always import `LadybugBackend` from its module; it is deliberately not on the package root.
-2. `open` constructs and **owns** its own connection; `close()` will close it.
+2. `open` constructs and **owns** its own database and connection; `close()` will close both.
 
 The argument to [`open`](../reference/doxastica/backends/ladybug.md#doxastica.backends.ladybug.LadybugBackend.open) is the database path. Pass `":memory:"` (or `""`) for a transient in-memory LadybugDB instead of a file:
 
@@ -78,7 +78,7 @@ Because you opened the connection with `open`, the backend **owns** it and you s
 backend.close()
 ```
 
-[`close`](../reference/doxastica/backends/ladybug.md#doxastica.backends.ladybug.LadybugBackend.close) closes the connection only when the backend owns it. A backend built from an injected connection (via `from_connection`) leaves the connection open: it is the tenant's handle, and the core never closes someone else's connection. That ownership model is the subject of [How to Lease a Shared Ladybug Connection](lease-shared-connection.md).
+[`close`](../reference/doxastica/backends/ladybug.md#doxastica.backends.ladybug.LadybugBackend.close) closes the connection, and the database `open` created, only when the backend owns them. A backend built from an injected connection (via `from_connection`) leaves the connection open: it is the tenant's handle, and the core never closes someone else's connection. That ownership model is the subject of [How to Lease a Shared Ladybug Connection](lease-shared-connection.md).
 
 ## Verification
 
