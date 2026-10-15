@@ -52,6 +52,8 @@ from __future__ import annotations
 
 import contextlib
 import re
+import weakref
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 from doxastica import errors
@@ -105,9 +107,23 @@ _DEFAULT_HOP_CAP = 30
 # transaction back (verified on 0.17.1). ``unit_of_work`` reports the failure behind it instead.
 _NO_TRANSACTION = "No active transaction for ROLLBACK"
 
-# The one failure verified (0.17.1) to leave a transaction open: a statement that doesn't parse.
-# Every other failure seen (binder, runtime, buffer manager) ends it.
+# A statement that doesn't parse leaves its transaction open (verified on 0.17.1). Most other
+# failures end it (binder and runtime errors, a nested BEGIN), but not all (an unknown parameter
+# type), and nothing tells which, so ``unit_of_work`` treats any other failure as one that may.
 _SYNTAX_ERROR = "Parser exception"
+
+
+@dataclass
+class _Unit:
+    """One connection's open ``unit_of_work``, as seen by every backend sharing it (R19)."""
+
+    failed: BaseException | None = None
+    """The first failed statement since BEGIN that may have ended the transaction."""
+    writes_after: int = 0
+    """Writes since then, which ran outside any transaction if it ended there."""
+
+
+_UNITS: weakref.WeakKeyDictionary[lb.Connection, _Unit] = weakref.WeakKeyDictionary()
 
 # Label -> PRIMARY KEY column. The SINGLE source of truth for each node table's PK: the
 # bootstrap DDL (``_bootstrap_schema``) and the ``upsert_node`` MERGE key both read from here,
@@ -177,10 +193,6 @@ class LadybugBackend:
         self._conn = conn
         self._ns = namespace
         self._owns_conn = owns_conn
-        # Within a ``unit_of_work``: the first failed statement that ended its transaction, and
-        # how many writes ran after it, outside any transaction.
-        self._lost: BaseException | None = None
-        self._wrote_after_lost = 0
         self._bootstrap_schema()
 
     @classmethod
@@ -521,43 +533,47 @@ class LadybugBackend:
         ``ROLLBACK`` (re-raising), otherwise ``COMMIT`` (serializable WAL — verified: ROLLBACK
         discards the write). Matches the in-memory adapter's logical snapshot/restore semantics.
 
-        The block's exception is always the one raised. A statement Ladybug fails (other than
-        for its syntax) ends the transaction there and then, so the ``ROLLBACK`` finds none.
-        That passes silently when nothing was written after the failure, since everything the
-        unit wrote was rolled back with it. When something was (the block caught the failure
-        and went on), it was written outside any transaction, so a note on the block's
-        exception says it is not undone. A block that catches the failure and finishes gets
-        Ladybug's ``COMMIT`` error, with the same note. Any other ``ROLLBACK`` failure is a
-        note too, never raised in the block's exception's place.
+        The block's exception is always the one raised. A failed statement (other than one
+        that doesn't parse) may end Ladybug's transaction there and then, and the
+        ``ROLLBACK`` then finds none. That passes silently when nothing was written after the
+        first such failure, since everything the unit wrote was rolled back with it. When
+        something was (the block caught the failure and went on), it may have been written
+        outside any transaction, so a note on the block's exception says it may not be
+        undone. A block that catches the failure and finishes gets Ladybug's ``COMMIT``
+        error, with the same note. Any other ``ROLLBACK`` failure is a note too, never raised
+        in the block's exception's place. Statements and writes are seen through every
+        backend on the connection; one run on the bare connection is not counted.
         """
         self._exec("BEGIN TRANSACTION")
-        self._lost, self._wrote_after_lost = None, 0
+        unit = _UNITS[self._conn] = _Unit()
         try:
             yield
         except BaseException as error:
-            lost, wrote = self._lost, self._wrote_after_lost
+            failed, writes = unit.failed, unit.writes_after
             try:
                 self._exec("ROLLBACK")
             except Exception as rollback:
                 if _NO_TRANSACTION not in str(rollback):
                     error.add_note(f"The ROLLBACK after it failed too: {rollback}")
-                elif lost is None:
-                    # A statement on the connection, but not through this backend, failed.
+                elif failed is None:
+                    # A statement run on the bare connection failed.
                     error.add_note(
                         "Ladybug had already ended this unit of work's transaction; writes "
                         "after that ran outside it and may not be undone"
                     )
-                elif wrote:
-                    error.add_note(_lost_note(lost, wrote))
+                elif writes:
+                    error.add_note(_lost_note(failed, writes))
             raise
         else:
-            lost, wrote = self._lost, self._wrote_after_lost
+            failed, writes = unit.failed, unit.writes_after
             try:
                 self._exec("COMMIT")
             except Exception as commit:
-                if lost is not None:
-                    commit.add_note(_lost_note(lost, wrote))
+                if failed is not None:
+                    commit.add_note(_lost_note(failed, writes))
                 raise
+        finally:
+            _UNITS.pop(self._conn, None)
 
     def _read_var_length_cap(self) -> int:
         """
@@ -605,14 +621,19 @@ class LadybugBackend:
         ``writes=False`` marks a read or a connection setting, which ``unit_of_work`` doesn't
         count among the writes made after its transaction was lost.
         """
+        unit = _UNITS.get(self._conn)
         try:
             result = self._conn.execute(cypher, parameters=parameters or {})
         except Exception as error:
-            if self._lost is None and not str(error).startswith(_SYNTAX_ERROR):
-                self._lost = error
+            if (
+                unit is not None
+                and unit.failed is None
+                and not str(error).startswith(_SYNTAX_ERROR)
+            ):
+                unit.failed = error
             raise
-        if writes and self._lost is not None:
-            self._wrote_after_lost += 1
+        if writes and unit is not None and unit.failed is not None:
+            unit.writes_after += 1
         if not isinstance(result, lb.QueryResult):
             raise TypeError(
                 f"single-statement execute must return one QueryResult; got {type(result)!r}"
@@ -620,14 +641,14 @@ class LadybugBackend:
         return result
 
 
-def _lost_note(lost: BaseException, wrote: int) -> str:
-    """Say that a unit of work's transaction ended at ``lost``, and what was written after it."""
+def _lost_note(failed: BaseException, writes: int) -> str:
+    """Say where a unit of work's transaction may have ended, and what was written after."""
     after = (
-        f"the {wrote} write(s) after that ran outside it and are not undone"
-        if wrote
-        else "nothing was written after that"
+        f"the {writes} write(s) after it may have run outside it and are then not undone"
+        if writes
+        else "nothing was written after it"
     )
     return (
-        f"Ladybug ended this unit of work's transaction when a statement in it failed "
-        f"({lost}); {after}"
+        f"A statement in this unit of work failed ({failed}), and Ladybug may have ended its "
+        f"transaction there; {after}"
     )

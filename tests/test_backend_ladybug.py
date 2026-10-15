@@ -348,6 +348,34 @@ def test_unit_of_work_that_finishes_after_a_caught_failure_says_why_commit_fails
     be.close()
 
 
+def test_unit_of_work_counts_writes_through_every_backend_on_its_connection() -> None:
+    """Tenants share the connection, so a write through another one is counted too (R19)."""
+    db = lb.Database()
+    conn = lb.Connection(db)
+    a = LadybugBackend(conn, namespace="a", owns_conn=False)
+    b = LadybugBackend(conn, namespace="b", owns_conn=False)
+    with pytest.raises(RuntimeError, match="boom") as raised, a.unit_of_work():
+        with pytest.raises(RuntimeError, match="Divide by zero"):
+            a._exec("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        b.upsert_node("BeliefState", "c", {})
+        raise RuntimeError("boom")
+    assert any("not undone" in note for note in raised.value.__notes__)
+    assert _ids(b.match_nodes("BeliefState", {})) == ["c"]
+
+
+def test_unit_of_work_notes_a_failure_on_the_bare_connection() -> None:
+    """A statement failed outside any backend still shows the unit wasn't undone."""
+    be = LadybugBackend.open(":memory:", namespace="dx")
+    with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="Divide by zero"):
+            be._conn.execute("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        be.upsert_node("BeliefState", "c", {})
+        raise RuntimeError("boom")
+    assert any("already ended" in note for note in raised.value.__notes__)
+    assert _ids(be.match_nodes("BeliefState", {})) == ["c"]
+    be.close()
+
+
 def test_unit_of_work_keeps_a_transaction_a_syntax_error_left_open() -> None:
     """A statement that doesn't parse leaves the transaction open: what follows rolls back."""
     be = LadybugBackend.open(":memory:", namespace="dx")
