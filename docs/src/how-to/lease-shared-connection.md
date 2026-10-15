@@ -59,7 +59,7 @@ conn.close()  # the owner closes it, when the owner is done
 ```
 
 !!! warning "Ownership is determined by how you built the backend"
-    `LadybugBackend.open(path)` **owns** its connection and closes it on `close()`. `LadybugBackend.from_connection(conn)` does **not** own the connection and never closes it. Pick the constructor that matches who owns the handle; there is no flag to override this after construction.
+    `LadybugBackend.open(path)` **owns** its database and connection and closes both on `close()`. `LadybugBackend.from_connection(conn)` does **not** own the connection and never closes it. Pick the constructor that matches who owns the handle; there is no flag to override this after construction.
 
 ## Namespace rules
 

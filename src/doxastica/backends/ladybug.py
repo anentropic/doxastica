@@ -12,8 +12,8 @@ What this adapter realizes
 --------------------------
 - **Flexible connection ownership (CONN-01 / R19):** ``__init__`` records an ``owns_conn``
   flag. A connection this backend opened itself (via :meth:`LadybugBackend.open`) is owned and
-  closed on :meth:`close`; an INJECTED connection (:meth:`LadybugBackend.from_connection`) is a
-  tenant's handle and is NEVER closed.
+  closed on :meth:`close`, with the database it opened; an INJECTED connection
+  (:meth:`LadybugBackend.from_connection`) is a tenant's handle and is NEVER closed.
 - **Namespaced, idempotent schema bootstrap (CONN-02 / CONN-03 / D-04):** the backend is the
   sole writer of its ``{ns}_*`` closed subgraph. Bootstrap runs ``CREATE NODE/REL TABLE IF
   NOT EXISTS`` on construction; re-running against a fresh OR shared injected DB is a safe
@@ -220,7 +220,13 @@ class LadybugBackend:
         db_path = None if path in (":memory:", "") else path
         db = lb.Database(db_path) if db_path is not None else lb.Database()
         conn = lb.Connection(db)
-        backend = cls(conn, namespace=namespace, owns_conn=True)
+        try:
+            backend = cls(conn, namespace=namespace, owns_conn=True)
+        except BaseException:
+            # No backend to close() them: a bad namespace, or a bootstrap that failed.
+            conn.close()
+            db.close()
+            raise
         backend._db = db
         return backend
 

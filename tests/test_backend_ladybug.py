@@ -617,6 +617,47 @@ def test_unit_of_work_exited_before_a_unit_inside_it_leaves_it_the_transaction()
     be.close()
 
 
+def test_unit_of_work_exited_early_counts_writes_after_an_unseen_failure() -> None:
+    """A failure on the bare connection ended this unit's transaction: all its writes may stay."""
+    be = _memory()
+    be.upsert_node("BeliefState", "a", {})
+    with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="duplicated primary key"):
+            be._exec("CREATE (n:dx_BeliefState {state_id:'a'})")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        middle, inner = be.unit_of_work(), be.unit_of_work()
+        middle.__enter__()
+        with pytest.raises(RuntimeError, match="duplicated primary key"):
+            be._conn.execute("CREATE (n:dx_BeliefState {state_id:'a'})")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        be.upsert_node("BeliefState", "c", {})
+        inner.__enter__()
+        with pytest.raises(RuntimeError, match="No active transaction for COMMIT") as gone:
+            middle.__exit__(None, None, None)
+        assert any("bare connection" in note for note in gone.value.__notes__)
+        inner.__exit__(None, None, None)
+        raise RuntimeError("boom")
+    assert any("the 1 write(s)" in note for note in raised.value.__notes__)
+    assert _ids(be.match_nodes("BeliefState", {})) == ["a", "c"]
+    be.close()
+
+
+def test_open_closes_what_it_opened_when_the_backend_fails() -> None:
+    """A bad namespace leaves no database open behind a backend nobody can close."""
+    opened: list[object] = []
+    real = lb.Database
+
+    def tracked(*args: object, **kwargs: object) -> object:
+        db = real(*args, **kwargs)
+        opened.append(db)
+        return db
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(lb, "Database", tracked)
+        with pytest.raises(ValueError, match="namespace must match"):
+            LadybugBackend.open(":memory:", namespace="bad-ns")
+    [db] = opened
+    assert db.is_closed  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+
+
 def test_unit_of_work_failing_before_a_unit_inside_it_leaves_it_the_rollback() -> None:
     """A unit that fails while one nested in it is open leaves that one to roll back its writes."""
     be = _memory()
