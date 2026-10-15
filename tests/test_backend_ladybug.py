@@ -484,6 +484,25 @@ def test_unit_of_work_counts_nothing_a_unit_inside_it_rolled_back() -> None:
     be.close()
 
 
+def test_unit_of_work_counts_only_what_a_failed_unit_inside_it_kept() -> None:
+    """A failure in the nested unit rolled back its writes before it; those after are kept."""
+    be = _memory()
+    be.upsert_node("BeliefState", "a", {})
+    with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="duplicated primary key"):
+            be._exec("CREATE (n:dx_BeliefState {state_id:'a'})")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        with pytest.raises(LookupError), be.unit_of_work():
+            be.upsert_node("BeliefState", "c", {})
+            with pytest.raises(RuntimeError, match="Divide by zero"):
+                be._exec("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            be.upsert_node("BeliefState", "d", {})
+            raise LookupError("inner")
+        raise RuntimeError("boom")
+    assert any("the 1 write(s)" in note for note in raised.value.__notes__)
+    assert _ids(be.match_nodes("BeliefState", {})) == ["a", "d"]
+    be.close()
+
+
 def test_unit_of_work_notes_a_commit_failure_only_when_the_transaction_is_gone() -> None:
     """A COMMIT that fails for its own reason isn't blamed on an earlier failure."""
     be = _memory()

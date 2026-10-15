@@ -546,7 +546,7 @@ class LadybugBackend:
         note too, never raised in the block's exception's place.
 
         A unit opened inside another (which Ladybug allows only once the outer one's
-        transaction has ended) counts as the outer one's writes, unless it rolled back.
+        transaction has ended) counts as the outer one's writes, as far as it kept them.
 
         Statements and writes are seen through every backend on the connection. One that
         failed on the bare connection isn't, so when the transaction is found gone with no
@@ -660,9 +660,11 @@ def _restore(conn: lb.Connection, outer: _Unit | None, inner: _Unit | None) -> N
         return
     _UNITS[conn] = outer
     if inner is not None:
-        outer.writes += inner.writes
+        # A failure in the nested unit may have rolled back what it wrote before it.
+        kept = inner.writes if inner.failed is None else inner.writes_after
+        outer.writes += kept
         if outer.failed is not None:
-            outer.writes_after += inner.writes
+            outer.writes_after += kept
 
 
 def _lost_note(failed: BaseException, writes: int) -> str:
