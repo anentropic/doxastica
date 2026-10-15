@@ -287,7 +287,7 @@ def test_unit_of_work_notes_writes_after_a_failure_it_caught() -> None:
 
 
 def test_unit_of_work_notes_writes_before_a_second_failure() -> None:
-    """The note follows the failure that ended the transaction, not the last one."""
+    """The note follows the first failure that may have ended the transaction, not the last."""
     be = LadybugBackend.open(":memory:", namespace="dx")
     be.upsert_node("BeliefState", "a", {})
     with pytest.raises(RuntimeError, match="Divide by zero") as raised, be.unit_of_work():
@@ -348,6 +348,24 @@ def test_unit_of_work_that_finishes_after_a_caught_failure_says_why_commit_fails
     be.close()
 
 
+def test_unit_of_work_that_finishes_after_a_caught_failure_says_nothing_came_after() -> None:
+    """With nothing written after the failure, the COMMIT error's note says so."""
+    be = LadybugBackend.open(":memory:", namespace="dx")
+    with (
+        pytest.raises(RuntimeError, match="No active transaction for COMMIT") as raised,
+        be.unit_of_work(),
+    ):
+        be.upsert_node("BeliefState", "a", {})
+        with pytest.raises(RuntimeError, match="Divide by zero"):
+            be._exec("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    assert any(
+        "Divide by zero" in note and "nothing was written after it" in note
+        for note in raised.value.__notes__
+    )
+    assert _ids(be.match_nodes("BeliefState", {})) == []
+    be.close()
+
+
 def test_unit_of_work_counts_writes_through_every_backend_on_its_connection() -> None:
     """Tenants share the connection, so a write through another one is counted too (R19)."""
     db = lb.Database()
@@ -371,8 +389,54 @@ def test_unit_of_work_notes_a_failure_on_the_bare_connection() -> None:
             be._conn.execute("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
         be.upsert_node("BeliefState", "c", {})
         raise RuntimeError("boom")
-    assert any("already ended" in note for note in raised.value.__notes__)
+    assert any("already ended" in note and "1 write(s)" in note for note in raised.value.__notes__)
     assert _ids(be.match_nodes("BeliefState", {})) == ["c"]
+    be.close()
+
+
+def test_unit_of_work_passes_a_failure_on_the_bare_connection_with_no_writes_silently() -> None:
+    """With nothing written, nothing can have escaped the unit, whenever the failure came."""
+    be = LadybugBackend.open(":memory:", namespace="dx")
+    with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="Divide by zero"):
+            be._conn.execute("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        be.match_nodes("BeliefState", {})
+        raise RuntimeError("boom")
+    assert not getattr(raised.value, "__notes__", [])
+    be.close()
+
+
+@pytest.mark.parametrize(("write", "note"), [(True, "1 write(s)"), (False, "it wrote nothing")])
+def test_unit_of_work_that_finishes_after_a_failure_on_the_bare_connection_says_why(
+    write: bool,
+    note: str,
+) -> None:
+    """Ladybug's COMMIT error says the transaction ended at a failure no backend saw."""
+    be = LadybugBackend.open(":memory:", namespace="dx")
+    with (
+        pytest.raises(RuntimeError, match="No active transaction for COMMIT") as raised,
+        be.unit_of_work(),
+    ):
+        with pytest.raises(RuntimeError, match="Divide by zero"):
+            be._conn.execute("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        if write:
+            be.upsert_node("BeliefState", "c", {})
+    assert any("already ended" in text and note in text for text in raised.value.__notes__)
+    be.close()
+
+
+def test_unit_of_work_keeps_a_transaction_a_parameter_it_cant_bind_left_open() -> None:
+    """A parameter Ladybug can't bind leaves the transaction open: what follows rolls back."""
+    be = LadybugBackend.open(":memory:", namespace="dx")
+    with pytest.raises(RuntimeError, match="Divide by zero") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="Unknown parameter type"):
+            be._exec(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+                "CREATE (n:dx_BeliefState {state_id:$x})", {"x": object()}
+            )
+        be.upsert_node("BeliefState", "c", {})
+        be._exec("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    assert not getattr(raised.value, "__notes__", [])
+    assert _ids(be.match_nodes("BeliefState", {})) == []
     be.close()
 
 
