@@ -278,7 +278,7 @@ def test_unit_of_work_notes_writes_after_a_failure_it_caught() -> None:
     with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
         with pytest.raises(RuntimeError, match="duplicated primary key"):
             be._exec("CREATE (n:dx_BeliefState {state_id:'a'})")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-        # Ladybug rolled the transaction back: this write commits on its own.
+        # Ladybug ended the transaction: this write commits on its own.
         be.upsert_node("BeliefState", "c", {})
         raise RuntimeError("boom")
     assert any("not undone" in note for note in raised.value.__notes__)
@@ -286,15 +286,47 @@ def test_unit_of_work_notes_writes_after_a_failure_it_caught() -> None:
     be.close()
 
 
-def test_unit_of_work_reports_a_failure_it_explicitly_causes() -> None:
-    """An error raised ``from`` the failed statement passes silently, like the failure itself."""
+def test_unit_of_work_notes_writes_before_a_second_failure() -> None:
+    """The note follows the failure that ended the transaction, not the last one."""
+    be = LadybugBackend.open(":memory:", namespace="dx")
+    be.upsert_node("BeliefState", "a", {})
+    with pytest.raises(RuntimeError, match="Divide by zero") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="duplicated primary key"):
+            be._exec("CREATE (n:dx_BeliefState {state_id:'a'})")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        be.upsert_node("BeliefState", "c", {})
+        be._exec("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    assert any("not undone" in note for note in raised.value.__notes__)
+    assert _ids(be.match_nodes("BeliefState", {})) == ["a", "c"]
+    be.close()
+
+
+@pytest.mark.parametrize("cause", ["from", "context", "none"])
+def test_unit_of_work_reports_a_wrapped_failure_silently(cause: str) -> None:
+    """However the block wraps the failure, nothing ran after it, so nothing is noted."""
     be = LadybugBackend.open(":memory:", namespace="dx")
     with pytest.raises(LookupError) as raised, be.unit_of_work():
         try:
             be._exec("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
         except RuntimeError as failure:
-            raise LookupError("wrapped") from failure
+            if cause == "from":
+                raise LookupError("wrapped") from failure
+            if cause == "none":
+                raise LookupError("wrapped") from None
+            raise LookupError("wrapped")  # noqa: B904
     assert not getattr(raised.value, "__notes__", [])
+    be.close()
+
+
+def test_unit_of_work_keeps_a_transaction_a_syntax_error_left_open() -> None:
+    """A statement that doesn't parse leaves the transaction open: what follows rolls back."""
+    be = LadybugBackend.open(":memory:", namespace="dx")
+    with pytest.raises(RuntimeError, match="Divide by zero") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="Parser exception"):
+            be._exec("NOT CYPHER")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        be.upsert_node("BeliefState", "c", {})
+        be._exec("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    assert not getattr(raised.value, "__notes__", [])
+    assert _ids(be.match_nodes("BeliefState", {})) == []
     be.close()
 
 
