@@ -15,6 +15,8 @@ Task 2 (SC4 confirmations): ``test_five_primitives`` (BACK-02),
 ``test_unit_of_work_rollback`` (A2) — port unchanged, SC4 confirmed.
 """
 
+import contextlib
+
 import pytest
 
 lb = pytest.importorskip("ladybug")
@@ -542,6 +544,23 @@ def test_unit_of_work_counts_all_of_a_unit_inside_it_that_committed(
         raise RuntimeError("boom")
     assert any("the 2 write(s)" in note for note in raised.value.__notes__)
     assert _ids(be.match_nodes("BeliefState", {})) == ["a", "c", "d"]
+    be.close()
+
+
+def test_unit_of_work_exited_out_of_order_leaves_no_unit_open() -> None:
+    """A unit that exits before one nested in it isn't put back when the nested one exits."""
+    be = _memory()
+    be.upsert_node("BeliefState", "a", {})
+    outer, inner = be.unit_of_work(), be.unit_of_work()
+    outer.__enter__()
+    with pytest.raises(RuntimeError, match="duplicated primary key"):
+        be._exec("CREATE (n:dx_BeliefState {state_id:'a'})")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    inner.__enter__()
+    with contextlib.suppress(RuntimeError):
+        outer.__exit__(None, None, None)
+    with contextlib.suppress(RuntimeError):
+        inner.__exit__(None, None, None)
+    assert be._conn not in ladybug_backend._UNITS  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
     be.close()
 
 

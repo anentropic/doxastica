@@ -123,6 +123,10 @@ class _Unit:
     """Writes since then, which ran outside any transaction if it ended there."""
     writes: int = 0
     """Writes since BEGIN."""
+    outer: _Unit | None = None
+    """The unit this one opened inside, if any."""
+    done: bool = False
+    """Whether this unit has exited, perhaps before a unit opened inside it."""
 
 
 _UNITS: weakref.WeakKeyDictionary[lb.Connection, _Unit] = weakref.WeakKeyDictionary()
@@ -533,7 +537,9 @@ class LadybugBackend:
 
         Issues ``BEGIN TRANSACTION`` on entry; on any exception inside the block it issues
         ``ROLLBACK`` (re-raising), otherwise ``COMMIT`` (serializable WAL — verified: ROLLBACK
-        discards the write). Matches the in-memory adapter's logical snapshot/restore semantics.
+        discards the write). Matches the in-memory adapter's logical snapshot/restore semantics,
+        except where a block catches a failed statement and goes on: Ladybug may have ended
+        the transaction at it, and then what follows isn't atomic, as below.
 
         The block's exception is always the one raised. A failed statement (other than one
         that doesn't parse or can't bind a parameter) may end Ladybug's transaction there and
@@ -556,7 +562,7 @@ class LadybugBackend:
         """
         self._exec("BEGIN TRANSACTION", writes=False)
         outer = _UNITS.get(self._conn)
-        unit = _UNITS[self._conn] = _Unit()
+        unit = _UNITS[self._conn] = _Unit(outer=outer)
         kept = 0  # the writes this unit leaves in place, for the unit it is nested in
         try:
             yield
@@ -588,7 +594,7 @@ class LadybugBackend:
                     )
                 raise
         finally:
-            _restore(self._conn, outer, kept)
+            _restore(self._conn, unit, kept)
 
     def _read_var_length_cap(self) -> int:
         """
@@ -658,8 +664,20 @@ class LadybugBackend:
         return result
 
 
-def _restore(conn: lb.Connection, outer: _Unit | None, kept: int) -> None:
-    """Put back the unit a nested one replaced, counting the ``kept`` writes it left in place."""
+def _restore(conn: lb.Connection, unit: _Unit, kept: int) -> None:
+    """
+    Put back the open unit ``unit`` was nested in, counting the ``kept`` writes it left.
+
+    Units exit in the order they opened unless something interleaves them (an ``ExitStack``,
+    say). One that exits before a unit nested in it leaves that unit current, and is passed
+    over when it exits.
+    """
+    unit.done = True
+    if _UNITS.get(conn) is not unit:
+        return
+    outer = unit.outer
+    while outer is not None and outer.done:
+        outer = outer.outer
     if outer is None:
         _UNITS.pop(conn, None)
         return
