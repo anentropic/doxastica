@@ -680,12 +680,42 @@ def test_open_closes_the_database_when_the_connection_fails() -> None:
     assert db.is_closed  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
 
 
+def test_open_closes_the_database_when_the_backend_and_the_connection_close_fail() -> None:
+    """A bad namespace, then a connection that won't close: the database still closes."""
+    opened: list[object] = []
+    real_database, real_connection = lb.Database, lb.Connection
+
+    def tracked(*args: object, **kwargs: object) -> object:
+        db = real_database(*args, **kwargs)
+        opened.append(db)
+        return db
+
+    class Sticky:
+        def __init__(self, db: object) -> None:
+            self.real = real_connection(db)  # pyright: ignore[reportArgumentType]
+
+        def close(self) -> None:
+            self.real.close()
+            raise RuntimeError("stuck")
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(lb, "Database", tracked)
+        patch.setattr(lb, "Connection", Sticky)
+        with pytest.raises(RuntimeError, match="stuck") as raised:
+            LadybugBackend.open(":memory:", namespace="bad-ns")
+    assert isinstance(raised.value.__context__, ValueError)
+    [db] = opened
+    assert db.is_closed  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+
+
 def test_close_closes_the_database_when_the_connection_wont_close() -> None:
     """A connection that fails to close still leaves the database closed."""
     be = LadybugBackend.open(":memory:")
+    real = be._conn  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
     class Stuck:
         def close(self) -> None:
+            real.close()  # closed for real, before its database, then reported stuck
             raise RuntimeError("stuck")
 
     be._conn = Stuck()  # pyright: ignore[reportAttributeAccessIssue, reportPrivateUsage]  # noqa: SLF001
