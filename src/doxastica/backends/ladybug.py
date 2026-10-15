@@ -178,9 +178,9 @@ class LadybugBackend:
         self._ns = namespace
         self._owns_conn = owns_conn
         # Within a ``unit_of_work``: the first failed statement that ended its transaction, and
-        # how many statements ran after it, outside any transaction.
+        # how many writes ran after it, outside any transaction.
         self._lost: BaseException | None = None
-        self._ran_after_lost = 0
+        self._wrote_after_lost = 0
         self._bootstrap_schema()
 
     @classmethod
@@ -368,7 +368,7 @@ class LadybugBackend:
         # `_ID` / `_LABEL` keys so the row is the plain prop map the oracle returns (D-04 parity).
         return [
             {k: v for k, v in row["n"].items() if not k.startswith("_")}
-            for row in self._rows(self._exec(cypher, params))
+            for row in self._rows(self._exec(cypher, params, writes=False))
         ]
 
     def traverse(
@@ -446,6 +446,7 @@ class LadybugBackend:
                         f"MATCH (a:{node} {{{_PK_BY_LABEL['BeliefState']}: $start}})"
                         f"{lhs}[:{rels}]{rhs}() RETURN a LIMIT 1",
                         {"start": str(start)},
+                        writes=False,
                     )
                 )
             )
@@ -484,13 +485,14 @@ class LadybugBackend:
         prior_cap = self._read_var_length_cap()
         lifted = bound > prior_cap
         if lifted:
-            self._exec(f"CALL var_length_extend_max_depth={bound}")  # lift the cap for this walk
+            # lift the cap for this walk
+            self._exec(f"CALL var_length_extend_max_depth={bound}", writes=False)
         try:
-            rows = self._rows(self._exec(cypher, {"start": str(start)}))
+            rows = self._rows(self._exec(cypher, {"start": str(start)}, writes=False))
         finally:
             if lifted:
                 # restore the tenant's ORIGINAL cap (not a literal) so the connection is unchanged
-                self._exec(f"CALL var_length_extend_max_depth={prior_cap}")
+                self._exec(f"CALL var_length_extend_max_depth={prior_cap}", writes=False)
         # WR-03 (DATA-04): `max_depth=None` is "full closure", compiled to the literal
         # `_DEPTH_CEILING` hop cap. That cap is a hard TRUNCATION limit, not a true infinity — a
         # graph deeper than it would otherwise be reported as a complete closure when it is not (the
@@ -521,18 +523,19 @@ class LadybugBackend:
 
         The block's exception is always the one raised. A statement Ladybug fails (other than
         for its syntax) ends the transaction there and then, so the ``ROLLBACK`` finds none.
-        That passes silently when no statement ran after the failure, since everything the
-        unit wrote was rolled back with it. When some did (the block caught the failure and
-        went on), they ran outside any transaction, so a note on the block's exception says
-        what they wrote is not undone. Any other ``ROLLBACK`` failure is a note too, never
-        raised in the block's exception's place.
+        That passes silently when nothing was written after the failure, since everything the
+        unit wrote was rolled back with it. When something was (the block caught the failure
+        and went on), it was written outside any transaction, so a note on the block's
+        exception says it is not undone. A block that catches the failure and finishes gets
+        Ladybug's ``COMMIT`` error, with the same note. Any other ``ROLLBACK`` failure is a
+        note too, never raised in the block's exception's place.
         """
         self._exec("BEGIN TRANSACTION")
-        self._lost, self._ran_after_lost = None, 0
+        self._lost, self._wrote_after_lost = None, 0
         try:
             yield
         except BaseException as error:
-            lost, ran = self._lost, self._ran_after_lost
+            lost, wrote = self._lost, self._wrote_after_lost
             try:
                 self._exec("ROLLBACK")
             except Exception as rollback:
@@ -544,15 +547,17 @@ class LadybugBackend:
                         "Ladybug had already ended this unit of work's transaction; writes "
                         "after that ran outside it and may not be undone"
                     )
-                elif ran:
-                    error.add_note(
-                        f"Ladybug ended this unit of work's transaction when a statement in it "
-                        f"failed ({lost}); the {ran} statement(s) after that ran outside it, "
-                        "so what they wrote is not undone"
-                    )
+                elif wrote:
+                    error.add_note(_lost_note(lost, wrote))
             raise
         else:
-            self._exec("COMMIT")
+            lost, wrote = self._lost, self._wrote_after_lost
+            try:
+                self._exec("COMMIT")
+            except Exception as commit:
+                if lost is not None:
+                    commit.add_note(_lost_note(lost, wrote))
+                raise
 
     def _read_var_length_cap(self) -> int:
         """
@@ -568,7 +573,7 @@ class LadybugBackend:
         still targets a sane value rather than raising mid-traverse.
         """
         rows = self._rows(
-            self._exec("CALL current_setting('var_length_extend_max_depth') RETURN *")
+            self._exec("CALL current_setting('var_length_extend_max_depth') RETURN *", writes=False)
         )
         if rows and "var_length_extend_max_depth" in rows[0]:
             return int(rows[0]["var_length_extend_max_depth"])
@@ -583,6 +588,8 @@ class LadybugBackend:
         self,
         cypher: str,
         parameters: dict[str, Any] | None = None,
+        *,
+        writes: bool = True,
     ) -> lb.QueryResult:
         """
         Execute a single Cypher statement and narrow the result to a single ``QueryResult``.
@@ -594,6 +601,9 @@ class LadybugBackend:
         A real ``raise`` (not ``assert``, WR-03) keeps the narrowing alive under ``python -O``;
         otherwise a stripped assert would let a ``list`` leak out and fail with a confusing
         ``AttributeError`` far from here.
+
+        ``writes=False`` marks a read or a connection setting, which ``unit_of_work`` doesn't
+        count among the writes made after its transaction was lost.
         """
         try:
             result = self._conn.execute(cypher, parameters=parameters or {})
@@ -601,10 +611,23 @@ class LadybugBackend:
             if self._lost is None and not str(error).startswith(_SYNTAX_ERROR):
                 self._lost = error
             raise
-        if self._lost is not None:
-            self._ran_after_lost += 1
+        if writes and self._lost is not None:
+            self._wrote_after_lost += 1
         if not isinstance(result, lb.QueryResult):
             raise TypeError(
                 f"single-statement execute must return one QueryResult; got {type(result)!r}"
             )
         return result
+
+
+def _lost_note(lost: BaseException, wrote: int) -> str:
+    """Say that a unit of work's transaction ended at ``lost``, and what was written after it."""
+    after = (
+        f"the {wrote} write(s) after that ran outside it and are not undone"
+        if wrote
+        else "nothing was written after that"
+    )
+    return (
+        f"Ladybug ended this unit of work's transaction when a statement in it failed "
+        f"({lost}); {after}"
+    )

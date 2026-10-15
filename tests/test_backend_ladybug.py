@@ -317,6 +317,37 @@ def test_unit_of_work_reports_a_wrapped_failure_silently(cause: str) -> None:
     be.close()
 
 
+def test_unit_of_work_counts_no_reads_after_a_failure_it_caught() -> None:
+    """Reads after the failure, a deep walk's cap lift and restore among them, write nothing."""
+    be = LadybugBackend.open(":memory:", namespace="dx")
+    be.upsert_node("BeliefState", "a", {})
+    with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="Divide by zero"):
+            be._exec("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        be.match_nodes("BeliefState", {})
+        be.traverse("a", frozenset({"DEPENDS_ON"}), None)  # lifts the cap past the default
+        raise RuntimeError("boom")
+    assert not getattr(raised.value, "__notes__", [])
+    be.close()
+
+
+def test_unit_of_work_that_finishes_after_a_caught_failure_says_why_commit_fails() -> None:
+    """Ladybug's COMMIT error carries the failure that ended the unit and what came after."""
+    be = LadybugBackend.open(":memory:", namespace="dx")
+    be.upsert_node("BeliefState", "a", {})
+    with (
+        pytest.raises(RuntimeError, match="No active transaction for COMMIT") as raised,
+        be.unit_of_work(),
+    ):
+        with pytest.raises(RuntimeError, match="duplicated primary key"):
+            be._exec("CREATE (n:dx_BeliefState {state_id:'a'})")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        be.upsert_node("BeliefState", "c", {})
+    assert any(
+        "duplicated primary key" in note and "1 write(s)" in note for note in raised.value.__notes__
+    )
+    be.close()
+
+
 def test_unit_of_work_keeps_a_transaction_a_syntax_error_left_open() -> None:
     """A statement that doesn't parse leaves the transaction open: what follows rolls back."""
     be = LadybugBackend.open(":memory:", namespace="dx")
