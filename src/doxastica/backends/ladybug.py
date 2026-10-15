@@ -218,15 +218,15 @@ class LadybugBackend:
         ``""`` path yields a fresh in-memory DB.
         """
         db_path = None if path in (":memory:", "") else path
-        db = lb.Database(db_path) if db_path is not None else lb.Database()
-        conn = lb.Connection(db)
-        try:
+        with contextlib.ExitStack() as opened:
+            # Until the backend exists there is nothing to close() them (a bad namespace, a
+            # bootstrap that failed), so a failure closes what was opened, every part of it.
+            db = lb.Database(db_path) if db_path is not None else lb.Database()
+            opened.callback(db.close)
+            conn = lb.Connection(db)
+            opened.callback(conn.close)
             backend = cls(conn, namespace=namespace, owns_conn=True)
-        except BaseException:
-            # No backend to close() them: a bad namespace, or a bootstrap that failed.
-            conn.close()
-            db.close()
-            raise
+            opened.pop_all()
         backend._db = db
         return backend
 
@@ -253,9 +253,11 @@ class LadybugBackend:
         collector reached it.
         """
         if self._owns_conn:
-            self._conn.close()  # idempotent — double-close is a no-op (verified live)
-            if self._db is not None:
-                self._db.close()  # idempotent too
+            try:
+                self._conn.close()  # idempotent — double-close is a no-op (verified live)
+            finally:
+                if self._db is not None:
+                    self._db.close()  # idempotent too
 
     def _bootstrap_schema(self) -> None:
         """
@@ -585,6 +587,8 @@ class LadybugBackend:
         own notes would count. Ladybug has one transaction per connection, so while a unit
         opened inside this one is still open, the transaction is that unit's: this one exits
         without a ``COMMIT`` or ``ROLLBACK``, as though it had found its transaction gone.
+        So a unit entered by hand (``__enter__`` rather than ``with``) must be exited: until
+        it is, the transaction stays open, and Ladybug lets no other connection write.
 
         Statements and writes are seen through every backend on the connection. One that
         failed on the bare connection isn't, so when the transaction is found gone with no
