@@ -452,6 +452,49 @@ def test_unit_of_work_keeps_a_transaction_a_parameter_it_cant_bind_left_open() -
     be.close()
 
 
+def test_unit_of_work_counts_what_a_unit_inside_it_wrote() -> None:
+    """A unit opened once the outer transaction is gone commits on its own: it is counted."""
+    be = _memory()
+    be.upsert_node("BeliefState", "a", {})
+    with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="duplicated primary key"):
+            be._exec("CREATE (n:dx_BeliefState {state_id:'a'})")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        with be.unit_of_work():
+            be.upsert_node("BeliefState", "c", {})
+        be.upsert_node("BeliefState", "d", {})
+        raise RuntimeError("boom")
+    assert any("2 write(s)" in note for note in raised.value.__notes__)
+    assert _ids(be.match_nodes("BeliefState", {})) == ["a", "c", "d"]
+    be.close()
+
+
+def test_unit_of_work_counts_nothing_a_unit_inside_it_rolled_back() -> None:
+    """Neither the inner unit's BEGIN nor its rolled-back write is a write of the outer one."""
+    be = _memory()
+    be.upsert_node("BeliefState", "a", {})
+    with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="duplicated primary key"):
+            be._exec("CREATE (n:dx_BeliefState {state_id:'a'})")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        with pytest.raises(LookupError), be.unit_of_work():
+            be.upsert_node("BeliefState", "c", {})
+            raise LookupError("inner")
+        raise RuntimeError("boom")
+    assert not getattr(raised.value, "__notes__", [])
+    assert _ids(be.match_nodes("BeliefState", {})) == ["a"]
+    be.close()
+
+
+def test_unit_of_work_notes_a_commit_failure_only_when_the_transaction_is_gone() -> None:
+    """A COMMIT that fails for its own reason isn't blamed on an earlier failure."""
+    be = _memory()
+    with pytest.raises(RuntimeError) as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="Divide by zero"):
+            be._exec("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        be._conn.close()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    assert "No active transaction" not in str(raised.value)
+    assert not getattr(raised.value, "__notes__", [])
+
+
 def test_unit_of_work_keeps_a_transaction_a_syntax_error_left_open() -> None:
     """A statement that doesn't parse leaves the transaction open: what follows rolls back."""
     be = _memory()
