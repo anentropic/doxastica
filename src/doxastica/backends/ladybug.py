@@ -52,6 +52,8 @@ from __future__ import annotations
 
 import contextlib
 import re
+import weakref
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 from doxastica import errors
@@ -100,6 +102,39 @@ _DEPTH_CEILING = 10_000
 # walk never mutates the connection's global config and even a deep walk leaves an INJECTED tenant
 # connection (R19) with the EXACT ceiling it started with, default or not (WR-05).
 _DEFAULT_HOP_CAP = 30
+
+# What Ladybug says to a ROLLBACK or COMMIT when a statement that failed at run time has already
+# rolled the transaction back (verified on 0.17.1). ``unit_of_work`` reports the failure behind it.
+_NO_TRANSACTION = "No active transaction for "
+
+# Failures that leave their transaction open (verified on 0.17.1): a statement that doesn't parse,
+# a parameter of a type Ladybug can't bind, and one the Python binding can't convert (an int past
+# int64). Most others end it (binder and runtime errors, a nested BEGIN), and nothing tells which,
+# so ``unit_of_work`` treats any other as one that may.
+_KEEPS_TRANSACTION = (
+    "Parser exception",
+    "Runtime exception: Unknown parameter type",
+    "Unable to cast Python instance",
+)
+
+
+@dataclass
+class _Unit:
+    """One connection's open ``unit_of_work``, as seen by every backend sharing it (R19)."""
+
+    failed: BaseException | None = None
+    """The first failed statement since BEGIN that may have ended the transaction."""
+    writes_after: int = 0
+    """Writes since then, which ran outside any transaction if it ended there."""
+    writes: int = 0
+    """Writes since BEGIN."""
+    outer: _Unit | None = None
+    """The unit this one opened inside, if any."""
+    done: bool = False
+    """Whether this unit has exited, perhaps before a unit opened inside it."""
+
+
+_UNITS: weakref.WeakKeyDictionary[lb.Connection, _Unit] = weakref.WeakKeyDictionary()
 
 # Label -> PRIMARY KEY column. The SINGLE source of truth for each node table's PK: the
 # bootstrap DDL (``_bootstrap_schema``) and the ``upsert_node`` MERGE key both read from here,
@@ -217,34 +252,40 @@ class LadybugBackend:
         D-07); no ``CURRENT_STATE`` table is created — current is DERIVED, not a stored edge (D-01).
         """
         ns = self._ns
+        # Schema, not data: none of it counts among a unit of work's writes.
         # PK columns are read from `_PK_BY_LABEL` so the DDL and `upsert_node`'s MERGE key
         # cannot diverge (CR-01: one source of truth for each table's primary key).
         self._exec(
             f"CREATE NODE TABLE IF NOT EXISTS {ns}_Scope"
             f"({_PK_BY_LABEL['Scope']} STRING, is_world BOOLEAN, "
-            f"PRIMARY KEY({_PK_BY_LABEL['Scope']}))"
+            f"PRIMARY KEY({_PK_BY_LABEL['Scope']}))",
+            writes=False,
         )
         self._exec(
             f"CREATE NODE TABLE IF NOT EXISTS {ns}_Belief"
-            f"({_PK_BY_LABEL['Belief']} STRING, PRIMARY KEY({_PK_BY_LABEL['Belief']}))"
+            f"({_PK_BY_LABEL['Belief']} STRING, PRIMARY KEY({_PK_BY_LABEL['Belief']}))",
+            writes=False,
         )
         self._exec(
             f"CREATE NODE TABLE IF NOT EXISTS {ns}_BeliefState"
             f"({_PK_BY_LABEL['BeliefState']} STRING, belief_id STRING, scope_id STRING, "
             f"source_event_id STRING, value STRING, status STRING, stance STRING, "
-            f"PRIMARY KEY({_PK_BY_LABEL['BeliefState']}))"
+            f"PRIMARY KEY({_PK_BY_LABEL['BeliefState']}))",
+            writes=False,
         )
         for edge_type in ("SUPERSEDES", "DEPENDS_ON", "DERIVED_FROM"):
             self._exec(
                 f"CREATE REL TABLE IF NOT EXISTS {ns}_{edge_type}"
-                f"(FROM {ns}_BeliefState TO {ns}_BeliefState)"
+                f"(FROM {ns}_BeliefState TO {ns}_BeliefState)",
+                writes=False,
             )
         # The hub-form HAS_REVISION structural edge (D-07): FROM is a Belief (keyed belief_id),
         # NOT a BeliefState — so it is its own statement, not part of the BeliefState->BeliefState
         # loop above. No CURRENT_STATE table (D-01: current is derived, not a stored edge).
         self._exec(
             f"CREATE REL TABLE IF NOT EXISTS {ns}_HAS_REVISION"
-            f"(FROM {ns}_Belief TO {ns}_BeliefState)"
+            f"(FROM {ns}_Belief TO {ns}_BeliefState)",
+            writes=False,
         )
 
     def upsert_node(
@@ -356,7 +397,7 @@ class LadybugBackend:
         # `_ID` / `_LABEL` keys so the row is the plain prop map the oracle returns (D-04 parity).
         return [
             {k: v for k, v in row["n"].items() if not k.startswith("_")}
-            for row in self._rows(self._exec(cypher, params))
+            for row in self._rows(self._exec(cypher, params, writes=False))
         ]
 
     def traverse(
@@ -434,6 +475,7 @@ class LadybugBackend:
                         f"MATCH (a:{node} {{{_PK_BY_LABEL['BeliefState']}: $start}})"
                         f"{lhs}[:{rels}]{rhs}() RETURN a LIMIT 1",
                         {"start": str(start)},
+                        writes=False,
                     )
                 )
             )
@@ -472,13 +514,14 @@ class LadybugBackend:
         prior_cap = self._read_var_length_cap()
         lifted = bound > prior_cap
         if lifted:
-            self._exec(f"CALL var_length_extend_max_depth={bound}")  # lift the cap for this walk
+            # lift the cap for this walk
+            self._exec(f"CALL var_length_extend_max_depth={bound}", writes=False)
         try:
-            rows = self._rows(self._exec(cypher, {"start": str(start)}))
+            rows = self._rows(self._exec(cypher, {"start": str(start)}, writes=False))
         finally:
             if lifted:
                 # restore the tenant's ORIGINAL cap (not a literal) so the connection is unchanged
-                self._exec(f"CALL var_length_extend_max_depth={prior_cap}")
+                self._exec(f"CALL var_length_extend_max_depth={prior_cap}", writes=False)
         # WR-03 (DATA-04): `max_depth=None` is "full closure", compiled to the literal
         # `_DEPTH_CEILING` hop cap. That cap is a hard TRUNCATION limit, not a true infinity — a
         # graph deeper than it would otherwise be reported as a complete closure when it is not (the
@@ -505,16 +548,69 @@ class LadybugBackend:
 
         Issues ``BEGIN TRANSACTION`` on entry; on any exception inside the block it issues
         ``ROLLBACK`` (re-raising), otherwise ``COMMIT`` (serializable WAL — verified: ROLLBACK
-        discards the write). Matches the in-memory adapter's logical snapshot/restore semantics.
+        discards the write). Matches the in-memory adapter's logical snapshot/restore semantics,
+        except where a block catches a failed statement and goes on: Ladybug may have ended
+        the transaction at it, and then what follows isn't atomic, as below.
+
+        The block's exception is always the one raised. A failed statement (other than one
+        that doesn't parse or can't bind a parameter) may end Ladybug's transaction there and
+        then, and the ``ROLLBACK`` then finds none. That passes silently when nothing was
+        written after the first such failure, since everything the unit wrote was rolled back
+        with it. When something was (the block caught the failure and went on), it may have
+        been written outside any transaction, so a note on the block's exception says it may
+        not be undone. A block that catches the failure and finishes gets Ladybug's
+        ``COMMIT`` error, with a note naming the failure. Any other ``ROLLBACK`` failure is a
+        note too, never raised in the block's exception's place.
+
+        A unit opened inside another (which Ladybug allows only once the outer one's
+        transaction has ended) counts as the outer one's writes, as far as it may have kept
+        them: all of them if it committed, none if it rolled back, and otherwise those its
+        own notes would count.
+
+        Statements and writes are seen through every backend on the connection. One that
+        failed on the bare connection isn't, so when the transaction is found gone with no
+        failure seen, the note can only say that any write the unit made may have come after.
         """
-        self._exec("BEGIN TRANSACTION")
+        self._exec("BEGIN TRANSACTION", writes=False)
+        outer = _UNITS.get(self._conn)
+        unit = _UNITS[self._conn] = _Unit(outer=outer)
+        kept = 0  # the writes this unit leaves in place, for the unit it is nested in
         try:
             yield
-        except BaseException:
-            self._exec("ROLLBACK")
+        except BaseException as error:
+            failed, writes = unit.failed, unit.writes_after
+            kept = unit.writes if failed is None else writes
+            try:
+                self._exec("ROLLBACK", writes=False)
+                kept = 0
+            except Exception as rollback:
+                if _NO_TRANSACTION not in str(rollback):
+                    # Not known to have ended: only what came after a failure may be in place.
+                    kept = 0 if failed is None else writes
+                    error.add_note(f"The ROLLBACK after it failed too: {rollback}")
+                elif failed is not None:
+                    if writes:
+                        error.add_note(_lost_note(failed, writes))
+                elif unit.writes:
+                    error.add_note(_unseen_note(unit.writes))
             raise
         else:
-            self._exec("COMMIT")
+            failed, writes = unit.failed, unit.writes_after
+            kept = unit.writes if failed is None else writes
+            try:
+                self._exec("COMMIT", writes=False)
+                kept = unit.writes  # the transaction was open after all
+            except Exception as commit:
+                if _NO_TRANSACTION in str(commit):
+                    commit.add_note(
+                        _unseen_note(unit.writes) if failed is None else _lost_note(failed, writes)
+                    )
+                else:
+                    # The transaction was still there, so nothing ran outside it.
+                    kept = 0
+                raise
+        finally:
+            _restore(self._conn, unit, kept)
 
     def _read_var_length_cap(self) -> int:
         """
@@ -530,7 +626,7 @@ class LadybugBackend:
         still targets a sane value rather than raising mid-traverse.
         """
         rows = self._rows(
-            self._exec("CALL current_setting('var_length_extend_max_depth') RETURN *")
+            self._exec("CALL current_setting('var_length_extend_max_depth') RETURN *", writes=False)
         )
         if rows and "var_length_extend_max_depth" in rows[0]:
             return int(rows[0]["var_length_extend_max_depth"])
@@ -545,6 +641,8 @@ class LadybugBackend:
         self,
         cypher: str,
         parameters: dict[str, Any] | None = None,
+        *,
+        writes: bool = True,
     ) -> lb.QueryResult:
         """
         Execute a single Cypher statement and narrow the result to a single ``QueryResult``.
@@ -556,10 +654,77 @@ class LadybugBackend:
         A real ``raise`` (not ``assert``, WR-03) keeps the narrowing alive under ``python -O``;
         otherwise a stripped assert would let a ``list`` leak out and fail with a confusing
         ``AttributeError`` far from here.
+
+        ``writes=False`` marks a read or a connection setting, which ``unit_of_work`` doesn't
+        count among the writes made after its transaction was lost.
         """
-        result = self._conn.execute(cypher, parameters=parameters or {})
+        unit = _UNITS.get(self._conn)
+        try:
+            result = self._conn.execute(cypher, parameters=parameters or {})
+        except Exception as error:
+            if (
+                unit is not None
+                and unit.failed is None
+                and not any(keeps in str(error) for keeps in _KEEPS_TRANSACTION)
+            ):
+                unit.failed = error
+            raise
+        if writes and unit is not None:
+            unit.writes += 1
+            if unit.failed is not None:
+                unit.writes_after += 1
         if not isinstance(result, lb.QueryResult):
             raise TypeError(
                 f"single-statement execute must return one QueryResult; got {type(result)!r}"
             )
         return result
+
+
+def _restore(conn: lb.Connection, unit: _Unit, kept: int) -> None:
+    """
+    Put back the open unit ``unit`` was nested in, counting the ``kept`` writes it left.
+
+    Units exit in the order they opened unless something interleaves them (an ``ExitStack``,
+    say). One that exits before a unit nested in it still counts its writes in its own outer
+    unit, leaves the nested unit current, and is passed over when that one exits.
+    """
+    unit.done = True
+    outer = unit.outer
+    while outer is not None and outer.done:
+        outer = outer.outer
+    if outer is not None:
+        outer.writes += kept
+        if outer.failed is not None:
+            outer.writes_after += kept
+    if _UNITS.get(conn) is not unit:
+        return
+    if outer is None:
+        _UNITS.pop(conn, None)
+    else:
+        _UNITS[conn] = outer
+
+
+def _lost_note(failed: BaseException, writes: int) -> str:
+    """Say where a unit of work's transaction may have ended, and what was written after."""
+    after = (
+        f"the {writes} write(s) after it may have run outside it and are then not undone"
+        if writes
+        else "nothing was written after it"
+    )
+    return (
+        f"A statement in this unit of work failed ({failed}), and Ladybug may have ended its "
+        f"transaction there; {after}"
+    )
+
+
+def _unseen_note(writes: int) -> str:
+    """Say a unit of work's transaction ended at a failure no backend saw, and what may be lost."""
+    after = (
+        f"any of its {writes} write(s) made after that ran outside it and may not be undone"
+        if writes
+        else "it wrote nothing"
+    )
+    return (
+        "Ladybug had already ended this unit of work's transaction, at a statement that failed "
+        f"outside any backend (on the bare connection, say); {after}"
+    )

@@ -63,7 +63,9 @@ A backend MUST implement exactly these five primitives, with these semantics:
   write-transaction context manager. The core groups a multi-write operation (e.g. a
   `revise`: append a new `BeliefState`, lay its `HAS_REVISION` hub edge, and lay the
   `SUPERSEDES` edge to the prior state) inside one `unit_of_work`; either all writes commit
-  or none do. There is **no** stored `CURRENT_STATE` pointer for the backend to re-point:
+  or none do. (On LadybugDB that holds unless the block catches a failed statement and goes
+  on: Ladybug may have ended the transaction at it. The error the unit then raises carries
+  a note saying which writes may not be undone.) There is **no** stored `CURRENT_STATE` pointer for the backend to re-point:
   current state is *derived* by the core from the append-only states, so the backend only
   ever appends.
 
