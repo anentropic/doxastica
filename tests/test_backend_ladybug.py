@@ -564,6 +564,74 @@ def test_unit_of_work_exited_out_of_order_leaves_no_unit_open() -> None:
     be.close()
 
 
+def test_unit_of_work_counts_what_a_unit_exited_out_of_order_kept() -> None:
+    """A unit that exits before one nested in it still counts its writes in its outer unit."""
+    be = _memory()
+    be.upsert_node("BeliefState", "a", {})
+    duplicate = "CREATE (n:dx_BeliefState {state_id:'a'})"
+    with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="duplicated primary key"):
+            be._exec(duplicate)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        middle, inner = be.unit_of_work(), be.unit_of_work()
+        middle.__enter__()
+        with pytest.raises(RuntimeError, match="duplicated primary key"):
+            be._exec(duplicate)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        be.upsert_node("BeliefState", "c", {})
+        inner.__enter__()
+        with contextlib.suppress(RuntimeError):
+            middle.__exit__(None, None, None)
+        with contextlib.suppress(RuntimeError):
+            inner.__exit__(None, None, None)
+        raise RuntimeError("boom")
+    assert any("write(s)" in note for note in raised.value.__notes__)
+    be.close()
+
+
+def test_unit_of_work_counts_no_schema_as_writes() -> None:
+    """A tenant set up on the connection mid-unit creates tables, not data: nothing is noted."""
+    db = lb.Database(max_db_size=_MAPPING)
+    conn = lb.Connection(db)
+    be = LadybugBackend(conn, namespace="a", owns_conn=False)
+    with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="Divide by zero"):
+            be._exec("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        LadybugBackend(conn, namespace="b", owns_conn=False)
+        raise RuntimeError("boom")
+    assert not getattr(raised.value, "__notes__", [])
+
+
+def test_unit_of_work_keeps_a_transaction_a_parameter_it_cant_convert_left_open() -> None:
+    """An int past int64 fails in the binding, before Ladybug: what follows rolls back."""
+    be = _memory()
+    with pytest.raises(RuntimeError, match="Divide by zero") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="Unable to cast Python instance"):
+            be._exec(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+                "CREATE (n:dx_BeliefState {state_id:$x})", {"x": 2**70}
+            )
+        be.upsert_node("BeliefState", "c", {})
+        be._exec("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    assert not getattr(raised.value, "__notes__", [])
+    assert _ids(be.match_nodes("BeliefState", {})) == []
+    be.close()
+
+
+def test_unit_of_work_counts_nothing_kept_by_a_unit_inside_it_whose_commit_failed() -> None:
+    """A COMMIT that fails for its own reason found its transaction: nothing ran outside it."""
+    be = _memory()
+    be.upsert_node("BeliefState", "a", {})
+    outer = be.unit_of_work()
+    outer.__enter__()
+    with pytest.raises(RuntimeError, match="duplicated primary key"):
+        be._exec("CREATE (n:dx_BeliefState {state_id:'a'})")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    unit = ladybug_backend._UNITS[be._conn]  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(RuntimeError), be.unit_of_work():
+        be.upsert_node("BeliefState", "c", {})
+        be._conn.close()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    assert unit.writes_after == 0
+    with contextlib.suppress(RuntimeError):
+        outer.__exit__(None, None, None)
+
+
 def test_unit_of_work_notes_a_commit_failure_only_when_the_transaction_is_gone() -> None:
     """A COMMIT that fails for its own reason isn't blamed on an earlier failure."""
     be = _memory()

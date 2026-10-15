@@ -108,9 +108,14 @@ _DEFAULT_HOP_CAP = 30
 _NO_TRANSACTION = "No active transaction for "
 
 # Failures that leave their transaction open (verified on 0.17.1): a statement that doesn't parse,
-# and a parameter of a type Ladybug can't bind. Most others end it (binder and runtime errors, a
-# nested BEGIN), and nothing tells which, so ``unit_of_work`` treats any other as one that may.
-_KEEPS_TRANSACTION = ("Parser exception", "Runtime exception: Unknown parameter type")
+# a parameter of a type Ladybug can't bind, and one the Python binding can't convert (an int past
+# int64). Most others end it (binder and runtime errors, a nested BEGIN), and nothing tells which,
+# so ``unit_of_work`` treats any other as one that may.
+_KEEPS_TRANSACTION = (
+    "Parser exception",
+    "Runtime exception: Unknown parameter type",
+    "Unable to cast Python instance",
+)
 
 
 @dataclass
@@ -247,34 +252,40 @@ class LadybugBackend:
         D-07); no ``CURRENT_STATE`` table is created — current is DERIVED, not a stored edge (D-01).
         """
         ns = self._ns
+        # Schema, not data: none of it counts among a unit of work's writes.
         # PK columns are read from `_PK_BY_LABEL` so the DDL and `upsert_node`'s MERGE key
         # cannot diverge (CR-01: one source of truth for each table's primary key).
         self._exec(
             f"CREATE NODE TABLE IF NOT EXISTS {ns}_Scope"
             f"({_PK_BY_LABEL['Scope']} STRING, is_world BOOLEAN, "
-            f"PRIMARY KEY({_PK_BY_LABEL['Scope']}))"
+            f"PRIMARY KEY({_PK_BY_LABEL['Scope']}))",
+            writes=False,
         )
         self._exec(
             f"CREATE NODE TABLE IF NOT EXISTS {ns}_Belief"
-            f"({_PK_BY_LABEL['Belief']} STRING, PRIMARY KEY({_PK_BY_LABEL['Belief']}))"
+            f"({_PK_BY_LABEL['Belief']} STRING, PRIMARY KEY({_PK_BY_LABEL['Belief']}))",
+            writes=False,
         )
         self._exec(
             f"CREATE NODE TABLE IF NOT EXISTS {ns}_BeliefState"
             f"({_PK_BY_LABEL['BeliefState']} STRING, belief_id STRING, scope_id STRING, "
             f"source_event_id STRING, value STRING, status STRING, stance STRING, "
-            f"PRIMARY KEY({_PK_BY_LABEL['BeliefState']}))"
+            f"PRIMARY KEY({_PK_BY_LABEL['BeliefState']}))",
+            writes=False,
         )
         for edge_type in ("SUPERSEDES", "DEPENDS_ON", "DERIVED_FROM"):
             self._exec(
                 f"CREATE REL TABLE IF NOT EXISTS {ns}_{edge_type}"
-                f"(FROM {ns}_BeliefState TO {ns}_BeliefState)"
+                f"(FROM {ns}_BeliefState TO {ns}_BeliefState)",
+                writes=False,
             )
         # The hub-form HAS_REVISION structural edge (D-07): FROM is a Belief (keyed belief_id),
         # NOT a BeliefState — so it is its own statement, not part of the BeliefState->BeliefState
         # loop above. No CURRENT_STATE table (D-01: current is derived, not a stored edge).
         self._exec(
             f"CREATE REL TABLE IF NOT EXISTS {ns}_HAS_REVISION"
-            f"(FROM {ns}_Belief TO {ns}_BeliefState)"
+            f"(FROM {ns}_Belief TO {ns}_BeliefState)",
+            writes=False,
         )
 
     def upsert_node(
@@ -574,6 +585,8 @@ class LadybugBackend:
                 kept = 0
             except Exception as rollback:
                 if _NO_TRANSACTION not in str(rollback):
+                    # Not known to have ended: only what came after a failure may be in place.
+                    kept = 0 if failed is None else writes
                     error.add_note(f"The ROLLBACK after it failed too: {rollback}")
                 elif failed is not None:
                     if writes:
@@ -592,6 +605,9 @@ class LadybugBackend:
                     commit.add_note(
                         _unseen_note(unit.writes) if failed is None else _lost_note(failed, writes)
                     )
+                else:
+                    # The transaction was still there, so nothing ran outside it.
+                    kept = 0
                 raise
         finally:
             _restore(self._conn, unit, kept)
@@ -649,7 +665,7 @@ class LadybugBackend:
             if (
                 unit is not None
                 and unit.failed is None
-                and not str(error).startswith(_KEEPS_TRANSACTION)
+                and not any(keeps in str(error) for keeps in _KEEPS_TRANSACTION)
             ):
                 unit.failed = error
             raise
@@ -669,22 +685,23 @@ def _restore(conn: lb.Connection, unit: _Unit, kept: int) -> None:
     Put back the open unit ``unit`` was nested in, counting the ``kept`` writes it left.
 
     Units exit in the order they opened unless something interleaves them (an ``ExitStack``,
-    say). One that exits before a unit nested in it leaves that unit current, and is passed
-    over when it exits.
+    say). One that exits before a unit nested in it still counts its writes in its own outer
+    unit, leaves the nested unit current, and is passed over when that one exits.
     """
     unit.done = True
-    if _UNITS.get(conn) is not unit:
-        return
     outer = unit.outer
     while outer is not None and outer.done:
         outer = outer.outer
+    if outer is not None:
+        outer.writes += kept
+        if outer.failed is not None:
+            outer.writes_after += kept
+    if _UNITS.get(conn) is not unit:
+        return
     if outer is None:
         _UNITS.pop(conn, None)
-        return
-    _UNITS[conn] = outer
-    outer.writes += kept
-    if outer.failed is not None:
-        outer.writes_after += kept
+    else:
+        _UNITS[conn] = outer
 
 
 def _lost_note(failed: BaseException, writes: int) -> str:
