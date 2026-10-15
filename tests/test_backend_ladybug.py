@@ -19,7 +19,8 @@ import pytest
 
 lb = pytest.importorskip("ladybug")
 
-from doxastica.backends.ladybug import LadybugBackend  # noqa: E402  (after importorskip gate)
+from doxastica.backends import ladybug as ladybug_backend  # noqa: E402  (after importorskip gate)
+from doxastica.backends.ladybug import LadybugBackend  # noqa: E402
 
 # Ladybug maps 8 TiB per database by default, and a test's caught exceptions can keep its
 # database alive until the garbage collector runs: a few dozen of those exhaust a 47-bit address
@@ -500,6 +501,47 @@ def test_unit_of_work_counts_only_what_a_failed_unit_inside_it_kept() -> None:
         raise RuntimeError("boom")
     assert any("the 1 write(s)" in note for note in raised.value.__notes__)
     assert _ids(be.match_nodes("BeliefState", {})) == ["a", "d"]
+    be.close()
+
+
+def test_unit_of_work_counts_a_unit_inside_it_that_failed_unseen() -> None:
+    """A nested unit whose transaction a bare-connection failure ended may have kept it all."""
+    be = _memory()
+    be.upsert_node("BeliefState", "a", {})
+    with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="duplicated primary key"):
+            be._exec("CREATE (n:dx_BeliefState {state_id:'a'})")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        with pytest.raises(LookupError), be.unit_of_work():
+            be.upsert_node("BeliefState", "c", {})
+            with pytest.raises(RuntimeError, match="Divide by zero"):
+                be._conn.execute("RETURN 1/0")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            raise LookupError("inner")
+        raise RuntimeError("boom")
+    assert any("the 1 write(s)" in note for note in raised.value.__notes__)
+    be.close()
+
+
+def test_unit_of_work_counts_all_of_a_unit_inside_it_that_committed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A nested unit that commits after a failure kept everything: the failure didn't end it."""
+    # Stands in for a failure not yet known to leave the transaction open.
+    monkeypatch.setattr(ladybug_backend, "_KEEPS_TRANSACTION", ("Parser exception",))
+    be = _memory()
+    be.upsert_node("BeliefState", "a", {})
+    with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
+        with pytest.raises(RuntimeError, match="duplicated primary key"):
+            be._exec("CREATE (n:dx_BeliefState {state_id:'a'})")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        with be.unit_of_work():
+            be.upsert_node("BeliefState", "c", {})
+            with pytest.raises(RuntimeError, match="Unknown parameter type"):
+                be._exec(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+                    "CREATE (n:dx_BeliefState {state_id:$x})", {"x": object()}
+                )
+            be.upsert_node("BeliefState", "d", {})
+        raise RuntimeError("boom")
+    assert any("the 2 write(s)" in note for note in raised.value.__notes__)
+    assert _ids(be.match_nodes("BeliefState", {})) == ["a", "c", "d"]
     be.close()
 
 

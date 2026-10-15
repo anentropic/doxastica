@@ -546,7 +546,9 @@ class LadybugBackend:
         note too, never raised in the block's exception's place.
 
         A unit opened inside another (which Ladybug allows only once the outer one's
-        transaction has ended) counts as the outer one's writes, as far as it kept them.
+        transaction has ended) counts as the outer one's writes, as far as it may have kept
+        them: all of them if it committed, none if it rolled back, and otherwise those its
+        own notes would count.
 
         Statements and writes are seen through every backend on the connection. One that
         failed on the bare connection isn't, so when the transaction is found gone with no
@@ -555,14 +557,15 @@ class LadybugBackend:
         self._exec("BEGIN TRANSACTION", writes=False)
         outer = _UNITS.get(self._conn)
         unit = _UNITS[self._conn] = _Unit()
-        kept = True
+        kept = 0  # the writes this unit leaves in place, for the unit it is nested in
         try:
             yield
         except BaseException as error:
             failed, writes = unit.failed, unit.writes_after
+            kept = unit.writes if failed is None else writes
             try:
                 self._exec("ROLLBACK", writes=False)
-                kept = False
+                kept = 0
             except Exception as rollback:
                 if _NO_TRANSACTION not in str(rollback):
                     error.add_note(f"The ROLLBACK after it failed too: {rollback}")
@@ -574,8 +577,10 @@ class LadybugBackend:
             raise
         else:
             failed, writes = unit.failed, unit.writes_after
+            kept = unit.writes if failed is None else writes
             try:
                 self._exec("COMMIT", writes=False)
+                kept = unit.writes  # the transaction was open after all
             except Exception as commit:
                 if _NO_TRANSACTION in str(commit):
                     commit.add_note(
@@ -583,7 +588,7 @@ class LadybugBackend:
                     )
                 raise
         finally:
-            _restore(self._conn, outer, unit if kept else None)
+            _restore(self._conn, outer, kept)
 
     def _read_var_length_cap(self) -> int:
         """
@@ -653,18 +658,15 @@ class LadybugBackend:
         return result
 
 
-def _restore(conn: lb.Connection, outer: _Unit | None, inner: _Unit | None) -> None:
-    """Put back the unit a nested one replaced, counting what the nested one kept."""
+def _restore(conn: lb.Connection, outer: _Unit | None, kept: int) -> None:
+    """Put back the unit a nested one replaced, counting the ``kept`` writes it left in place."""
     if outer is None:
         _UNITS.pop(conn, None)
         return
     _UNITS[conn] = outer
-    if inner is not None:
-        # A failure in the nested unit may have rolled back what it wrote before it.
-        kept = inner.writes if inner.failed is None else inner.writes_after
-        outer.writes += kept
-        if outer.failed is not None:
-            outer.writes_after += kept
+    outer.writes += kept
+    if outer.failed is not None:
+        outer.writes_after += kept
 
 
 def _lost_note(failed: BaseException, writes: int) -> str:
