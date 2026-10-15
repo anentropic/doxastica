@@ -248,6 +248,38 @@ def test_unit_of_work_rollback() -> None:
     be.close()
 
 
+@pytest.mark.parametrize(
+    ("statement", "failure"),
+    [
+        ("CREATE (n:dx_BeliefState {state_id:'a'})", "duplicated primary key"),
+        ("RETURN 1/0", "Divide by zero"),
+    ],
+)
+def test_unit_of_work_reports_the_failure_not_the_rollback(statement: str, failure: str) -> None:
+    """A statement Ladybug fails at run time is the error raised, not the ROLLBACK after it."""
+    be = LadybugBackend.open(":memory:", namespace="dx")
+    be.upsert_node("BeliefState", "a", {})
+    with pytest.raises(RuntimeError, match=failure) as raised, be.unit_of_work():
+        be.upsert_node("BeliefState", "b", {})
+        be._exec(statement)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    # Ladybug already rolled it back: nothing to add, and nothing written.
+    assert not getattr(raised.value, "__notes__", [])
+    assert _ids(be.match_nodes("BeliefState", {})) == ["a"]
+    with be.unit_of_work():
+        be.upsert_node("BeliefState", "c", {})
+    assert _ids(be.match_nodes("BeliefState", {})) == ["a", "c"]
+    be.close()
+
+
+def test_unit_of_work_notes_a_rollback_that_fails() -> None:
+    """A ROLLBACK that fails for another reason is noted on the block's error, not raised."""
+    be = LadybugBackend.open(":memory:", namespace="dx")
+    with pytest.raises(RuntimeError, match="boom") as raised, be.unit_of_work():
+        be._conn.close()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        raise RuntimeError("boom")
+    assert any("ROLLBACK after it failed too" in note for note in raised.value.__notes__)
+
+
 def test_unit_of_work_persists_on_success() -> None:
     """A ``unit_of_work`` that completes normally commits its writes (BACK-02)."""
     be = LadybugBackend.open(":memory:", namespace="dx")

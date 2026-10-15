@@ -101,6 +101,11 @@ _DEPTH_CEILING = 10_000
 # connection (R19) with the EXACT ceiling it started with, default or not (WR-05).
 _DEFAULT_HOP_CAP = 30
 
+# What Ladybug says to a ROLLBACK when a statement that failed at run time has already rolled the
+# transaction back (verified on 0.17.1). ``unit_of_work`` lets it pass: the failure behind it is
+# the one to report.
+_NO_TRANSACTION = "No active transaction for ROLLBACK"
+
 # Label -> PRIMARY KEY column. The SINGLE source of truth for each node table's PK: the
 # bootstrap DDL (``_bootstrap_schema``) and the ``upsert_node`` MERGE key both read from here,
 # so a schema change cannot silently diverge from the upsert key (CR-01). The port keys upsert
@@ -506,12 +511,21 @@ class LadybugBackend:
         Issues ``BEGIN TRANSACTION`` on entry; on any exception inside the block it issues
         ``ROLLBACK`` (re-raising), otherwise ``COMMIT`` (serializable WAL — verified: ROLLBACK
         discards the write). Matches the in-memory adapter's logical snapshot/restore semantics.
+
+        The block's exception is always the one raised. A statement Ladybug fails at run time
+        (a duplicate key, a full buffer pool) has already rolled the transaction back, so the
+        ``ROLLBACK`` then finds none; that is expected and passes silently. Any other
+        ``ROLLBACK`` failure is added to the block's exception as a note, never in its place.
         """
         self._exec("BEGIN TRANSACTION")
         try:
             yield
-        except BaseException:
-            self._exec("ROLLBACK")
+        except BaseException as error:
+            try:
+                self._exec("ROLLBACK")
+            except Exception as rollback:
+                if _NO_TRANSACTION not in str(rollback):
+                    error.add_note(f"The ROLLBACK after it failed too: {rollback}")
             raise
         else:
             self._exec("COMMIT")
