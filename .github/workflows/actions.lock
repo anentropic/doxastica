@@ -25,7 +25,7 @@ workflows:
         - 'actions/upload-artifact@v7.0.2'
         - 'astral-sh/setup-uv@v7.6.0'
         - 'orhun/git-cliff-action@v4.9.1'
-        - 'pypa/gh-action-pypi-publish@release/v1'
+        - 'pypa/gh-action-pypi-publish@v1.14.3'
         - 'softprops/action-gh-release@v3.0.4'
     '.github/workflows/verify-lockfile.yml':
         - 'actions/checkout@v7.0.1'
@@ -91,8 +91,8 @@ dependencies:
         commit: 'sha1-a9a95522b26fe6403f7bb24031f21fb573d0f5ff'
         owner_id: 24392180
         repo_id: 377964066
-    'pypa/gh-action-pypi-publish@release/v1':
-        ref: 'release/v1'
+    'pypa/gh-action-pypi-publish@v1.14.3':
+        ref: 'v1.14.3'
         commit: 'sha1-7245906fb61fa33a13554f9d5fb856fe61758086'
         owner_id: 647025
         repo_id: 178055147
